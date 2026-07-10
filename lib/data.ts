@@ -159,6 +159,39 @@ export async function isAdmin(): Promise<boolean> {
   return p?.role === "admin";
 }
 
+export interface TeamMember {
+  userId: string;
+  name: string;
+  role: string;
+}
+
+export async function getTeam(): Promise<TeamMember[]> {
+  if (!isSupabaseConfigured)
+    return [{ userId: "demo", name: "Tú (demo)", role: "admin" }];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("userId:id, name:full_name, role");
+  return (data ?? []) as unknown as TeamMember[];
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export async function getInvitations(): Promise<Invitation[]> {
+  if (!isSupabaseConfigured) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("invitations")
+    .select("id, email, role")
+    .eq("status", "pendiente")
+    .order("created_at", { ascending: false });
+  return (data ?? []) as unknown as Invitation[];
+}
+
 export interface DashboardSummary {
   balance: number;
   deltaPct: number;

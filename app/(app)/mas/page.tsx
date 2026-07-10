@@ -8,6 +8,7 @@ import {
   PayrollIcon,
   ReceiptIcon,
   RepeatIcon,
+  UserPlusIcon,
   ChevronRightIcon,
   SunIcon,
   LogoutIcon,
@@ -26,6 +27,7 @@ const modules: Item[] = [
   { href: "/servicios", label: "Servicios", desc: "Suscripciones recurrentes", Icon: RepeatIcon },
   { href: "/nomina", label: "Nómina", desc: "Empleados y pagos quincenales", Icon: PayrollIcon },
   { href: "/empresas", label: "Empresas", desc: "Datos fiscales e impuestos", Icon: BuildingIcon },
+  { href: "/equipo", label: "Equipo", desc: "Invita a tu contador", Icon: UserPlusIcon },
 ];
 
 export default function MasPage() {
