@@ -169,6 +169,49 @@ export async function addClient(
   return { ok: true };
 }
 
+/** Registra un pago (o abono) contra una factura y actualiza su estado. */
+export async function registerPayment(
+  invoiceId: string,
+  amount: number,
+  method = "transferencia",
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+  if (amount <= 0) return { ok: false, error: "Monto inválido." };
+
+  const { data: inv } = await ctx.supabase
+    .from("invoices")
+    .select("total, currency")
+    .eq("id", invoiceId)
+    .single();
+  if (!inv) return { ok: false, error: "Factura no encontrada." };
+
+  const { error } = await ctx.supabase.from("payments").insert({
+    company_id: ctx.companyId,
+    invoice_id: invoiceId,
+    amount,
+    currency: inv.currency,
+    paid_on: today(),
+    method,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  const { data: pays } = await ctx.supabase
+    .from("payments")
+    .select("amount")
+    .eq("invoice_id", invoiceId);
+  const paid = (pays ?? []).reduce((s, p) => s + Number(p.amount), 0);
+  const status =
+    paid >= Number(inv.total) ? "pagada" : paid > 0 ? "parcial" : "pendiente";
+  await ctx.supabase.from("invoices").update({ status }).eq("id", invoiceId);
+
+  revalidatePath("/cobros");
+  revalidatePath(`/cobros/${invoiceId}`);
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 /* ------------------------------ Eliminar ----------------------------- */
 /* Solo el rol 'admin' puede eliminar. */
 
