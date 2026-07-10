@@ -3,58 +3,59 @@
 import { useRef } from "react";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
-import { chart } from "@/lib/mock-data";
 
 const W = 320;
 const H = 120;
 const PAD = 8;
 
-function toPoints(series: number[]) {
+/** Balance acumulado real de los últimos días. Muestra un estado vacío si no hay datos. */
+export function MiniLineChart({
+  series,
+  hasData,
+}: {
+  series: number[];
+  hasData: boolean;
+}) {
+  const scope = useRef<SVGSVGElement>(null);
+  const lineRef = useRef<SVGPolylineElement>(null);
+
   const n = series.length;
-  return series
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const range = max - min || 1;
+  const points = series
     .map((v, i) => {
-      const x = PAD + (i / (n - 1)) * (W - PAD * 2);
-      const y = H - PAD - v * (H - PAD * 2);
+      const x = PAD + (n > 1 ? i / (n - 1) : 0) * (W - PAD * 2);
+      const y = H - PAD - ((v - min) / range) * (H - PAD * 2);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
-}
-
-/** Gráfico de línea sobrio que se "dibuja" al aparecer (draw-in GSAP). */
-export function MiniLineChart() {
-  const scope = useRef<SVGSVGElement>(null);
-  const prevRef = useRef<SVGPolylineElement>(null);
-  const curRef = useRef<SVGPolylineElement>(null);
-  const dotRef = useRef<SVGCircleElement>(null);
-
-  const n = chart.actual.length;
-  const markerX = PAD + (chart.markerIndex / (n - 1)) * (W - PAD * 2);
-  const markerY = H - PAD - chart.actual[chart.markerIndex] * (H - PAD * 2);
 
   useGSAP(
     () => {
-      const lines = [prevRef.current, curRef.current];
-      lines.forEach((line, idx) => {
-        if (!line) return;
-        const len = line.getTotalLength();
-        gsap.set(line, { strokeDasharray: len, strokeDashoffset: len });
-        gsap.to(line, {
-          strokeDashoffset: 0,
-          duration: 1.1,
-          ease: "power2.out",
-          delay: 0.15 + idx * 0.12,
-        });
-      });
-      gsap.from(dotRef.current, {
-        scale: 0,
-        transformOrigin: "center",
-        duration: 0.4,
-        ease: "back.out(2)",
-        delay: 1.1,
+      const line = lineRef.current;
+      if (!line) return;
+      const len = line.getTotalLength();
+      gsap.set(line, { strokeDasharray: len, strokeDashoffset: len });
+      gsap.to(line, {
+        strokeDashoffset: 0,
+        duration: 1.1,
+        ease: "power2.out",
+        delay: 0.15,
       });
     },
-    { scope },
+    { scope, dependencies: [points] },
   );
+
+  if (!hasData) {
+    return (
+      <div className="flex h-[120px] items-center justify-center rounded-2xl border border-dashed border-line px-4 text-center">
+        <p className="text-xs text-hint">
+          Tu gráfico crecerá a medida que registres cobros y gastos.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <svg
@@ -62,7 +63,7 @@ export function MiniLineChart() {
       viewBox={`0 0 ${W} ${H}`}
       className="h-[120px] w-full"
       role="img"
-      aria-label="Ingresos del mes actual comparados con el mes anterior"
+      aria-label="Balance acumulado de los últimos días"
     >
       <line
         x1={PAD}
@@ -73,35 +74,15 @@ export function MiniLineChart() {
         strokeWidth={1}
         strokeDasharray="2 4"
       />
-      <line
-        x1={markerX}
-        y1={PAD}
-        x2={markerX}
-        y2={H - PAD}
-        stroke="var(--accent)"
-        strokeWidth={1}
-        strokeDasharray="3 3"
-        opacity={0.45}
-      />
       <polyline
-        ref={prevRef}
-        points={toPoints(chart.anterior)}
-        fill="none"
-        stroke="var(--hint)"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <polyline
-        ref={curRef}
-        points={toPoints(chart.actual)}
+        ref={lineRef}
+        points={points}
         fill="none"
         stroke="var(--accent)"
         strokeWidth={2.5}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle ref={dotRef} cx={markerX} cy={markerY} r={3.5} fill="var(--accent)" />
     </svg>
   );
 }

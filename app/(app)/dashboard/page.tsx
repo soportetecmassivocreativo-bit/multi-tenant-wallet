@@ -4,7 +4,7 @@ import { StatPills } from "@/components/dashboard/stat-pills";
 import { Transactions } from "@/components/dashboard/transactions";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { ArrowUpRightIcon, PayrollIcon, GridIcon } from "@/components/ui/icons";
+import { PayrollIcon, GridIcon } from "@/components/ui/icons";
 import { formatCurrency } from "@/lib/currency";
 import { formatMoney, formatDate } from "@/lib/format";
 import { getDashboardSummary } from "@/lib/data";
@@ -22,19 +22,13 @@ export default async function DashboardPage() {
       <section>
         <p className="font-serif text-[15px] text-muted">Saldo · julio</p>
         <HeroBalance value={s.balance} />
-        <p className="mt-2.5 inline-flex items-center gap-1.5 text-xs text-muted">
-          <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-accent-bg text-accent">
-            <ArrowUpRightIcon className="h-3 w-3" />
-          </span>
-          +{s.deltaPct}% vs. mes pasado
-        </p>
-        <p className="mt-1.5 text-xs text-hint">
+        <p className="mt-2.5 text-xs text-hint">
           ≈ {formatCurrency(s.balance * s.bcv.usd, "VES")} · tasa BCV{" "}
           {formatDate(s.bcv.date)}
         </p>
       </section>
 
-      <MiniLineChart />
+      <MiniLineChart series={s.chartSeries} hasData={s.hasMovements} />
 
       <StatPills
         porCobrar={s.porCobrar}
@@ -62,7 +56,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <Transactions />
+      <Transactions movements={s.movements} />
     </div>
   );
 }
