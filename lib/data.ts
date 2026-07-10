@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import * as mock from "@/lib/mock-data";
+import type { CurrencyCode } from "@/lib/currency";
 import type {
   Client,
   Invoice,
@@ -72,6 +73,126 @@ export async function getClients(): Promise<Client[]> {
 export async function getClient(id: string): Promise<Client | null> {
   const clients = await getClients();
   return clients.find((c) => c.id === id) ?? null;
+}
+
+export interface InvoiceItem {
+  id: string;
+  description: string;
+  qty: number;
+  unitPrice: number;
+}
+
+export interface Payment {
+  id: string;
+  amount: number;
+  paidOn: string;
+  method: string;
+}
+
+export interface InvoiceDetail {
+  id: string;
+  number: number | string;
+  clientId: string;
+  clientName: string;
+  date: string;
+  dueDate: string;
+  status: string;
+  currency: CurrencyCode;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  vesRate: number | null;
+  vesRateRef: string | null;
+  vesTotal: number | null;
+  items: InvoiceItem[];
+  payments: Payment[];
+  paidTotal: number;
+  balance: number;
+}
+
+export async function getInvoiceDetail(
+  id: string,
+): Promise<InvoiceDetail | null> {
+  if (!isSupabaseConfigured) {
+    const inv = mock.invoices.find((i) => i.id === id);
+    if (!inv) return null;
+    const clientName =
+      mock.clients.find((c) => c.id === inv.clientId)?.name ?? "—";
+    const paidTotal = inv.status === "pagada" ? inv.total : 0;
+    return {
+      id: inv.id,
+      number: inv.number,
+      clientId: inv.clientId,
+      clientName,
+      date: inv.date,
+      dueDate: inv.dueDate,
+      status: inv.status,
+      currency: "USD",
+      subtotal: inv.total,
+      discount: 0,
+      tax: 0,
+      total: inv.total,
+      vesRate: null,
+      vesRateRef: null,
+      vesTotal: null,
+      items: [],
+      payments: [],
+      paidTotal,
+      balance: inv.total - paidTotal,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select(
+      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+    )
+    .eq("id", id)
+    .single();
+  if (!inv) return null;
+  const row = inv as Record<string, unknown>;
+
+  const [itemsRes, paymentsRes, clientRes] = await Promise.all([
+    supabase
+      .from("invoice_items")
+      .select("id, description, qty, unitPrice:unit_price")
+      .eq("invoice_id", id),
+    supabase
+      .from("payments")
+      .select("id, amount, paidOn:paid_on, method")
+      .eq("invoice_id", id)
+      .order("paid_on"),
+    supabase
+      .from("clients")
+      .select("name")
+      .eq("id", row.clientId as string)
+      .maybeSingle(),
+  ]);
+
+  const items = (itemsRes.data ?? []) as unknown as InvoiceItem[];
+  const payments = (paymentsRes.data ?? []) as unknown as Payment[];
+  const paidTotal = payments.reduce((s, p) => s + Number(p.amount), 0);
+
+  return {
+    ...(row as unknown as InvoiceDetail),
+    clientName: (clientRes.data?.name as string) ?? "—",
+    items,
+    payments,
+    paidTotal,
+    balance: Number(row.total) - paidTotal,
+  };
+}
+
+export async function getPayments(): Promise<Payment[]> {
+  if (!isSupabaseConfigured) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("payments")
+    .select("id, amount, paidOn:paid_on, method")
+    .order("paid_on", { ascending: false });
+  return (data ?? []) as unknown as Payment[];
 }
 
 export async function getExpenses(): Promise<Expense[]> {
@@ -207,12 +328,15 @@ export interface DashboardSummary {
 
 /** Resumen contable del dashboard: compone ingresos y egresos (incluye nómina y servicios). */
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [invoices, employees, services, bcv] = await Promise.all([
-    getInvoices(),
-    getEmployees(),
-    getServices(),
-    getBcvRates(),
-  ]);
+  const [invoices, employees, services, bcv, payments, expenses] =
+    await Promise.all([
+      getInvoices(),
+      getEmployees(),
+      getServices(),
+      getBcvRates(),
+      getPayments(),
+      getExpenses(),
+    ]);
 
   const porCobrar = invoices
     .filter((i) => OPEN_STATUSES.includes(i.status))
@@ -227,13 +351,19 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     0,
   );
 
+  // Contabilidad real: ingresos (pagos cobrados) − egresos (gastos).
+  const cobrado = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const gastos = expenses.reduce((s, e) => s + e.amount, 0);
+  const balance = isSupabaseConfigured ? cobrado - gastos : mock.balance;
+  const cobradoMes = isSupabaseConfigured ? cobrado : mock.stats.cobradoMes;
+
   return {
-    balance: mock.balance,
+    balance,
     deltaPct: mock.deltaPct,
     bcv,
     porCobrar,
     vencidas,
-    cobradoMes: mock.stats.cobradoMes,
+    cobradoMes,
     nominaMes,
     serviciosMes,
     chart: mock.chart,

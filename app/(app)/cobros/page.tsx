@@ -57,18 +57,25 @@ export default async function CobrosPage() {
               key={inv.id}
               className="flex items-center gap-3 border-t border-line py-3"
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium">#{inv.number}</span>
-                  <StatusBadge status={inv.status} />
+              <Link
+                href={`/cobros/${inv.id}`}
+                className="flex min-w-0 flex-1 items-center gap-3 active:scale-[0.99]"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-medium">
+                      #{inv.number}
+                    </span>
+                    <StatusBadge status={inv.status} />
+                  </div>
+                  <p className="truncate text-[11px] text-hint">
+                    {clientName(inv.clientId)} · vence {formatDate(inv.dueDate)}
+                  </p>
                 </div>
-                <p className="truncate text-[11px] text-hint">
-                  {clientName(inv.clientId)} · vence {formatDate(inv.dueDate)}
-                </p>
-              </div>
-              <span className="tnum text-sm font-medium">
-                {formatMoney(inv.total)}
-              </span>
+                <span className="tnum text-sm font-medium">
+                  {formatMoney(inv.total)}
+                </span>
+              </Link>
               {admin && (
                 <DeleteButton
                   action={deleteInvoice.bind(null, inv.id)}
