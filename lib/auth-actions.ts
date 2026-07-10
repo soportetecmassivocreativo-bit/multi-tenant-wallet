@@ -39,17 +39,28 @@ export async function signUp(
   const password = String(formData.get("password") ?? "");
   const companyName = String(formData.get("company_name") ?? "");
   const fullName = String(formData.get("full_name") ?? "");
+  const mode = String(formData.get("mode") ?? "empresa"); // empresa | invited
 
   if (password.length < 6)
     return { error: "La contraseña debe tener al menos 6 caracteres." };
+  if (mode === "empresa" && !companyName)
+    return { error: "Escribe el nombre de tu empresa." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { company_name: companyName, full_name: fullName } },
+    options: { data: { mode, company_name: companyName, full_name: fullName } },
   });
-  if (error) return { error: error.message };
+  if (error) {
+    // Si eligió "me invitaron" y no hay invitación, el trigger rechaza el registro.
+    if (mode === "invited")
+      return {
+        error:
+          "No encontramos una invitación para ese correo. Pídele a tu empresa que te invite primero.",
+      };
+    return { error: error.message };
+  }
 
   if (!data.session) {
     return { message: "Revisa tu correo para confirmar la cuenta." };

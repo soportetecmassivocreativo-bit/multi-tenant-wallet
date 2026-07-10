@@ -147,6 +147,7 @@ export interface CreateClientInput {
   name: string;
   rif?: string;
   termDays?: number;
+  score?: number;
 }
 
 export async function addClient(
@@ -156,11 +157,12 @@ export async function addClient(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
+  const score = Math.min(100, Math.max(0, Math.round(input.score ?? 80)));
   const { error } = await ctx.supabase.from("clients").insert({
     company_id: ctx.companyId,
     name: input.name,
     rif: input.rif ?? "",
-    score: 80,
+    score,
     term_days: input.termDays ?? 0,
   });
   if (error) return { ok: false, error: error.message };

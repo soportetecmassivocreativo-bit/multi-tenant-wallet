@@ -5,6 +5,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import { CheckIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { MoneyInput } from "@/components/ui/money-input";
 import { formatDate } from "@/lib/format";
 import {
   formatCurrency,
@@ -233,13 +234,9 @@ export function NuevaFacturaForm({
             <div className="mt-2 flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <span className="text-[11px] text-hint">Cant.</span>
-                <input
-                  type="number"
-                  min={0}
+                <MoneyInput
                   value={l.qty}
-                  onChange={(e) =>
-                    updateLine(l.id, { qty: Number(e.target.value) || 0 })
-                  }
+                  onValueChange={(n) => updateLine(l.id, { qty: n })}
                   className="w-14 rounded-lg border border-line bg-page px-2 py-1 text-sm outline-none focus:border-accent"
                 />
               </div>
@@ -247,13 +244,9 @@ export function NuevaFacturaForm({
                 <span className="text-[11px] text-hint">
                   Precio {CURRENCIES[currency].symbol}
                 </span>
-                <input
-                  type="number"
-                  min={0}
+                <MoneyInput
                   value={l.unitPrice}
-                  onChange={(e) =>
-                    updateLine(l.id, { unitPrice: Number(e.target.value) || 0 })
-                  }
+                  onValueChange={(n) => updateLine(l.id, { unitPrice: n })}
                   className="w-full rounded-lg border border-line bg-page px-2 py-1 text-sm outline-none focus:border-accent"
                 />
               </div>
@@ -300,12 +293,9 @@ export function NuevaFacturaForm({
         </div>
         <div className="space-y-1">
           <label className="text-[11px] text-muted">Descuento %</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
+          <MoneyInput
             value={discountPct}
-            onChange={(e) => setDiscountPct(Number(e.target.value) || 0)}
+            onValueChange={setDiscountPct}
             className={inputClass}
           />
         </div>
@@ -353,12 +343,9 @@ export function NuevaFacturaForm({
             <span className="whitespace-nowrap text-xs text-muted">
               Bs por {CURRENCIES[rateRef].symbol}
             </span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
+            <MoneyInput
               value={rate}
-              onChange={(e) => setRate(Number(e.target.value) || 0)}
+              onValueChange={setRate}
               className={inputClass}
             />
           </div>

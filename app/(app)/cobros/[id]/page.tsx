@@ -26,12 +26,20 @@ export default async function InvoiceDetailPage({
         <Link href="/cobros" className="text-sm text-muted active:scale-95">
           ‹ Cobros
         </Link>
-        {admin && (
-          <DeleteButton
-            action={deleteInvoice.bind(null, inv.id)}
-            ariaLabel={`Eliminar factura #${inv.number}`}
-          />
-        )}
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/factura/${inv.id}`}
+            className="rounded-full border border-line px-3 py-1.5 text-xs font-medium text-accent active:scale-95"
+          >
+            PDF
+          </Link>
+          {admin && (
+            <DeleteButton
+              action={deleteInvoice.bind(null, inv.id)}
+              ariaLabel={`Eliminar factura #${inv.number}`}
+            />
+          )}
+        </div>
       </header>
 
       <section>

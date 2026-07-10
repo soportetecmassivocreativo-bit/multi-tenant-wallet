@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useActionState } from "react";
 import { signUp, type AuthState } from "@/lib/auth-actions";
 
@@ -8,6 +9,7 @@ const inputClass =
   "w-full rounded-xl border border-line bg-card px-4 py-3 text-sm outline-none focus:border-accent";
 
 export default function RegistroPage() {
+  const [mode, setMode] = useState<"empresa" | "invited">("empresa");
   const [state, action, pending] = useActionState<AuthState | null, FormData>(
     signUp,
     null,
@@ -22,14 +24,46 @@ export default function RegistroPage() {
         </p>
       </div>
 
+      {/* Modo: empresa nueva o usuario invitado */}
+      <div className="flex gap-2">
+        {(
+          [
+            { id: "empresa", label: "Soy una empresa" },
+            { id: "invited", label: "Me invitaron" },
+          ] as const
+        ).map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => setMode(o.id)}
+            className={`flex-1 rounded-xl border px-3 py-2 text-sm active:scale-[0.98] ${
+              mode === o.id
+                ? "border-accent bg-accent-bg text-accent-text"
+                : "border-line text-muted"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="-mt-3 text-center text-[11px] text-hint">
+        {mode === "empresa"
+          ? "Crearás tu empresa y serás su administrador."
+          : "Únete a la empresa que te invitó (regístrate con el correo invitado)."}
+      </p>
+
       <form action={action} className="space-y-3">
-        <input
-          name="company_name"
-          type="text"
-          required
-          placeholder="Nombre de tu empresa"
-          className={inputClass}
-        />
+        <input type="hidden" name="mode" value={mode} />
+
+        {mode === "empresa" && (
+          <input
+            name="company_name"
+            type="text"
+            required
+            placeholder="Nombre de tu empresa"
+            className={inputClass}
+          />
+        )}
         <input
           name="full_name"
           type="text"

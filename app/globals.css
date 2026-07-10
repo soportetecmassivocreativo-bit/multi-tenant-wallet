@@ -79,3 +79,13 @@
     font-feature-settings: "tnum";
   }
 }
+
+/* Impresión / PDF: ocultar controles y forzar fondo blanco. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}
