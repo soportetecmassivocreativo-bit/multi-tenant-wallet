@@ -1,0 +1,14 @@
+{
+  "name": "M-Wallet",
+  "short_name": "M-Wallet",
+  "description": "Finanzas, cobros y facturación en la palma de la mano.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#fafaf8",
+  "theme_color": "#3b5bdb",
+  "orientation": "portrait",
+  "lang": "es",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

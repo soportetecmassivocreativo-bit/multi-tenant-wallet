@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/* Modo oscuro por clase (.dark en <html>, gestionado por next-themes). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   M-Wallet — Design tokens (Editorial Minimal Fintech)
+   Monocromo cálido + acento azul índigo. Claro y oscuro.
+   ============================================================ */
+
+:root {
+  --page: #fafaf8;
+  --card: #ffffff;
+  --soft: #f2f1ec;
+  --ink: #14151a;
+  --muted: #6b6c70;
+  --hint: #9a9b9f;
+  --line: rgba(0, 0, 0, 0.08);
+
+  --accent: #3b5bdb;
+  --accent-strong: #2f49b0;
+  --accent-bg: #ebeefb;
+  --accent-text: #24379a;
+
+  --income: #1d9e75;
+  --pending: #ba7517;
+  --overdue: #d8402f;
+}
+
+.dark {
+  --page: #0b0b0c;
+  --card: #17181b;
+  --soft: #202124;
+  --ink: #f4f4f2;
+  --muted: #a0a0a5;
+  --hint: #6e6f74;
+  --line: rgba(255, 255, 255, 0.1);
+
+  --accent: #5b78e8;
+  --accent-strong: #3b5bdb;
+  --accent-bg: #1c2440;
+  --accent-text: #b9c6f5;
+}
+
+/* Expose tokens to Tailwind utilities (bg-page, text-ink, border-line…) */
+@theme inline {
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-soft: var(--soft);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-hint: var(--hint);
+  --color-line: var(--line);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-text: var(--accent-text);
+
+  --color-income: var(--income);
+  --color-pending: var(--pending);
+  --color-overdue: var(--overdue);
+
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, serif;
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    text-rendering: optimizeLegibility;
+  }
+  /* Cifras alineadas para dinero (obligatorio en montos) */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
