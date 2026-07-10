@@ -1,0 +1,95 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { PlusIcon } from "@/components/ui/icons";
+import { addClient } from "@/lib/mutations";
+
+const inputClass =
+  "w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent";
+
+const termOptions = [
+  { label: "Contado", days: 0 },
+  { label: "15 días", days: 15 },
+  { label: "30 días", days: 30 },
+  { label: "60 días", days: 60 },
+];
+
+export function NuevoClienteForm() {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [rif, setRif] = useState("");
+  const [termDays, setTermDays] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function submit() {
+    if (!name) return;
+    setError(null);
+    start(async () => {
+      const r = await addClient({ name, rif, termDays });
+      if (r.ok) {
+        setName("");
+        setRif("");
+        setTermDays(0);
+        setOpen(false);
+      } else {
+        setError(r.error ?? "No se pudo crear el cliente.");
+      }
+    });
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white active:scale-95"
+      >
+        <PlusIcon className="h-4 w-4" />
+        Nuevo
+      </button>
+
+      {open && (
+        <section className="mt-3 space-y-2 rounded-2xl border border-line bg-card p-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nombre del cliente"
+            className={inputClass}
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <input
+              value={rif}
+              onChange={(e) => setRif(e.target.value)}
+              placeholder="RIF (opcional)"
+              className={inputClass}
+            />
+            <select
+              value={termDays}
+              onChange={(e) => setTermDays(Number(e.target.value))}
+              className={inputClass}
+            >
+              {termOptions.map((t) => (
+                <option key={t.days} value={t.days}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {error && (
+            <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue">
+              {error}
+            </p>
+          )}
+          <button
+            onClick={submit}
+            disabled={!name || pending}
+            className="w-full rounded-full bg-accent py-2.5 text-sm font-medium text-white active:scale-[0.98] disabled:opacity-40"
+          >
+            {pending ? "Guardando…" : "Guardar cliente"}
+          </button>
+        </section>
+      )}
+    </div>
+  );
+}

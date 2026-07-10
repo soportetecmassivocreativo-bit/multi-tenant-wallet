@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { Reveal } from "@/components/ui/reveal";
 import { StatusBadge } from "@/components/cobros/status-badge";
+import { DeleteButton } from "@/components/ui/delete-button";
 import { PlusIcon } from "@/components/ui/icons";
+import { deleteInvoice } from "@/lib/mutations";
 import { formatMoney, formatDate } from "@/lib/format";
-import { getInvoices, getClients } from "@/lib/data";
+import { getInvoices, getClients, isAdmin } from "@/lib/data";
 
 const OPEN = ["pendiente", "parcial", "vencida"];
 
 export default async function CobrosPage() {
-  const [invoices, clients] = await Promise.all([getInvoices(), getClients()]);
+  const [invoices, clients, admin] = await Promise.all([
+    getInvoices(),
+    getClients(),
+    isAdmin(),
+  ]);
   const clientName = (id: string) =>
     clients.find((c) => c.id === id)?.name ?? "—";
 
@@ -63,6 +69,12 @@ export default async function CobrosPage() {
               <span className="tnum text-sm font-medium">
                 {formatMoney(inv.total)}
               </span>
+              {admin && (
+                <DeleteButton
+                  action={deleteInvoice.bind(null, inv.id)}
+                  ariaLabel={`Eliminar factura #${inv.number}`}
+                />
+              )}
             </div>
           ))}
         </Reveal>
