@@ -33,7 +33,7 @@ export default async function ClienteDetailPage({
           <h1 className="font-serif text-2xl leading-tight tracking-tight">
             {client.name}
           </h1>
-          <p className="text-xs text-hint">RNC {client.rnc}</p>
+          <p className="text-xs text-hint">RIF {client.rif}</p>
           <div className="mt-1.5">
             <ScoreChip score={client.score} />
           </div>

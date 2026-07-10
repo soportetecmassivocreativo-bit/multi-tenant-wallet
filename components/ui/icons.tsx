@@ -133,6 +133,13 @@ export const EditIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const ChartIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4 20h16" />
+    <path d="M7 20v-6M12 20V8M17 20v-9" />
+  </Icon>
+);
+
 export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />

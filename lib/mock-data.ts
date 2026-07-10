@@ -35,7 +35,7 @@ export const chart = {
 export interface Client {
   id: string;
   name: string;
-  rnc: string;
+  rif:string;
   /** Score de comportamiento de pago (0-100). */
   score: number;
   /** Términos de crédito por defecto en días. */
@@ -45,11 +45,11 @@ export interface Client {
 }
 
 export const clients: Client[] = [
-  { id: "c1", name: "Ferretería Peña", rnc: "1-01-45678-9", score: 92, termDays: 30, balance: 18500 },
-  { id: "c2", name: "Distribuidora Sol", rnc: "1-30-11223-4", score: 74, termDays: 15, balance: 9750 },
-  { id: "c3", name: "Colmado La Bendición", rnc: "0-01-99887-6", score: 88, termDays: 0, balance: 0 },
-  { id: "c4", name: "Constructora RD", rnc: "1-31-55010-2", score: 61, termDays: 60, balance: 45200 },
-  { id: "c5", name: "Farmacia Nova", rnc: "1-01-77654-3", score: 95, termDays: 30, balance: 0 },
+  { id: "c1", name: "Ferretería Peña", rif: "1-01-45678-9", score: 92, termDays: 30, balance: 18500 },
+  { id: "c2", name: "Distribuidora Sol", rif: "1-30-11223-4", score: 74, termDays: 15, balance: 9750 },
+  { id: "c3", name: "Colmado La Bendición", rif: "0-01-99887-6", score: 88, termDays: 0, balance: 0 },
+  { id: "c4", name: "Constructora RD", rif: "1-31-55010-2", score: 61, termDays: 60, balance: 45200 },
+  { id: "c5", name: "Farmacia Nova", rif: "1-01-77654-3", score: 95, termDays: 30, balance: 0 },
 ];
 
 export const getClient = (id: string) => clients.find((c) => c.id === id);

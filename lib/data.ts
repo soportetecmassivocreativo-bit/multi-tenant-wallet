@@ -371,6 +371,50 @@ export async function getInvitations(): Promise<Invitation[]> {
   return (data ?? []) as unknown as Invitation[];
 }
 
+export interface CategoryTotal {
+  category: string;
+  amount: number;
+}
+
+export interface ReportData {
+  ingresos: number;
+  egresos: number;
+  neto: number;
+  porCategoria: CategoryTotal[];
+  hasData: boolean;
+}
+
+/** Reporte del mes actual: ingresos (pagos) vs egresos (gastos) + desglose por categoría. */
+export async function getReport(): Promise<ReportData> {
+  const [payments, expenses] = await Promise.all([
+    getPayments(),
+    getExpenses(),
+  ]);
+  const ym = new Date().toISOString().slice(0, 7); // "2026-07"
+  const inMonth = (d: string) => d.startsWith(ym);
+
+  const ingresos = payments
+    .filter((p) => inMonth(p.paidOn))
+    .reduce((s, p) => s + Number(p.amount), 0);
+  const monthExpenses = expenses.filter((e) => inMonth(e.date));
+  const egresos = monthExpenses.reduce((s, e) => s + e.amount, 0);
+
+  const catMap = new Map<string, number>();
+  for (const e of monthExpenses)
+    catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  const porCategoria = [...catMap.entries()]
+    .map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return {
+    ingresos,
+    egresos,
+    neto: ingresos - egresos,
+    porCategoria,
+    hasData: payments.length + expenses.length > 0,
+  };
+}
+
 export interface DashboardSummary {
   balance: number;
   bcv: BcvRates;
