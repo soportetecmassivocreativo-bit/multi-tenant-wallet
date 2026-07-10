@@ -87,6 +87,7 @@ export interface Payment {
   amount: number;
   paidOn: string;
   method: string;
+  invoiceId?: string | null;
 }
 
 export interface InvoiceDetail {
@@ -190,9 +191,66 @@ export async function getPayments(): Promise<Payment[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("payments")
-    .select("id, amount, paidOn:paid_on, method")
+    .select("id, amount, paidOn:paid_on, method, invoiceId:invoice_id")
     .order("paid_on", { ascending: false });
   return (data ?? []) as unknown as Payment[];
+}
+
+export interface Movement {
+  id: string;
+  kind: "cobro" | "gasto";
+  title: string;
+  subtitle: string;
+  amount: number; // + cobro, − gasto
+  date: string;
+}
+
+/** Movimientos recientes reales: pagos (ingresos) + gastos (egresos), más nuevos primero. */
+export async function getRecentMovements(limit = 8): Promise<Movement[]> {
+  if (!isSupabaseConfigured) {
+    return mock.transactions.map((t) => ({
+      id: t.id,
+      kind: t.kind === "gasto" ? "gasto" : "cobro",
+      title: t.title,
+      subtitle: t.subtitle,
+      amount: t.amount,
+      date: mock.bcvRates.date,
+    }));
+  }
+
+  const [payments, expenses, invoices, clients] = await Promise.all([
+    getPayments(),
+    getExpenses(),
+    getInvoices(),
+    getClients(),
+  ]);
+  const invMap = new Map(invoices.map((i) => [i.id, i]));
+  const cliMap = new Map(clients.map((c) => [c.id, c.name]));
+
+  const cobros: Movement[] = payments.map((p) => {
+    const inv = p.invoiceId ? invMap.get(p.invoiceId) : undefined;
+    const client = inv ? cliMap.get(inv.clientId) : undefined;
+    return {
+      id: `p_${p.id}`,
+      kind: "cobro",
+      title: inv ? `Cobro · Factura #${inv.number}` : "Cobro",
+      subtitle: client ?? "",
+      amount: Number(p.amount),
+      date: p.paidOn,
+    };
+  });
+  const gastos: Movement[] = expenses.map((e) => ({
+    id: `e_${e.id}`,
+    kind: "gasto",
+    title: e.note,
+    subtitle: e.category,
+    amount: -e.amount,
+    date: e.date,
+  }));
+
+  return [...cobros, ...gastos]
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .slice(0, limit);
 }
 
 export async function getExpenses(): Promise<Expense[]> {
@@ -315,20 +373,20 @@ export async function getInvitations(): Promise<Invitation[]> {
 
 export interface DashboardSummary {
   balance: number;
-  deltaPct: number;
   bcv: BcvRates;
   porCobrar: number;
   vencidas: number;
   cobradoMes: number;
   nominaMes: number;
   serviciosMes: number;
-  chart: typeof mock.chart;
-  transactions: typeof mock.transactions;
+  movements: Movement[];
+  hasMovements: boolean;
+  chartSeries: number[];
 }
 
 /** Resumen contable del dashboard: compone ingresos y egresos (incluye nómina y servicios). */
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [invoices, employees, services, bcv, payments, expenses] =
+  const [invoices, employees, services, bcv, payments, expenses, movements] =
     await Promise.all([
       getInvoices(),
       getEmployees(),
@@ -336,6 +394,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       getBcvRates(),
       getPayments(),
       getExpenses(),
+      getRecentMovements(),
     ]);
 
   const porCobrar = invoices
@@ -367,16 +426,48 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const balance = isSupabaseConfigured ? cobrado - gastos : mock.balance;
   const cobradoMes = isSupabaseConfigured ? cobrado : mock.stats.cobradoMes;
 
+  const hasMovements = isSupabaseConfigured
+    ? payments.length + expenses.length > 0
+    : true;
+  const chartSeries = isSupabaseConfigured
+    ? buildBalanceSeries(payments, expenses, 12)
+    : mock.chart.actual;
+
   return {
     balance,
-    deltaPct: mock.deltaPct,
     bcv,
     porCobrar,
     vencidas,
     cobradoMes,
     nominaMes,
     serviciosMes,
-    chart: mock.chart,
-    transactions: mock.transactions,
+    movements,
+    hasMovements,
+    chartSeries,
   };
+}
+
+/** Serie del balance acumulado (ingresos − egresos) de los últimos N días. */
+function buildBalanceSeries(
+  payments: Payment[],
+  expenses: Expense[],
+  days: number,
+): number[] {
+  const netByDate = new Map<string, number>();
+  for (const p of payments)
+    netByDate.set(p.paidOn, (netByDate.get(p.paidOn) ?? 0) + Number(p.amount));
+  for (const e of expenses)
+    netByDate.set(e.date, (netByDate.get(e.date) ?? 0) - e.amount);
+
+  const series: number[] = [];
+  let running = 0;
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    running += netByDate.get(iso) ?? 0;
+    series.push(running);
+  }
+  return series;
 }
