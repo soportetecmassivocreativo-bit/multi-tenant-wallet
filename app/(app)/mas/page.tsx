@@ -9,6 +9,7 @@ import {
   ReceiptIcon,
   RepeatIcon,
   UserPlusIcon,
+  ChartIcon,
   ChevronRightIcon,
   SunIcon,
   LogoutIcon,
@@ -22,6 +23,7 @@ type Item = {
 };
 
 const modules: Item[] = [
+  { href: "/reportes", label: "Reportes", desc: "Ingresos vs egresos del mes", Icon: ChartIcon },
   { href: "/clientes", label: "Clientes", desc: "Fichas, historial y score", Icon: UsersIcon },
   { href: "/gastos", label: "Gastos", desc: "Egresos y categorías", Icon: ReceiptIcon },
   { href: "/servicios", label: "Servicios", desc: "Suscripciones recurrentes", Icon: RepeatIcon },
