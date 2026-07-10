@@ -338,6 +338,55 @@ export async function isAdmin(): Promise<boolean> {
   return p?.role === "admin";
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  rif: string;
+  defaultCurrency: string;
+  defaultTaxRate: number;
+  nextInvoiceNumber: number;
+  address: string;
+  phone: string;
+  email: string;
+  logoUrl: string;
+}
+
+export async function getCompany(): Promise<Company | null> {
+  if (!isSupabaseConfigured) {
+    return {
+      id: "demo",
+      name: "Massivo Creativo",
+      rif: "J-31000000-0",
+      defaultCurrency: "USD",
+      defaultTaxRate: 0.16,
+      nextInvoiceNumber: 1053,
+      address: "",
+      phone: "",
+      email: "",
+      logoUrl: "",
+    };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+  if (!prof) return null;
+  const { data } = await supabase
+    .from("companies")
+    .select(
+      "id, name, rif, defaultCurrency:default_currency, defaultTaxRate:default_tax_rate, nextInvoiceNumber:next_invoice_number, address, phone, email, logoUrl:logo_url",
+    )
+    .eq("id", prof.company_id)
+    .single();
+  return (data as unknown as Company) ?? null;
+}
+
 export interface TeamMember {
   userId: string;
   name: string;

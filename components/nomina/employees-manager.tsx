@@ -8,6 +8,7 @@ import {
   payPayroll,
 } from "@/lib/nomina-actions";
 import { DeleteButton } from "@/components/ui/delete-button";
+import { MoneyInput } from "@/components/ui/money-input";
 import { PlusIcon, CheckIcon, EditIcon } from "@/components/ui/icons";
 import { formatCurrency, CURRENCIES, type CurrencyCode } from "@/lib/currency";
 import type { Employee } from "@/lib/mock-data";
@@ -111,11 +112,9 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
             className={inputClass}
           />
           <div className="flex gap-2">
-            <input
-              type="number"
-              min={0}
+            <MoneyInput
               value={salary}
-              onChange={(e) => setSalary(Number(e.target.value) || 0)}
+              onValueChange={setSalary}
               placeholder="Salario/quincena"
               className={inputClass}
             />

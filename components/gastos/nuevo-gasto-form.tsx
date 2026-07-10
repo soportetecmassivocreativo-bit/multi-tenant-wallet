@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { PlusIcon } from "@/components/ui/icons";
+import { MoneyInput } from "@/components/ui/money-input";
 import { createExpense } from "@/lib/mutations";
 
 const inputClass =
@@ -57,11 +58,9 @@ export function NuevoGastoForm() {
               placeholder="Categoría"
               className={inputClass}
             />
-            <input
-              type="number"
-              min={0}
+            <MoneyInput
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value) || 0)}
+              onValueChange={setAmount}
               placeholder="Monto"
               className={inputClass}
             />

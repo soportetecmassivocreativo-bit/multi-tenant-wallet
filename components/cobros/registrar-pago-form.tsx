@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { MoneyInput } from "@/components/ui/money-input";
 import { registerPayment } from "@/lib/mutations";
 import { formatCurrency, type CurrencyCode } from "@/lib/currency";
 
@@ -41,12 +42,9 @@ export function RegistrarPagoForm({
     <section className="space-y-2 rounded-2xl border border-line bg-card p-4">
       <p className="font-serif text-[15px]">Registrar pago</p>
       <div className="flex items-center gap-2">
-        <input
-          type="number"
-          min={0}
-          step="0.01"
+        <MoneyInput
           value={amount}
-          onChange={(e) => setAmount(Number(e.target.value) || 0)}
+          onValueChange={setAmount}
           className={inputClass}
         />
         <button

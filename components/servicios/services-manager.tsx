@@ -9,6 +9,7 @@ import {
 import { payService } from "@/lib/accounting-actions";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { ActionButton } from "@/components/ui/action-button";
+import { MoneyInput } from "@/components/ui/money-input";
 import { PlusIcon, EditIcon } from "@/components/ui/icons";
 import { formatCurrency, CURRENCIES, type CurrencyCode } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
@@ -106,11 +107,9 @@ export function ServicesManager({ services }: { services: Service[] }) {
             autoFocus
           />
           <div className="flex gap-2">
-            <input
-              type="number"
-              min={0}
+            <MoneyInput
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value) || 0)}
+              onValueChange={setAmount}
               placeholder="Monto"
               className={inputClass}
             />
