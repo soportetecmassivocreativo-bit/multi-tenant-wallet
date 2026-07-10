@@ -343,11 +343,21 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     .reduce((s, i) => s + i.total, 0);
   const vencidas = invoices.filter((i) => i.status === "vencida").length;
 
-  // Nómina mensual = dos quincenas.
-  const nominaMes = employees.reduce((s, e) => s + e.salary, 0) * 2;
-  // Servicios mensuales + prorrateo de los anuales.
+  // Convierte a USD-equivalente usando la tasa BCV (para sumar monedas mixtas).
+  const toUSD = (amount: number, currency: string) =>
+    currency === "VES"
+      ? amount / bcv.usd
+      : currency === "EUR"
+        ? amount * (bcv.eur / bcv.usd)
+        : amount;
+
+  // Nómina mensual = dos quincenas (en USD-equivalente).
+  const nominaMes =
+    employees.reduce((s, e) => s + toUSD(e.salary, e.currency), 0) * 2;
+  // Servicios mensuales + prorrateo de los anuales (en USD-equivalente).
   const serviciosMes = services.reduce(
-    (s, x) => s + (x.cycle === "anual" ? x.amount / 12 : x.amount),
+    (s, x) =>
+      s + toUSD(x.cycle === "anual" ? x.amount / 12 : x.amount, x.currency),
     0,
   );
 
