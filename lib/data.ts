@@ -8,6 +8,7 @@ import type {
   Employee,
   PayrollPeriod,
   Service,
+  Product,
 } from "@/lib/mock-data";
 
 /**
@@ -117,6 +118,45 @@ export async function getServices(): Promise<Service[]> {
     .eq("active", true)
     .order("next_charge_date");
   return (data ?? []) as unknown as Service[];
+}
+
+export async function getProducts(): Promise<Product[]> {
+  if (!isSupabaseConfigured) return mock.products;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("products")
+    .select("id, name, price, currency")
+    .order("name");
+  return (data ?? []) as unknown as Product[];
+}
+
+export interface CurrentProfile {
+  userId: string;
+  companyId: string;
+  role: string;
+}
+
+/** Perfil del usuario autenticado (empresa + rol). En modo demo devuelve un admin ficticio. */
+export async function getCurrentProfile(): Promise<CurrentProfile | null> {
+  if (!isSupabaseConfigured)
+    return { userId: "demo", companyId: "demo", role: "admin" };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("company_id, role")
+    .eq("id", user.id)
+    .single();
+  if (!data) return null;
+  return { userId: user.id, companyId: data.company_id, role: data.role };
+}
+
+export async function isAdmin(): Promise<boolean> {
+  const p = await getCurrentProfile();
+  return p?.role === "admin";
 }
 
 export interface DashboardSummary {
