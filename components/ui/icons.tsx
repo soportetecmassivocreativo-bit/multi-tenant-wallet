@@ -126,6 +126,13 @@ export const ChevronRightIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const EditIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </Icon>
+);
+
 export const TrashIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
