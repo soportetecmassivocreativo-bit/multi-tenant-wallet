@@ -124,3 +124,35 @@ export async function payPayroll(): Promise<MutationResult> {
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+/** Paga a un solo empleado: registra su egreso (en su moneda). Para pagar de a poco. */
+export async function payEmployee(
+  employeeId: string,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+
+  const { data: emp } = await ctx.supabase
+    .from("employees")
+    .select("full_name, salary, currency")
+    .eq("id", employeeId)
+    .single();
+  if (!emp) return { ok: false, error: "Empleado no encontrado." };
+
+  const { error } = await ctx.supabase.from("expenses").insert({
+    company_id: ctx.companyId,
+    category: "Nómina",
+    note: `Nómina · ${emp.full_name}`,
+    amount: emp.salary,
+    currency: emp.currency,
+    spent_on: today(),
+    source: "nomina",
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/nomina");
+  revalidatePath("/gastos");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
