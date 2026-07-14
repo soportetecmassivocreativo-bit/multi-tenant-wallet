@@ -6,8 +6,10 @@ import {
   updateEmployee,
   deactivateEmployee,
   payPayroll,
+  payEmployee,
 } from "@/lib/nomina-actions";
 import { DeleteButton } from "@/components/ui/delete-button";
+import { ActionButton } from "@/components/ui/action-button";
 import { MoneyInput } from "@/components/ui/money-input";
 import { PlusIcon, CheckIcon, EditIcon } from "@/components/ui/icons";
 import { formatCurrency, CURRENCIES, type CurrencyCode } from "@/lib/currency";
@@ -165,31 +167,38 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
       <section>
         <h2 className="mb-1 font-serif text-[15px]">Empleados</h2>
         {employees.map((e) => (
-          <div
-            key={e.id}
-            className="flex items-center gap-2 border-t border-line py-3"
-          >
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-bg font-serif text-accent-text">
-              {(e.name || "?").charAt(0).toUpperCase()}
+          <div key={e.id} className="border-t border-line py-3">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-bg font-serif text-accent-text">
+                {(e.name || "?").charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium">{e.name}</p>
+                <p className="text-[11px] text-hint">{e.role}</p>
+              </div>
+              <span className="tnum text-sm font-medium">
+                {formatCurrency(e.salary, e.currency)}
+              </span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium">{e.name}</p>
-              <p className="text-[11px] text-hint">{e.role}</p>
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                onClick={() => openEdit(e)}
+                aria-label={`Editar ${e.name}`}
+                className="grid h-8 w-8 place-items-center rounded-lg text-hint active:scale-90 hover:text-accent"
+              >
+                <EditIcon className="h-4 w-4" />
+              </button>
+              <DeleteButton
+                action={() => deactivateEmployee(e.id)}
+                ariaLabel={`Quitar ${e.name}`}
+              />
+              <ActionButton
+                label="Pagar"
+                doneLabel="Pagado"
+                action={() => payEmployee(e.id)}
+                className="px-4"
+              />
             </div>
-            <span className="tnum text-sm font-medium">
-              {formatCurrency(e.salary, e.currency)}
-            </span>
-            <button
-              onClick={() => openEdit(e)}
-              aria-label={`Editar ${e.name}`}
-              className="grid h-8 w-8 place-items-center rounded-lg text-hint active:scale-90 hover:text-accent"
-            >
-              <EditIcon className="h-4 w-4" />
-            </button>
-            <DeleteButton
-              action={() => deactivateEmployee(e.id)}
-              ariaLabel={`Quitar ${e.name}`}
-            />
           </div>
         ))}
       </section>
@@ -205,7 +214,7 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
           disabled={employees.length === 0 || pending}
           className="w-full rounded-full bg-accent py-3.5 text-sm font-medium text-white shadow-[0_8px_20px_rgba(59,91,219,0.35)] active:scale-[0.98] disabled:opacity-40"
         >
-          {pending ? "Procesando…" : "Pagar nómina de la quincena"}
+          {pending ? "Procesando…" : "Pagar toda la nómina"}
         </button>
       )}
     </div>
