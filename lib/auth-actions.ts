@@ -20,14 +20,33 @@ export async function signIn(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
+  if (!email) return { error: "Escribe tu correo electrónico." };
+  if (!password) return { error: "Escribe tu contraseña." };
+
   try {
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message === "Invalid login credentials" ? "Correo o contraseña incorrectos." : error.message };
+
+    // Timeout de 10 segundos para no dejar al usuario colgado infinitamente
+    const authPromise = supabase.auth.signInWithPassword({ email, password });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+    );
+
+    const { error } = await Promise.race([authPromise, timeoutPromise]);
+
+    if (error) {
+      if (error.message === "Invalid login credentials")
+        return { error: "Correo o contraseña incorrectos." };
+      if (error.message === "Email not confirmed")
+        return { error: "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada." };
+      return { error: error.message };
+    }
 
     revalidatePath("/", "layout");
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+    if (err instanceof Error && err.message === "TIMEOUT")
+      return { error: "El servidor tardó demasiado en responder. Intenta de nuevo en unos segundos." };
+    const message = err instanceof Error ? err.message : "Error desconocido.";
     return { error: `Error de conexión: ${message}` };
   }
   redirect("/dashboard");

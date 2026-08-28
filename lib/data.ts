@@ -501,16 +501,47 @@ export interface DashboardSummary {
 
 /** Resumen contable del dashboard: compone ingresos y egresos (incluye nómina y servicios). */
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [invoices, employees, services, bcv, payments, expenses, movements] =
-    await Promise.all([
-      getInvoices(),
-      getEmployees(),
-      getServices(),
-      getBcvRates(),
-      getPayments(),
-      getExpenses(),
-      getRecentMovements(),
-    ]);
+  // Timeout de seguridad: si Supabase tarda más de 12s, usamos mock data.
+  const fetchAll = Promise.all([
+    getInvoices(),
+    getEmployees(),
+    getServices(),
+    getBcvRates(),
+    getPayments(),
+    getExpenses(),
+    getRecentMovements(),
+  ]);
+
+  const timeoutFallback = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), 12000)
+  );
+
+  const result = await Promise.race([fetchAll, timeoutFallback]);
+
+  // Si hubo timeout, devolver resumen con datos mock para no bloquear el dashboard
+  if (!result) {
+    return {
+      balance: mock.balance,
+      bcv: { usd: mock.bcvRates.USD, eur: mock.bcvRates.EUR, date: mock.bcvRates.date },
+      porCobrar: mock.stats.porCobrar,
+      vencidas: 0,
+      cobradoMes: mock.stats.cobradoMes,
+      nominaMes: 0,
+      serviciosMes: 0,
+      movements: mock.transactions.map((t) => ({
+        id: t.id,
+        kind: t.kind === "gasto" ? "gasto" as const : "cobro" as const,
+        title: t.title,
+        subtitle: t.subtitle,
+        amount: t.amount,
+        date: mock.bcvRates.date,
+      })),
+      hasMovements: true,
+      chartSeries: mock.chart.actual,
+    };
+  }
+
+  const [invoices, employees, services, bcv, payments, expenses, movements] = result;
 
   const porCobrar = invoices
     .filter((i) => OPEN_STATUSES.includes(i.status))
