@@ -12,9 +12,9 @@ export const deltaPct = 12.4;
  * Bs por unidad de divisa. En la Fase 1 se sincroniza con el BCV.
  */
 export const bcvRates = {
-  date: "2026-07-10",
-  USD: 148.2, // Bs por dólar
-  EUR: 161.35, // Bs por euro
+  date: "2026-08-28",
+  USD: 791.6667, // Bs por dólar
+  EUR: 921.88, // Bs por euro
 };
 
 export const stats = {

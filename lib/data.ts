@@ -25,20 +25,37 @@ export interface BcvRates {
   date: string;
 }
 
+import { fetchLiveBcvRates, syncAndSaveBcvRates } from "@/lib/bcv";
+
 export async function getBcvRates(): Promise<BcvRates> {
   if (!isSupabaseConfigured) {
-    return { usd: mock.bcvRates.USD, eur: mock.bcvRates.EUR, date: mock.bcvRates.date };
+    const live = await fetchLiveBcvRates();
+    return { usd: live.usd, eur: live.eur, date: live.date };
   }
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("bcv_rates")
-    .select("date:rate_date, usd, eur")
-    .order("rate_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data
-    ? { usd: Number(data.usd), eur: Number(data.eur), date: String(data.date) }
-    : { usd: mock.bcvRates.USD, eur: mock.bcvRates.EUR, date: mock.bcvRates.date };
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("bcv_rates")
+      .select("date:rate_date, usd, eur")
+      .order("rate_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (!data || data.date < today) {
+      const live = await syncAndSaveBcvRates();
+      return { usd: live.usd, eur: live.eur, date: live.date };
+    }
+
+    return {
+      usd: Number(data.usd),
+      eur: Number(data.eur),
+      date: String(data.date),
+    };
+  } catch {
+    const live = await fetchLiveBcvRates();
+    return { usd: live.usd, eur: live.eur, date: live.date };
+  }
 }
 
 export async function getInvoices(): Promise<Invoice[]> {

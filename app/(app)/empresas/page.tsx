@@ -2,8 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BuildingIcon } from "@/components/ui/icons";
 import { CompanyForm } from "@/components/empresas/company-form";
-import { formatCurrency } from "@/lib/currency";
-import { formatDate } from "@/lib/format";
+import { BcvRatesCard } from "@/components/empresas/bcv-rates-card";
 import { getCompany, getBcvRates, isAdmin } from "@/lib/data";
 
 export default async function EmpresasPage() {
@@ -36,20 +35,7 @@ export default async function EmpresasPage() {
 
       <CompanyForm company={company} canEdit={admin} />
 
-      <section className="rounded-2xl bg-soft p-4">
-        <p className="text-xs text-muted">Tasas BCV · {formatDate(bcv.date)}</p>
-        <p className="mt-1 text-sm">
-          Dólar{" "}
-          <span className="tnum font-medium">
-            {formatCurrency(bcv.usd, "VES")}
-          </span>{" "}
-          / $ · Euro{" "}
-          <span className="tnum font-medium">
-            {formatCurrency(bcv.eur, "VES")}
-          </span>{" "}
-          / €
-        </p>
-      </section>
+      <BcvRatesCard initialBcv={bcv} />
     </div>
   );
 }
