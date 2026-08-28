@@ -47,8 +47,10 @@ export function InviteForm() {
           onChange={(e) => setRole(e.target.value)}
           className={inputClass}
         >
-          <option value="contador">Contador</option>
           <option value="admin">Administrador</option>
+          <option value="ceo">CEO</option>
+          <option value="project_manager">Project Manager</option>
+          <option value="contador">Contador</option>
         </select>
         <button
           onClick={submit}

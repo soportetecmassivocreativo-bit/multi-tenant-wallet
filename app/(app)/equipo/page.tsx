@@ -4,18 +4,22 @@ import { DeleteButton } from "@/components/ui/delete-button";
 import { cancelInvitation } from "@/lib/team-actions";
 import { getTeam, getInvitations, getCurrentProfile } from "@/lib/data";
 
+const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
+  admin:           { label: "Administrador",   className: "bg-accent-bg text-accent-text" },
+  ceo:             { label: "CEO",             className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  project_manager: { label: "Project Manager", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
+  contador:        { label: "Contador",        className: "bg-income/10 text-income" },
+};
+
 function RoleBadge({ role }: { role: string }) {
-  const admin = role === "admin";
+  const cfg = ROLE_CONFIG[role] ?? { label: role, className: "bg-soft text-muted" };
   return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-        admin ? "bg-accent-bg text-accent-text" : "bg-income/10 text-income"
-      }`}
-    >
-      {admin ? "Administrador" : "Contador"}
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${cfg.className}`}>
+      {cfg.label}
     </span>
   );
 }
+
 
 export default async function EquipoPage() {
   const [profile, team, invitations] = await Promise.all([
@@ -23,7 +27,7 @@ export default async function EquipoPage() {
     getTeam(),
     getInvitations(),
   ]);
-  const admin = profile?.role === "admin";
+  const admin = profile?.role === "admin" || profile?.role === "ceo";
 
   return (
     <div className="space-y-6">
