@@ -41,17 +41,22 @@ export async function getBcvRates(): Promise<BcvRates> {
       .limit(1)
       .maybeSingle();
 
-    const today = new Date().toISOString().slice(0, 10);
-    if (!data || data.date < today) {
-      const live = await syncAndSaveBcvRates();
-      return { usd: live.usd, eur: live.eur, date: live.date };
+    if (data) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (String(data.date) < today) {
+        // Sincronización en segundo plano para no demorar la carga del dashboard
+        syncAndSaveBcvRates().catch(() => {});
+      }
+      return {
+        usd: Number(data.usd),
+        eur: Number(data.eur),
+        date: String(data.date),
+      };
     }
 
-    return {
-      usd: Number(data.usd),
-      eur: Number(data.eur),
-      date: String(data.date),
-    };
+    // Si no hay ninguna tasa en base de datos, obtenemos la inicial
+    const live = await syncAndSaveBcvRates();
+    return { usd: live.usd, eur: live.eur, date: live.date };
   } catch {
     const live = await fetchLiveBcvRates();
     return { usd: live.usd, eur: live.eur, date: live.date };

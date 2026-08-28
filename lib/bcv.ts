@@ -83,18 +83,18 @@ export async function fetchFromBcvBackup(): Promise<BcvRateResult | null> {
 }
 
 /**
- * Obtiene la tasa actualizada en vivo del BCV con fallback en cascada.
+ * Obtiene la tasa actualizada en vivo del BCV de forma ultra-rápida.
  */
 export async function fetchLiveBcvRates(): Promise<BcvRateResult> {
-  // 1. Intenta portal oficial
-  const official = await fetchFromBcvOfficial();
-  if (official) return official;
-
-  // 2. Intenta API de contingencia
+  // 1. Intenta primero la API réplica de alta velocidad (CDN < 300ms)
   const backup = await fetchFromBcvBackup();
   if (backup) return backup;
 
-  // 3. Fallback por defecto si no hay conexión a internet
+  // 2. Si falla la API, intenta el portal oficial de bcv.org.ve
+  const official = await fetchFromBcvOfficial();
+  if (official) return official;
+
+  // 3. Fallback por defecto
   return {
     usd: defaultMockRates.USD,
     eur: defaultMockRates.EUR,
