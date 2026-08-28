@@ -15,16 +15,21 @@ export async function signIn(
   formData: FormData,
 ): Promise<AuthState> {
   if (!isSupabaseConfigured)
-    return { error: "Configura Supabase (.env.local) para iniciar sesión." };
+    return { error: "Configura Supabase (.env.local o variables en Vercel) para iniciar sesión." };
 
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: "Correo o contraseña incorrectos." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message === "Invalid login credentials" ? "Correo o contraseña incorrectos." : error.message };
 
-  revalidatePath("/", "layout");
+    revalidatePath("/", "layout");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+    return { error: `Error de conexión: ${message}` };
+  }
   redirect("/dashboard");
 }
 
@@ -33,12 +38,12 @@ export async function signUp(
   formData: FormData,
 ): Promise<AuthState> {
   if (!isSupabaseConfigured)
-    return { error: "Configura Supabase (.env.local) para registrarte." };
+    return { error: "Configura Supabase (.env.local o variables en Vercel) para registrarte." };
 
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const companyName = String(formData.get("company_name") ?? "");
-  const fullName = String(formData.get("full_name") ?? "");
+  const companyName = String(formData.get("company_name") ?? "").trim();
+  const fullName = String(formData.get("full_name") ?? "").trim();
   const mode = String(formData.get("mode") ?? "empresa"); // empresa | invited
 
   if (password.length < 6)
@@ -46,27 +51,34 @@ export async function signUp(
   if (mode === "empresa" && !companyName)
     return { error: "Escribe el nombre de tu empresa." };
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { mode, company_name: companyName, full_name: fullName } },
-  });
-  if (error) {
-    // Si eligió "me invitaron" y no hay invitación, el trigger rechaza el registro.
-    if (mode === "invited")
-      return {
-        error:
-          "No encontramos una invitación para ese correo. Pídele a tu empresa que te invite primero.",
-      };
-    return { error: error.message };
+  let sessionExists = false;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { mode, company_name: companyName, full_name: fullName } },
+    });
+    if (error) {
+      if (mode === "invited")
+        return {
+          error:
+            "No encontramos una invitación para ese correo. Pídele a tu empresa que te invite primero.",
+        };
+      return { error: error.message };
+    }
+
+    sessionExists = !!data.session;
+    if (!sessionExists) {
+      return { message: "Cuenta creada. Revisa tu correo si requiere confirmación o inicia sesión." };
+    }
+
+    revalidatePath("/", "layout");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+    return { error: `Error de conexión: ${message}` };
   }
 
-  if (!data.session) {
-    return { message: "Revisa tu correo para confirmar la cuenta." };
-  }
-
-  revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
