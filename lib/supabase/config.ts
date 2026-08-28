@@ -13,8 +13,15 @@ function cleanKey(key: string | undefined): string {
   return key.trim().replace(/^["']|["']$/g, "");
 }
 
-export const SUPABASE_URL = cleanUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
-export const SUPABASE_ANON_KEY = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const DEFAULT_SUPABASE_URL = "https://fguxdeqqwwtrbizqnguv.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_l565KUwsXphFZSpmXGWpAg_wrJYLP_r";
+
+export const SUPABASE_URL = cleanUrl(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL
+);
+export const SUPABASE_ANON_KEY = cleanKey(
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
+);
 
 /**
  * true cuando hay credenciales válidas de Supabase.
