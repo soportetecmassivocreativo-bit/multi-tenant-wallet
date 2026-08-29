@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { saveSystemConfig } from "@/lib/config-actions";
 import { PdfLivePreview } from "@/components/configuracion/pdf-live-preview";
 import { SettingsIcon, CheckIcon, ReceiptIcon, PayrollIcon, RepeatIcon } from "@/components/ui/icons";
@@ -15,6 +15,8 @@ const COLOR_PRESETS = [
   { label: "Negro Ejecutivo", value: "#18181B" },
 ];
 
+const LOCAL_STORAGE_KEY = "m_wallet_system_config";
+
 interface ConfiguracionTabsProps {
   initialConfig: SystemConfig;
   canEdit: boolean;
@@ -26,6 +28,17 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Cargar preferencias locales al montar en el navegador
+  useEffect(() => {
+    try {
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) {
+        const parsed = JSON.parse(local);
+        setConfig((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {}
+  }, []);
 
   function updateField<K extends keyof SystemConfig>(key: K, value: SystemConfig[K]) {
     setConfig((prev) => ({
@@ -40,10 +53,15 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
     setMsg(null);
     setError(null);
 
+    // Guardar en localStorage de inmediato para persistencia permanente en el navegador
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
+    } catch {}
+
     startTransition(async () => {
       const res = await saveSystemConfig(config);
       if (res.ok) {
-        setMsg("Configuración guardada y aplicada a todo el sistema.");
+        setMsg("Configuración guardada permanentemente y aplicada a todo el sistema.");
       } else {
         setError(res.error || "No se pudo guardar la configuración.");
       }

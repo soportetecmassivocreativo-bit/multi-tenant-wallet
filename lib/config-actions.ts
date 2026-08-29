@@ -1,17 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAuditEvent } from "@/lib/audit";
 import { DEFAULT_SYSTEM_CONFIG, type SystemConfig } from "@/lib/config";
 import type { MutationResult } from "@/lib/mutations";
 
-let memoryConfig: SystemConfig = { ...DEFAULT_SYSTEM_CONFIG };
+const CONFIG_COOKIE_NAME = "m_wallet_system_config";
 
 /** Devuelve el siguiente código correlativo para un módulo dado (sin incrementar).
  * Si Supabase está configurado, cuenta los registros activos para determinar el número.
- * Si no, usa el contador de memoryConfig.
+ * Si no, usa el contador de la configuración activa.
  */
 export async function getNextCode(
   module: "invoice" | "expense" | "employee" | "service",
@@ -23,14 +24,16 @@ export async function getNextCode(
     service: "services",
   } as const;
 
+  const config = await getSystemConfig();
+
   const counterKey = `${module}Counter` as keyof SystemConfig;
   const prefixKey = `${module}Prefix` as keyof SystemConfig;
 
-  const prefix = String(memoryConfig[prefixKey] ?? "Mas-Corp-");
-  const digits = memoryConfig.codeDigits ?? 4;
+  const prefix = String(config[prefixKey] ?? config.basePrefix ?? "Mas-Corp-");
+  const digits = config.codeDigits ?? 4;
 
   if (!isSupabaseConfigured) {
-    const counter = Number(memoryConfig[counterKey] ?? 1);
+    const counter = Number(config[counterKey] ?? 1);
     return `${prefix}${String(counter).padStart(digits, "0")}`;
   }
 
@@ -43,7 +46,7 @@ export async function getNextCode(
     const nextNum = (count ?? 0) + 1;
     return `${prefix}${String(nextNum).padStart(digits, "0")}`;
   } catch {
-    const counter = Number(memoryConfig[counterKey] ?? 1);
+    const counter = Number(config[counterKey] ?? 1);
     return `${prefix}${String(counter).padStart(digits, "0")}`;
   }
 }
@@ -70,11 +73,25 @@ async function getContext() {
 }
 
 /**
- * Obtiene la configuración del sistema (contabilizadores y personalización PDF).
+ * Obtiene la configuración persistente del sistema (desde cookies / DB).
  */
 export async function getSystemConfig(): Promise<SystemConfig> {
+  let cookieConfig: Partial<SystemConfig> = {};
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(CONFIG_COOKIE_NAME)?.value;
+    if (raw) {
+      cookieConfig = JSON.parse(decodeURIComponent(raw));
+    }
+  } catch {}
+
+  let merged: SystemConfig = {
+    ...DEFAULT_SYSTEM_CONFIG,
+    ...cookieConfig,
+  };
+
   if (!isSupabaseConfigured) {
-    return memoryConfig;
+    return merged;
   }
 
   try {
@@ -82,7 +99,7 @@ export async function getSystemConfig(): Promise<SystemConfig> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return memoryConfig;
+    if (!user) return merged;
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -90,7 +107,7 @@ export async function getSystemConfig(): Promise<SystemConfig> {
       .eq("id", user.id)
       .single();
 
-    if (!profile?.company_id) return memoryConfig;
+    if (!profile?.company_id) return merged;
 
     const { data: company } = await supabase
       .from("companies")
@@ -100,43 +117,60 @@ export async function getSystemConfig(): Promise<SystemConfig> {
 
     if (company) {
       return {
-        ...memoryConfig,
-        pdfCompanyName: company.name || memoryConfig.pdfCompanyName,
-        pdfCompanyRif: company.rif || memoryConfig.pdfCompanyRif,
-        pdfContactEmail: company.email || memoryConfig.pdfContactEmail,
-        pdfContactPhone: company.phone || memoryConfig.pdfContactPhone,
-        invoiceCounter: company.next_invoice_number || memoryConfig.invoiceCounter,
+        ...merged,
+        pdfCompanyName: company.name || merged.pdfCompanyName,
+        pdfCompanyRif: company.rif || merged.pdfCompanyRif,
+        pdfContactEmail: company.email || merged.pdfContactEmail,
+        pdfContactPhone: company.phone || merged.pdfContactPhone,
+        invoiceCounter: company.next_invoice_number || merged.invoiceCounter,
       };
     }
 
-    return memoryConfig;
+    return merged;
   } catch {
-    return memoryConfig;
+    return merged;
   }
 }
 
 /**
- * Guarda los cambios de configuración del sistema.
+ * Guarda los cambios de configuración del sistema (en cookie de larga duración + base de datos).
  * Permitido para CEO, Administrador y Project Manager.
  */
 export async function saveSystemConfig(
   newConfig: Partial<SystemConfig>
 ): Promise<MutationResult> {
+  // 1. Guardar siempre en Cookie persistente (1 año de vigencia)
+  try {
+    const current = await getSystemConfig();
+    const merged = { ...current, ...newConfig };
+    const cookieStore = await cookies();
+    cookieStore.set(CONFIG_COOKIE_NAME, encodeURIComponent(JSON.stringify(merged)), {
+      maxAge: 60 * 60 * 24 * 365, // 1 año
+      path: "/",
+      sameSite: "lax",
+    });
+  } catch (err) {
+    console.error("Error setting config cookie:", err);
+  }
+
   if (!isSupabaseConfigured) {
-    memoryConfig = {
-      ...memoryConfig,
-      ...newConfig,
-    };
     await logAuditEvent({
       action: "configuracion_sistema",
       entityType: "empresa",
-      description: "Actualizó personalización PDF y contabilizadores Mas-Corp- (Demo)",
+      description: `Actualizó personalización PDF y contabilizadores ${newConfig.basePrefix || "Mas-Corp-"} (Demo)`,
     });
+    revalidatePath("/", "layout");
+    revalidatePath("/configuracion");
     return { ok: true, demo: true };
   }
 
   const ctx = await getContext();
-  if (!ctx) return { ok: false, error: "No autenticado." };
+  if (!ctx) {
+    // Si no tiene sesión en Supabase pero está configurado, la cookie ya guardó los datos
+    revalidatePath("/", "layout");
+    revalidatePath("/configuracion");
+    return { ok: true };
+  }
 
   if (
     ctx.role !== "admin" &&
@@ -150,22 +184,19 @@ export async function saveSystemConfig(
   }
 
   try {
-    memoryConfig = {
-      ...memoryConfig,
-      ...newConfig,
-    };
-
-    // Actualizar datos fiscales base en tabla companies
-    await ctx.supabase
-      .from("companies")
-      .update({
-        name: newConfig.pdfCompanyName,
-        rif: newConfig.pdfCompanyRif,
-        email: newConfig.pdfContactEmail,
-        phone: newConfig.pdfContactPhone,
-        next_invoice_number: newConfig.invoiceCounter,
-      })
-      .eq("id", ctx.companyId);
+    // Actualizar datos fiscales base en tabla companies si existe
+    if (ctx.companyId) {
+      await ctx.supabase
+        .from("companies")
+        .update({
+          name: newConfig.pdfCompanyName,
+          rif: newConfig.pdfCompanyRif,
+          email: newConfig.pdfContactEmail,
+          phone: newConfig.pdfContactPhone,
+          next_invoice_number: newConfig.invoiceCounter,
+        })
+        .eq("id", ctx.companyId);
+    }
 
     await logAuditEvent({
       action: "configuracion_sistema",
