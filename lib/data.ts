@@ -357,7 +357,7 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
 
 export async function isAdmin(): Promise<boolean> {
   const p = await getCurrentProfile();
-  return p?.role === "admin";
+  return p?.role === "admin" || p?.role === "ceo";
 }
 
 export interface Company {

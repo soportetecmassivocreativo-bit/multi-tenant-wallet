@@ -33,13 +33,14 @@ export async function inviteMember(
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
-  if (ctx.role !== "admin")
-    return { ok: false, error: "Solo el administrador puede invitar." };
+  if (ctx.role !== "admin" && ctx.role !== "ceo")
+    return { ok: false, error: "Solo el administrador o CEO puede invitar." };
 
   const clean = email.trim().toLowerCase();
   if (!clean.includes("@") || clean.length < 5)
     return { ok: false, error: "Correo inválido." };
-  const safeRole = role === "admin" ? "admin" : "contador";
+  const validRoles = ["admin", "ceo", "project_manager", "contador"];
+  const safeRole = validRoles.includes(role) ? role : "contador";
 
   const { error } = await ctx.supabase.from("invitations").insert({
     company_id: ctx.companyId,
@@ -53,13 +54,13 @@ export async function inviteMember(
   return { ok: true };
 }
 
-/** Cancela una invitación pendiente. Solo admin. */
+/** Cancela una invitación pendiente. Solo admin o CEO. */
 export async function cancelInvitation(id: string): Promise<MutationResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
-  if (ctx.role !== "admin")
-    return { ok: false, error: "Solo el administrador puede cancelar." };
+  if (ctx.role !== "admin" && ctx.role !== "ceo")
+    return { ok: false, error: "Solo el administrador o CEO puede cancelar." };
 
   const { error } = await ctx.supabase
     .from("invitations")
