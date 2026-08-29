@@ -42,16 +42,16 @@ function hexToRgb(hex: string): [number, number, number] {
  * Genera y descarga un reporte PDF profesional con el branding y personalización de Massivo Corp.
  */
 export function exportPdfReport(options: PdfReportOptions): void {
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
   const config = {
     ...DEFAULT_SYSTEM_CONFIG,
     ...(options.branding ?? {}),
   };
+
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: config.pdfPaperSize || "a4",
+  });
 
   const [prR, prG, prB] = hexToRgb(config.pdfPrimaryColor || "#2C21FF");
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -218,4 +218,80 @@ export function exportPdfReport(options: PdfReportOptions): void {
     ? options.filename
     : `${options.filename}.pdf`;
   doc.save(cleanFilename);
+}
+
+/**
+ * Genera y descarga un PDF de muestra para verificar el diseño, color y formato de papel.
+ */
+export function exportSamplePdf(branding: Partial<SystemConfig>): void {
+  const paperLabel =
+    branding.pdfPaperSize === "letter"
+      ? "Carta (Letter)"
+      : branding.pdfPaperSize === "legal"
+      ? "Oficio (Legal)"
+      : "A4 Estándar";
+
+  exportPdfReport({
+    title: "Reporte de Muestra & Previsualización",
+    subtitle: `Formato de Papel: ${paperLabel} · Nomenclatura activa: ${branding.basePrefix || "Mas-Corp-"}0001`,
+    filename: `M-Wallet_Muestra_${branding.pdfPaperSize || "A4"}`,
+    branding,
+    bcvRates: { usd: 794.99, eur: 922.69, date: new Date().toISOString() },
+    kpis: [
+      { label: "Facturas Emitidas", value: "14" },
+      { label: "Total Facturado", value: "$ 18.450,00" },
+      { label: "Nómina Mensual", value: "$ 1.760,00" },
+      { label: "Servicios Activos", value: "$ 79,00" },
+    ],
+    columns: [
+      { header: "Código", dataKey: "code", align: "left" },
+      { header: "Descripción / Concepto", dataKey: "desc", align: "left" },
+      { header: "Categoría", dataKey: "cat", align: "left" },
+      { header: "Fecha Emisión", dataKey: "date", align: "center" },
+      { header: "Estado", dataKey: "status", align: "center" },
+      { header: "Monto Total", dataKey: "amount", align: "right" },
+    ],
+    data: [
+      {
+        code: `${branding.invoicePrefix || "Mas-Corp-"}0001`,
+        desc: "Servicios de Consultoría Tecnológica & Infraestructura",
+        cat: "Facturación",
+        date: "2026-08-29",
+        status: "Cobrada",
+        amount: "$ 4.500,00",
+      },
+      {
+        code: `${branding.invoicePrefix || "Mas-Corp-"}0002`,
+        desc: "Desarrollo de Software y Wallet Corporativa",
+        cat: "Facturación",
+        date: "2026-08-28",
+        status: "Pendiente",
+        amount: "$ 7.200,00",
+      },
+      {
+        code: `${branding.expensePrefix || "Mas-Corp-"}0001`,
+        desc: "Servidor Cloud & Base de Datos Supabase Pro",
+        cat: "Infraestructura",
+        date: "2026-08-25",
+        status: "Pagado",
+        amount: "$ 25,00",
+      },
+      {
+        code: `${branding.employeePrefix || "Mas-Corp-"}0001`,
+        desc: "Nómina Quincenal · Ana Reyes (Diseño)",
+        cat: "Nómina",
+        date: "2026-08-15",
+        status: "Pagado",
+        amount: "$ 220,00",
+      },
+      {
+        code: `${branding.servicePrefix || "Mas-Corp-"}0001`,
+        desc: "Suscripción Claude AI Pro",
+        cat: "Software / IA",
+        date: "2026-08-18",
+        status: "Recurrente",
+        amount: "$ 20,00",
+      },
+    ],
+  });
 }

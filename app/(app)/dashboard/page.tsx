@@ -18,66 +18,76 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between lg:hidden">
         <Logo />
         <ThemeToggle />
       </header>
 
-      <section>
-        <p className="font-serif text-[15px] text-muted capitalize">
-          Saldo · {currentMonth}
-        </p>
-        <HeroBalance value={s.balance} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Columna Principal (8 columnas en desktop) */}
+        <div className="lg:col-span-7 space-y-6">
+          <section className="rounded-3xl border border-line bg-card p-6 shadow-sm">
+            <p className="font-serif text-[15px] text-muted capitalize">
+              Saldo Total Disponible · {currentMonth}
+            </p>
+            <HeroBalance value={s.balance} />
 
-        {/* Equivalencia en Bolívares y Euros */}
-        <p className="mt-2 text-xs text-hint">
-          ≈ {formatCurrency(vesEquivalent, "VES")} · ≈ {formatCurrency(eurEquivalent, "EUR")}
-        </p>
+            {/* Equivalencia en Bolívares y Euros */}
+            <p className="mt-2 text-xs text-hint">
+              ≈ {formatCurrency(vesEquivalent, "VES")} · ≈ {formatCurrency(eurEquivalent, "EUR")}
+            </p>
 
-        {/* Tasas oficiales del día (siempre visibles) */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-soft px-3 py-2 text-xs text-muted">
-          <span className="font-medium text-foreground">
-            Tasas del día ({formatDate(s.bcv.date)}):
-          </span>
-          <span>
-            $ 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.usd, "VES")}</strong>
-          </span>
-          <span className="text-hint">·</span>
-          <span>
-            € 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.eur, "VES")}</strong>
-          </span>
+            {/* Tasas oficiales del día (siempre visibles) */}
+            <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-2xl bg-soft px-3.5 py-2.5 text-xs text-muted">
+              <span className="font-medium text-foreground">
+                Tasas Oficiales BCV ({formatDate(s.bcv.date)}):
+              </span>
+              <span>
+                $ 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.usd, "VES")}</strong>
+              </span>
+              <span className="text-hint">·</span>
+              <span>
+                € 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.eur, "VES")}</strong>
+              </span>
+            </div>
+          </section>
+
+          <MiniLineChart series={s.chartSeries} hasData={s.hasMovements} />
+
+          <StatPills
+            porCobrar={s.porCobrar}
+            vencidas={s.vencidas}
+            cobradoMes={s.cobradoMes}
+          />
         </div>
-      </section>
 
-      <MiniLineChart series={s.chartSeries} hasData={s.hasMovements} />
+        {/* Columna Lateral (5 columnas en desktop): Compromisos y Movimientos */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Compromisos fijos del mes (contabilidad de nómina + servicios) */}
+          <section className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+              <p className="inline-flex items-center gap-1.5 text-xs text-muted">
+                <PayrollIcon className="h-4 w-4 text-purple-600" /> Nómina (mes)
+              </p>
+              <p className="tnum mt-1 text-lg font-medium">
+                {formatMoney(s.nominaMes)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+              <p className="inline-flex items-center gap-1.5 text-xs text-muted">
+                <GridIcon className="h-4 w-4 text-accent" /> Servicios (mes)
+              </p>
+              <p className="tnum mt-1 text-lg font-medium">
+                {formatMoney(s.serviciosMes)}
+              </p>
+            </div>
+          </section>
 
-      <StatPills
-        porCobrar={s.porCobrar}
-        vencidas={s.vencidas}
-        cobradoMes={s.cobradoMes}
-      />
-
-      {/* Compromisos fijos del mes (contabilidad de nómina + servicios) */}
-      <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-soft p-4">
-          <p className="inline-flex items-center gap-1.5 text-xs text-muted">
-            <PayrollIcon className="h-4 w-4" /> Nómina (mes)
-          </p>
-          <p className="tnum mt-1 text-lg font-medium">
-            {formatMoney(s.nominaMes)}
-          </p>
+          <div className="rounded-3xl border border-line bg-card p-5 shadow-sm">
+            <Transactions movements={s.movements} />
+          </div>
         </div>
-        <div className="rounded-2xl bg-soft p-4">
-          <p className="inline-flex items-center gap-1.5 text-xs text-muted">
-            <GridIcon className="h-4 w-4" /> Servicios (mes)
-          </p>
-          <p className="tnum mt-1 text-lg font-medium">
-            {formatMoney(s.serviciosMes)}
-          </p>
-        </div>
-      </section>
-
-      <Transactions movements={s.movements} />
+      </div>
     </div>
   );
 }

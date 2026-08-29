@@ -117,13 +117,13 @@ export function BottomNav() {
       {open && (
         <>
           <button
-            className="fixed inset-0 z-30 bg-black/30"
+            className="fixed inset-0 z-30 bg-black/30 lg:hidden"
             aria-label="Cerrar menú"
             onClick={() => setOpen(false)}
           />
           <div
             ref={sheetRef}
-            className="fixed inset-x-0 bottom-[92px] z-40 mx-auto w-[calc(100%-2.5rem)] max-w-[440px] space-y-2"
+            className="fixed inset-x-0 bottom-[92px] z-40 mx-auto w-[calc(100%-2.5rem)] max-w-[440px] space-y-2 lg:hidden"
           >
             {quickActions.map((a) => (
               <Link
@@ -145,7 +145,7 @@ export function BottomNav() {
 
       <nav
         ref={barRef}
-        className="fixed inset-x-0 bottom-4 z-40 mx-auto flex h-14 w-[calc(100%-2.5rem)] max-w-[440px] items-center justify-around rounded-full border border-line bg-card px-2 shadow-[0_6px_24px_rgba(0,0,0,0.08)]"
+        className="fixed inset-x-0 bottom-4 z-40 mx-auto flex h-14 w-[calc(100%-2.5rem)] max-w-[440px] items-center justify-around rounded-full border border-line bg-card px-2 shadow-[0_6px_24px_rgba(0,0,0,0.08)] lg:hidden"
       >
         {left.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} />

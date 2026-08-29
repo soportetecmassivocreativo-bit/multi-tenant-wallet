@@ -355,6 +355,34 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                   </div>
                 </div>
 
+                {/* Tipo de Hoja / Tamaño de Papel */}
+                <div>
+                  <label className="mb-1.5 block text-xs text-muted font-medium">
+                    Tipo de Hoja / Formato de Papel
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "a4", name: "A4", sub: "210 × 297 mm" },
+                      { id: "letter", name: "Carta", sub: "216 × 279 mm" },
+                      { id: "legal", name: "Oficio", sub: "216 × 356 mm" },
+                    ].map((fmt) => (
+                      <button
+                        key={fmt.id}
+                        type="button"
+                        onClick={() => updateField("pdfPaperSize", fmt.id as "a4" | "letter" | "legal")}
+                        className={`rounded-xl border p-2 text-left transition-all ${
+                          (config.pdfPaperSize || "a4") === fmt.id
+                            ? "border-accent bg-accent-bg text-accent shadow-sm"
+                            : "border-line bg-card hover:bg-soft text-foreground"
+                        }`}
+                      >
+                        <p className="text-xs font-semibold">{fmt.name}</p>
+                        <p className="text-[10px] text-muted">{fmt.sub}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Color Primario */}
                 <div>
                   <label className="mb-1.5 block text-xs text-muted">Color de Encabezados y Tablas</label>

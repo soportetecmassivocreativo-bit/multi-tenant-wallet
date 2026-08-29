@@ -16,6 +16,7 @@ export interface SystemConfig {
   pdfCompanyRif: string; // "J-50000000-0"
   pdfHeaderSubtitle: string; // "Sistema Financiero & Facturación"
   pdfPrimaryColor: string; // "#2C21FF"
+  pdfPaperSize: "a4" | "letter" | "legal"; // "a4" | "letter" | "legal"
   pdfContactEmail: string; // "contacto@massivocorp.com"
   pdfContactPhone: string; // "+58 412-0000000"
   pdfShowBcvRates: boolean; // true
@@ -38,6 +39,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfCompanyRif: "J-50000000-0",
   pdfHeaderSubtitle: "Sistema Financiero & Facturación",
   pdfPrimaryColor: "#2C21FF",
+  pdfPaperSize: "a4",
   pdfContactEmail: "contacto@massivocorp.com",
   pdfContactPhone: "+58 412-0000000",
   pdfShowBcvRates: true,
