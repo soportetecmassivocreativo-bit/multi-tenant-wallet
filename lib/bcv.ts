@@ -10,7 +10,30 @@ export interface BcvRateResult {
 }
 
 /**
- * Intenta obtener las tasas directamente desde el portal oficial del BCV (https://www.bcv.org.ve/)
+ * Calcula la fecha de vigencia para fines de semana (sábado/domingo → lunes próximo).
+ */
+function getEffectiveBcvDate(baseDate?: string): string {
+  const now = baseDate ? new Date(baseDate) : new Date();
+  const dayOfWeek = now.getDay(); // 0 = Domingo, 6 = Sábado
+
+  if (dayOfWeek === 6) {
+    // Sábado -> avanzar 2 días al lunes
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + 2);
+    return monday.toISOString().slice(0, 10);
+  } else if (dayOfWeek === 0) {
+    // Domingo -> avanzar 1 día al lunes
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + 1);
+    return monday.toISOString().slice(0, 10);
+  }
+
+  return baseDate ? baseDate.slice(0, 10) : now.toISOString().slice(0, 10);
+}
+
+/**
+ * Obtiene las tasas oficiales directamente desde el portal del BCV (https://www.bcv.org.ve/)
+ * con la Fecha Valor oficial de vigencia (incluyendo fines de semana).
  */
 export async function fetchFromBcvOfficial(): Promise<BcvRateResult | null> {
   try {
@@ -37,13 +60,18 @@ export async function fetchFromBcvOfficial(): Promise<BcvRateResult | null> {
 
     const usdMatch = html.match(/id=["']dolar["'][\s\S]*?<strong[^>]*>\s*([\d,.]+)\s*<\/strong>/i);
     const eurMatch = html.match(/id=["']euro["'][\s\S]*?<strong[^>]*>\s*([\d,.]+)\s*<\/strong>/i);
-    const dateMatch = html.match(/<span[^>]*class=["'][^"']*date-display-single[^"']*["'][^>]*content=["']([^"']+)["']/i);
+    const dateAttrMatch = html.match(/<span[^>]*class=["'][^"']*date-display-single[^"']*["'][^>]*content=["']([^"']+)["']/i);
 
     if (!usdMatch || !eurMatch) return null;
 
     const usd = parseFloat(usdMatch[1].replace(/\./g, "").replace(",", "."));
     const eur = parseFloat(eurMatch[1].replace(/\./g, "").replace(",", "."));
-    const date = dateMatch ? dateMatch[1].slice(0, 10) : new Date().toISOString().slice(0, 10);
+    
+    // Obtiene la fecha exacta del atributo content (ej: 2026-08-31) o calcula la vigencia
+    let date = dateAttrMatch ? dateAttrMatch[1].slice(0, 10) : "";
+    if (!date) {
+      date = getEffectiveBcvDate();
+    }
 
     if (isNaN(usd) || isNaN(eur) || usd <= 0 || eur <= 0) return null;
 
@@ -55,7 +83,7 @@ export async function fetchFromBcvOfficial(): Promise<BcvRateResult | null> {
 }
 
 /**
- * Fallback a la API de contingencia oficial (DolarApi) que replica exactamente el BCV
+ * Fallback a la API de contingencia (DolarApi)
  */
 export async function fetchFromBcvBackup(): Promise<BcvRateResult | null> {
   try {
@@ -71,7 +99,10 @@ export async function fetchFromBcvBackup(): Promise<BcvRateResult | null> {
 
     const usd = Number(usdData.promedio);
     const eur = Number(eurData.promedio);
-    const date = (usdData.fechaActualizacion || new Date().toISOString()).slice(0, 10);
+    
+    // Ajustar fecha para fines de semana si DolarApi devuelve la fecha del viernes
+    const rawDate = (usdData.fechaActualizacion || new Date().toISOString()).slice(0, 10);
+    const date = getEffectiveBcvDate(rawDate);
 
     if (isNaN(usd) || isNaN(eur) || usd <= 0 || eur <= 0) return null;
 
@@ -83,22 +114,23 @@ export async function fetchFromBcvBackup(): Promise<BcvRateResult | null> {
 }
 
 /**
- * Obtiene la tasa actualizada en vivo del BCV de forma ultra-rápida.
+ * Obtiene la tasa actualizada en vivo del BCV.
+ * Prioriza el portal oficial para obtener siempre la Fecha Valor de vigencia exacta.
  */
 export async function fetchLiveBcvRates(): Promise<BcvRateResult> {
-  // 1. Intenta primero la API réplica de alta velocidad (CDN < 300ms)
-  const backup = await fetchFromBcvBackup();
-  if (backup) return backup;
-
-  // 2. Si falla la API, intenta el portal oficial de bcv.org.ve
+  // 1. Intenta primero el portal oficial de bcv.org.ve para obtener la Fecha Valor real
   const official = await fetchFromBcvOfficial();
   if (official) return official;
+
+  // 2. Si bcv.org.ve no responde, usa la réplica de contingencia
+  const backup = await fetchFromBcvBackup();
+  if (backup) return backup;
 
   // 3. Fallback por defecto
   return {
     usd: defaultMockRates.USD,
     eur: defaultMockRates.EUR,
-    date: defaultMockRates.date,
+    date: getEffectiveBcvDate(),
     source: "Mock Local",
   };
 }
