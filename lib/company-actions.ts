@@ -32,8 +32,8 @@ export async function updateCompany(
     .eq("id", user.id)
     .single();
   if (!prof) return { ok: false, error: "No autenticado." };
-  if (prof.role !== "admin")
-    return { ok: false, error: "Solo el administrador puede editar la empresa." };
+  if (prof.role !== "admin" && prof.role !== "ceo")
+    return { ok: false, error: "Solo el administrador o CEO puede editar la empresa." };
 
   const { error } = await supabase
     .from("companies")

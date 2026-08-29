@@ -33,7 +33,12 @@ export function InviteForm() {
 
   return (
     <section className="space-y-2 rounded-2xl border border-line bg-card p-4">
-      <p className="font-serif text-[15px]">Invitar a alguien</p>
+      <div>
+        <p className="font-serif text-[15px]">Invitar a un miembro</p>
+        <p className="text-xs text-muted">
+          Asigna un rol (Administrador, CEO, Project Manager o Contador) a un nuevo integrante.
+        </p>
+      </div>
       <input
         type="email"
         value={email}

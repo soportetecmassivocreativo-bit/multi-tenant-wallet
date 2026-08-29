@@ -40,7 +40,7 @@ export default async function EquipoPage() {
       <div>
         <h1 className="font-serif text-2xl tracking-tight">Equipo</h1>
         <p className="mt-1 text-sm text-muted">
-          Invita a tu contador para que gestione las finanzas contigo.
+          Invita y gestiona a los miembros de tu equipo (CEO, Administrador, Project Manager, Contador).
         </p>
       </div>
 
@@ -99,7 +99,7 @@ export default async function EquipoPage() {
 
       {!admin && (
         <p className="text-center text-xs text-hint">
-          Solo el administrador puede invitar o gestionar el equipo.
+          Solo el CEO y el Administrador pueden invitar o gestionar el equipo.
         </p>
       )}
     </div>
