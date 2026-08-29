@@ -299,7 +299,10 @@ export async function getEmployees(): Promise<Employee[]> {
     .select("id, name:full_name, role, salary, currency")
     .eq("active", true)
     .order("full_name");
-  return (data ?? []) as unknown as Employee[];
+  return (data ?? []).map((e, idx) => ({
+    ...e,
+    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+  })) as unknown as Employee[];
 }
 
 export async function getPayrollPeriods(): Promise<PayrollPeriod[]> {
@@ -324,7 +327,10 @@ export async function getServices(): Promise<Service[]> {
     )
     .eq("active", true)
     .order("next_charge_date");
-  return (data ?? []) as unknown as Service[];
+  return (data ?? []).map((s, idx) => ({
+    ...s,
+    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+  })) as unknown as Service[];
 }
 
 export async function getProducts(): Promise<Product[]> {

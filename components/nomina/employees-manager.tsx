@@ -173,7 +173,12 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
                 {(e.name || "?").charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium">{e.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-[13px] font-medium">{e.name}</p>
+                  <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] text-muted">
+                    {e.code || "Mas-Corp-0001"}
+                  </span>
+                </div>
                 <p className="text-[11px] text-hint">{e.role}</p>
               </div>
               <span className="tnum text-sm font-medium">

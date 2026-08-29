@@ -192,6 +192,9 @@ export function ServicesManager({ services }: { services: Service[] }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-medium">{s.name}</p>
+                  <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] text-muted">
+                    {s.code || "Mas-Corp-0001"}
+                  </span>
                   <span className="rounded-full bg-soft px-2 py-0.5 text-[10px] text-muted">
                     {s.cycle}
                   </span>

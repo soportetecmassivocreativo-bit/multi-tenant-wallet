@@ -15,6 +15,7 @@ import {
   LogoutIcon,
   UserIcon,
   ShieldCheckIcon,
+  SettingsIcon,
 } from "@/components/ui/icons";
 
 type Item = {
@@ -25,6 +26,7 @@ type Item = {
 };
 
 const modules: Item[] = [
+  { href: "/configuracion", label: "Configuración", desc: "Personalización PDF y contabilizadores Mas-Corp-", Icon: SettingsIcon },
   { href: "/perfil", label: "Mi Perfil & Seguridad", desc: "Cambiar clave y datos de cuenta", Icon: UserIcon },
   { href: "/auditoria", label: "Auditoría", desc: "Registro de movimientos y acciones", Icon: ShieldCheckIcon },
   { href: "/reportes", label: "Reportes", desc: "Ingresos vs egresos del mes", Icon: ChartIcon },

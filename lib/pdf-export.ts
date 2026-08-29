@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { DEFAULT_SYSTEM_CONFIG, type SystemConfig } from "@/lib/config";
 
 export interface PdfReportColumn {
   header: string;
@@ -20,10 +21,25 @@ export interface PdfReportOptions {
   columns: PdfReportColumn[];
   data: Record<string, string | number>[];
   bcvRates?: { usd: number; eur: number; date?: string };
+  branding?: Partial<SystemConfig>;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    return [r, g, b];
+  }
+  const r = parseInt(clean.substring(0, 2), 16) || 44;
+  const g = parseInt(clean.substring(2, 4), 16) || 33;
+  const b = parseInt(clean.substring(4, 6), 16) || 255;
+  return [r, g, b];
 }
 
 /**
- * Genera y descarga un reporte PDF profesional con el branding oficial de Massivo Corp.
+ * Genera y descarga un reporte PDF profesional con el branding y personalización de Massivo Corp.
  */
 export function exportPdfReport(options: PdfReportOptions): void {
   const doc = new jsPDF({
@@ -32,6 +48,12 @@ export function exportPdfReport(options: PdfReportOptions): void {
     format: "a4",
   });
 
+  const config = {
+    ...DEFAULT_SYSTEM_CONFIG,
+    ...(options.branding ?? {}),
+  };
+
+  const [prR, prG, prB] = hexToRgb(config.pdfPrimaryColor || "#2C21FF");
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 14;
 
@@ -43,17 +65,21 @@ export function exportPdfReport(options: PdfReportOptions): void {
   // Logo / Texto de Marca Massivo Corp
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.setTextColor(44, 33, 255); // Color primario #2C21FF
+  doc.setTextColor(prR, prG, prB);
   doc.text("M-WALLET", margin + 5, margin + 8);
 
   doc.setFontSize(12);
   doc.setTextColor(20, 20, 30);
-  doc.text("Massivo Corp", margin + 5, margin + 15);
+  doc.text(config.pdfCompanyName || "Massivo Corp", margin + 5, margin + 15);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(100, 100, 120);
-  doc.text("Sistema Financiero & Facturación", margin + 5, margin + 20);
+  doc.text(
+    `${config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF: ${config.pdfCompanyRif || "J-50000000-0"}`,
+    margin + 5,
+    margin + 20
+  );
 
   // Fecha y Tasa a la derecha
   const now = new Date();
@@ -75,13 +101,18 @@ export function exportPdfReport(options: PdfReportOptions): void {
     align: "right",
   });
 
-  if (options.bcvRates && options.bcvRates.usd > 0) {
+  if (config.pdfShowBcvRates && options.bcvRates && options.bcvRates.usd > 0) {
     doc.text(
       `Tasa Ref. BCV: USD ${options.bcvRates.usd.toFixed(2)} Bs. | EUR ${options.bcvRates.eur.toFixed(2)} Bs.`,
       pageWidth - margin - 5,
       margin + 15,
       { align: "right" }
     );
+  }
+
+  if (config.pdfContactPhone || config.pdfContactEmail) {
+    const contact = [config.pdfContactPhone, config.pdfContactEmail].filter(Boolean).join(" · ");
+    doc.text(contact, pageWidth - margin - 5, margin + 20, { align: "right" });
   }
 
   let currentY = margin + 32;
@@ -146,7 +177,7 @@ export function exportPdfReport(options: PdfReportOptions): void {
     body: options.data,
     theme: "striped",
     headStyles: {
-      fillColor: [44, 33, 255], // #2C21FF
+      fillColor: [prR, prG, prB],
       textColor: [255, 255, 255],
       fontStyle: "bold",
       fontSize: 8.5,
@@ -169,7 +200,7 @@ export function exportPdfReport(options: PdfReportOptions): void {
       doc.setFontSize(7.5);
       doc.setTextColor(140, 140, 160);
       doc.text(
-        "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet",
+        config.pdfFooterText || "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet",
         margin,
         doc.internal.pageSize.getHeight() - 8
       );

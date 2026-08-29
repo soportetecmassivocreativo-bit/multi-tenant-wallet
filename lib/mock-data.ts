@@ -138,6 +138,7 @@ export const transactions: Transaction[] = [
 
 export interface Employee {
   id: string;
+  code?: string;
   name: string;
   role: string;
   salary: number; // salario por quincena
@@ -145,10 +146,10 @@ export interface Employee {
 }
 
 export const employees: Employee[] = [
-  { id: "e1", name: "Ana Reyes", role: "Diseñadora", salary: 220, currency: "USD" },
-  { id: "e2", name: "Luis Peña", role: "Desarrollador", salary: 300, currency: "USD" },
-  { id: "e3", name: "María Gómez", role: "Administración", salary: 180, currency: "USD" },
-  { id: "e4", name: "Jorge Díaz", role: "Ventas", salary: 160, currency: "USD" },
+  { id: "e1", code: "Mas-Corp-0001", name: "Ana Reyes", role: "Diseñadora", salary: 220, currency: "USD" },
+  { id: "e2", code: "Mas-Corp-0002", name: "Luis Peña", role: "Desarrollador", salary: 300, currency: "USD" },
+  { id: "e3", code: "Mas-Corp-0003", name: "María Gómez", role: "Administración", salary: 180, currency: "USD" },
+  { id: "e4", code: "Mas-Corp-0004", name: "Jorge Díaz", role: "Ventas", salary: 160, currency: "USD" },
 ];
 
 export type PayrollStatus = "pendiente" | "pagada";
@@ -176,6 +177,7 @@ export type ServiceCycle = "mensual" | "anual";
 
 export interface Service {
   id: string;
+  code?: string;
   name: string;
   amount: number;
   currency: CurrencyCode;
@@ -185,8 +187,8 @@ export interface Service {
 }
 
 export const services: Service[] = [
-  { id: "s1", name: "Claude", amount: 20, currency: "USD", cycle: "mensual", category: "IA", nextChargeDate: "2026-07-18" },
-  { id: "s2", name: "Supabase", amount: 25, currency: "USD", cycle: "mensual", category: "Backend", nextChargeDate: "2026-07-22" },
-  { id: "s3", name: "Vercel", amount: 20, currency: "USD", cycle: "mensual", category: "Hosting", nextChargeDate: "2026-07-25" },
-  { id: "s4", name: "Dominio .com", amount: 14, currency: "USD", cycle: "anual", category: "Dominio", nextChargeDate: "2027-03-01" },
+  { id: "s1", code: "Mas-Corp-0001", name: "Claude", amount: 20, currency: "USD", cycle: "mensual", category: "IA", nextChargeDate: "2026-07-18" },
+  { id: "s2", code: "Mas-Corp-0002", name: "Supabase", amount: 25, currency: "USD", cycle: "mensual", category: "Backend", nextChargeDate: "2026-07-22" },
+  { id: "s3", code: "Mas-Corp-0003", name: "Vercel", amount: 20, currency: "USD", cycle: "mensual", category: "Hosting", nextChargeDate: "2026-07-25" },
+  { id: "s4", code: "Mas-Corp-0004", name: "Dominio .com", amount: 14, currency: "USD", cycle: "anual", category: "Dominio", nextChargeDate: "2027-03-01" },
 ];
