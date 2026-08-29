@@ -23,32 +23,44 @@ export async function signIn(
   if (!email) return { error: "Escribe tu correo electrónico." };
   if (!password) return { error: "Escribe tu contraseña." };
 
-  try {
-    const supabase = await createClient();
+  const MAX_RETRIES = 2; // hasta 2 intentos (cold-start tolerante)
+  const TIMEOUT_MS = 15000; // 15 segundos por intento
 
-    // Timeout de 6 segundos (Supabase Auth en producción tarda 1-3s normalmente)
-    const authPromise = supabase.auth.signInWithPassword({ email, password });
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT")), 6000)
-    );
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const supabase = await createClient();
 
-    const { error } = await Promise.race([authPromise, timeoutPromise]);
+      const authPromise = supabase.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("TIMEOUT")), TIMEOUT_MS)
+      );
 
-    if (error) {
-      if (error.message === "Invalid login credentials")
-        return { error: "Correo o contraseña incorrectos." };
-      if (error.message === "Email not confirmed")
-        return { error: "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada." };
-      return { error: error.message };
+      const { error } = await Promise.race([authPromise, timeoutPromise]);
+
+      if (error) {
+        if (error.message === "Invalid login credentials")
+          return { error: "Correo o contraseña incorrectos." };
+        if (error.message === "Email not confirmed")
+          return { error: "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada." };
+        return { error: error.message };
+      }
+
+      // Éxito — salimos del loop
+      revalidatePath("/", "layout");
+      break;
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "TIMEOUT") {
+        if (attempt < MAX_RETRIES) {
+          // Reintento automático silencioso (cold-start)
+          continue;
+        }
+        return { error: "El servidor está iniciando, por favor intenta de nuevo en unos segundos." };
+      }
+      const message = err instanceof Error ? err.message : "Error desconocido.";
+      return { error: `Error de conexión: ${message}` };
     }
-
-    revalidatePath("/", "layout");
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === "TIMEOUT")
-      return { error: "El servidor tardó demasiado en responder. Intenta de nuevo en unos segundos." };
-    const message = err instanceof Error ? err.message : "Error desconocido.";
-    return { error: `Error de conexión: ${message}` };
   }
+
   redirect("/dashboard");
 }
 
