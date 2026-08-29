@@ -27,7 +27,10 @@ export default async function EquipoPage() {
     getTeam(),
     getInvitations(),
   ]);
-  const admin = profile?.role === "admin" || profile?.role === "ceo";
+  const canManage =
+    profile?.role === "admin" ||
+    profile?.role === "ceo" ||
+    profile?.role === "project_manager";
 
   return (
     <div className="space-y-6">
@@ -44,7 +47,7 @@ export default async function EquipoPage() {
         </p>
       </div>
 
-      {admin && <InviteForm />}
+      {canManage && <InviteForm />}
 
       {/* Miembros */}
       <section>
@@ -86,7 +89,7 @@ export default async function EquipoPage() {
                 </p>
               </div>
               <RoleBadge role={i.role} />
-              {admin && (
+              {canManage && (
                 <DeleteButton
                   action={cancelInvitation.bind(null, i.id)}
                   ariaLabel={`Cancelar invitación de ${i.email}`}
@@ -97,9 +100,9 @@ export default async function EquipoPage() {
         </section>
       )}
 
-      {!admin && (
+      {!canManage && (
         <p className="text-center text-xs text-hint">
-          Solo el CEO y el Administrador pueden invitar o gestionar el equipo.
+          Solo el CEO, Administrador y Project Manager pueden invitar o gestionar el equipo.
         </p>
       )}
     </div>

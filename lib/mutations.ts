@@ -297,8 +297,8 @@ async function deleteRow(
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
-  if (ctx.role !== "admin" && ctx.role !== "ceo")
-    return { ok: false, error: "Solo el administrador o CEO puede eliminar." };
+  if (ctx.role !== "admin" && ctx.role !== "ceo" && ctx.role !== "project_manager")
+    return { ok: false, error: "Solo el Administrador, CEO o Project Manager puede eliminar." };
 
   const { error } = await ctx.supabase.from(table).delete().eq("id", id);
   if (error) return { ok: false, error: error.message };

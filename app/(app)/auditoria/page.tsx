@@ -10,7 +10,10 @@ export default async function AuditoriaPage() {
     getAuditLogs(),
   ]);
 
-  const canView = profile?.role === "admin" || profile?.role === "ceo";
+  const canView =
+    profile?.role === "admin" ||
+    profile?.role === "ceo" ||
+    profile?.role === "project_manager";
 
   return (
     <div className="space-y-6">
@@ -39,7 +42,7 @@ export default async function AuditoriaPage() {
       ) : (
         <div className="rounded-2xl border border-line bg-card p-6 text-center">
           <p className="text-sm text-muted">
-            Solo el CEO y el Administrador tienen acceso al registro de auditoría de la empresa.
+            Solo el CEO, Administrador y Project Manager tienen acceso al registro de auditoría de la empresa.
           </p>
         </div>
       )}

@@ -36,7 +36,7 @@ export function InviteForm() {
       <div>
         <p className="font-serif text-[15px]">Invitar a un miembro</p>
         <p className="text-xs text-muted">
-          Asigna un rol (Administrador, CEO, Project Manager o Contador) a un nuevo integrante.
+          El CEO, Administrador y Project Manager pueden sumar nuevos integrantes al equipo.
         </p>
       </div>
       <input
