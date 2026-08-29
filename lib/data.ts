@@ -38,36 +38,51 @@ export interface BcvRates {
 import { fetchLiveBcvRates, syncAndSaveBcvRates } from "@/lib/bcv";
 
 export async function getBcvRates(): Promise<BcvRates> {
+  // Mock rápido cuando no hay Supabase
   if (!isSupabaseConfigured) {
     const live = await fetchLiveBcvRates();
     return { usd: live.usd, eur: live.eur, date: live.date };
   }
+
   try {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("bcv_rates")
-      .select("date:rate_date, usd, eur")
-      .order("rate_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Timeout de 4s: si Supabase no responde, caemos al live
+    const dbPromise = (async (): Promise<BcvRates | null> => {
+      const supabase = await createClient();
+      const { data } = await supabase
+        .from("bcv_rates")
+        .select("date:rate_date, usd, eur")
+        .order("rate_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const today = new Date().toISOString().slice(0, 10);
-    if (data && String(data.date) >= today) {
-      return {
-        usd: Number(data.usd),
-        eur: Number(data.eur),
-        date: String(data.date),
-      };
-    }
+      const today = new Date().toISOString().slice(0, 10);
+      if (data && String(data.date) >= today) {
+        return {
+          usd: Number(data.usd),
+          eur: Number(data.eur),
+          date: String(data.date),
+        };
+      }
+      return null; // BD desactualizada → obtener en vivo
+    })();
 
-    // Si no hay datos o la fecha en BD es anterior a hoy, sincronizamos y obtenemos la tasa oficial
-    const live = await syncAndSaveBcvRates();
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), 4000),
+    );
+
+    const fromDb = await Promise.race([dbPromise, timeoutPromise]);
+    if (fromDb) return fromDb;
+
+    // BD desactualizada o lenta → sincronizar en background, devolver live
+    syncAndSaveBcvRates().catch(() => {}); // fire-and-forget
+    const live = await fetchLiveBcvRates();
     return { usd: live.usd, eur: live.eur, date: live.date };
   } catch {
     const live = await fetchLiveBcvRates();
     return { usd: live.usd, eur: live.eur, date: live.date };
   }
 }
+
 
 export async function getInvoices(): Promise<Invoice[]> {
   if (!isSupabaseConfigured) return mock.invoices;
@@ -525,7 +540,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   ]);
 
   const timeoutFallback = new Promise<null>((resolve) =>
-    setTimeout(() => resolve(null), 12000)
+    setTimeout(() => resolve(null), 7000)
   );
 
   const result = await Promise.race([fetchAll, timeoutFallback]);

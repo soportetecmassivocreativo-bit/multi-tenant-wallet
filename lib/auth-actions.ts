@@ -26,10 +26,10 @@ export async function signIn(
   try {
     const supabase = await createClient();
 
-    // Timeout de 10 segundos para no dejar al usuario colgado infinitamente
+    // Timeout de 6 segundos (Supabase Auth en producción tarda 1-3s normalmente)
     const authPromise = supabase.auth.signInWithPassword({ email, password });
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT")), 10000)
+      setTimeout(() => reject(new Error("TIMEOUT")), 6000)
     );
 
     const { error } = await Promise.race([authPromise, timeoutPromise]);
