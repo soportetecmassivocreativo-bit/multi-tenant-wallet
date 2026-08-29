@@ -1,8 +1,7 @@
 import { NuevoGastoForm } from "@/components/gastos/nuevo-gasto-form";
 import { GastosPdfButton } from "@/components/gastos/gastos-pdf-button";
-import { DeleteButton } from "@/components/ui/delete-button";
-import { deleteExpense } from "@/lib/mutations";
-import { formatMoney, formatDate } from "@/lib/format";
+import { GastosManager } from "@/components/gastos/gastos-manager";
+import { formatMoney } from "@/lib/format";
 import { getExpenses, isAdmin } from "@/lib/data";
 
 export default async function GastosPage() {
@@ -12,55 +11,26 @@ export default async function GastosPage() {
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
-        <h1 className="font-serif text-2xl tracking-tight">Gastos</h1>
+        <div>
+          <h1 className="font-serif text-2xl tracking-tight">Gastos & Egresos</h1>
+          <p className="text-xs text-hint mt-0.5">
+            Registro, historial interno y comprobantes en PDF
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <GastosPdfButton expenses={expenses} total={total} />
           <NuevoGastoForm />
         </div>
       </header>
 
-      <div className="rounded-2xl bg-soft p-4">
-        <p className="text-xs text-muted">Total registrado</p>
-        <p className="tnum mt-1 text-2xl font-medium text-overdue">
+      <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+        <p className="text-xs text-muted">Total egresos registrados</p>
+        <p className="tnum mt-1 text-2xl font-semibold text-overdue">
           {formatMoney(total)}
         </p>
       </div>
 
-      <section>
-        {expenses.length === 0 ? (
-          <p className="py-8 text-center text-sm text-hint">
-            Aún no hay gastos. Registra el primero.
-          </p>
-        ) : (
-          expenses.map((e) => (
-            <div
-              key={e.id}
-              className="flex items-center gap-3 border-t border-line py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-[13px] font-medium">{e.note}</p>
-                  <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] text-muted">
-                    {e.code || "Mas-Corp-0001"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-hint">
-                  {e.category} · {formatDate(e.date)}
-                </p>
-              </div>
-              <span className="tnum text-sm font-medium text-overdue">
-                − {formatMoney(e.amount)}
-              </span>
-              {admin && (
-                <DeleteButton
-                  action={deleteExpense.bind(null, e.id)}
-                  ariaLabel={`Eliminar ${e.note}`}
-                />
-              )}
-            </div>
-          ))
-        )}
-      </section>
+      <GastosManager expenses={expenses} admin={admin} />
     </div>
   );
 }

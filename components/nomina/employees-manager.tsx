@@ -11,14 +11,34 @@ import {
 import { DeleteButton } from "@/components/ui/delete-button";
 import { ActionButton } from "@/components/ui/action-button";
 import { MoneyInput } from "@/components/ui/money-input";
-import { PlusIcon, CheckIcon, EditIcon } from "@/components/ui/icons";
-import { formatCurrency, CURRENCIES, type CurrencyCode } from "@/lib/currency";
-import type { Employee } from "@/lib/mock-data";
+import {
+  PlusIcon,
+  CheckIcon,
+  EditIcon,
+  DownloadIcon,
+  UsersIcon,
+  PayrollIcon,
+  SearchIcon,
+} from "@/components/ui/icons";
+import { formatCurrency, type CurrencyCode } from "@/lib/currency";
+import { formatDate, formatMoney } from "@/lib/format";
+import { exportPayrollReceiptPdf } from "@/lib/pdf-export";
+import type { Employee, PayrollPeriod } from "@/lib/mock-data";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent";
 
-export function EmployeesManager({ employees }: { employees: Employee[] }) {
+interface EmployeesManagerProps {
+  employees: Employee[];
+  payrollPeriods?: PayrollPeriod[];
+}
+
+export function EmployeesManager({
+  employees,
+  payrollPeriods = [],
+}: EmployeesManagerProps) {
+  const [tab, setTab] = useState<"empleados" | "historial">("empleados");
+  const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -34,6 +54,16 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
     return acc;
   }, {});
 
+  const filteredEmployees = employees.filter((e) => {
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (e.name || "").toLowerCase().includes(q) ||
+      (e.role || "").toLowerCase().includes(q) ||
+      (e.code || "").toLowerCase().includes(q)
+    );
+  });
+
   function openAdd() {
     setEditId(null);
     setName("");
@@ -43,6 +73,7 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
     setError(null);
     setFormOpen(true);
   }
+
   function openEdit(e: Employee) {
     setEditId(e.id);
     setName(e.name);
@@ -52,6 +83,7 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
     setError(null);
     setFormOpen(true);
   }
+
   function submit() {
     if (!name || salary <= 0) return;
     setError(null);
@@ -64,6 +96,7 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
       else setError(r.error ?? "No se pudo guardar.");
     });
   }
+
   function pay() {
     setError(null);
     start(async () => {
@@ -76,151 +109,302 @@ export function EmployeesManager({ employees }: { employees: Employee[] }) {
   return (
     <div className="space-y-5">
       {/* Total por moneda */}
-      <div className="rounded-2xl bg-soft p-4">
-        <p className="text-xs text-muted">Nómina por quincena</p>
+      <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+        <p className="text-xs text-muted font-medium">Presupuesto Nómina Quincenal</p>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
           {Object.keys(totals).length === 0 ? (
             <p className="text-lg font-medium text-hint">—</p>
           ) : (
             Object.entries(totals).map(([cur, amt]) => (
-              <p key={cur} className="tnum text-xl font-medium">
+              <p key={cur} className="tnum text-xl font-bold text-foreground">
                 {formatCurrency(amt, cur as CurrencyCode)}
               </p>
             ))
           )}
         </div>
         <p className="mt-1 text-[11px] text-hint">
-          {employees.length} empleados · 15 y último
+          {employees.length} empleados activos · Frecuencia 15 y último
         </p>
       </div>
 
-      {/* Agregar / editar */}
-      {formOpen ? (
-        <section className="space-y-2 rounded-2xl border border-line bg-card p-3">
-          <p className="font-serif text-[15px]">
-            {editId ? "Editar empleado" : "Nuevo empleado"}
-          </p>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre"
-            className={inputClass}
-            autoFocus
-          />
-          <input
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            placeholder="Cargo"
-            className={inputClass}
-          />
-          <div className="flex gap-2">
-            <MoneyInput
-              value={salary}
-              onValueChange={setSalary}
-              placeholder="Salario/quincena"
-              className={inputClass}
-            />
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-              className={inputClass}
-            >
-              {(Object.keys(CURRENCIES) as CurrencyCode[]).map((c) => (
-                <option key={c} value={c}>
-                  {CURRENCIES[c].symbol} {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          {error && (
-            <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue">
-              {error}
-            </p>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={submit}
-              disabled={!name || salary <= 0 || pending}
-              className="flex-1 rounded-full bg-accent py-2.5 text-sm font-medium text-white active:scale-[0.98] disabled:opacity-40"
-            >
-              {pending ? "Guardando…" : "Guardar"}
-            </button>
-            <button
-              onClick={() => setFormOpen(false)}
-              className="rounded-full border border-line px-4 py-2.5 text-sm text-muted"
-            >
-              Cancelar
-            </button>
-          </div>
-        </section>
-      ) : (
+      {/* Selector de Pestañas: Empleados / Historial */}
+      <div className="flex gap-2 border-b border-line pb-2">
         <button
-          onClick={openAdd}
-          className="inline-flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-sm font-medium text-accent active:scale-95"
+          type="button"
+          onClick={() => setTab("empleados")}
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+            tab === "empleados"
+              ? "bg-accent text-white shadow-sm"
+              : "bg-card border border-line text-muted hover:text-foreground"
+          }`}
         >
-          <PlusIcon className="h-4 w-4" />
-          Agregar empleado
+          <UsersIcon className="h-4 w-4" />
+          <span>Empleados ({employees.length})</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setTab("historial")}
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+            tab === "historial"
+              ? "bg-accent text-white shadow-sm"
+              : "bg-card border border-line text-muted hover:text-foreground"
+          }`}
+        >
+          <PayrollIcon className="h-4 w-4" />
+          <span>Historial de Pagos & Recibos</span>
+        </button>
+      </div>
+
+      {/* PESTAÑA 1: EMPLEADOS ACTIVOS */}
+      {tab === "empleados" && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-hint" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar empleado por nombre, cargo o código..."
+                className="w-full rounded-xl border border-line bg-card pl-10 pr-4 py-2 text-xs outline-none focus:border-accent"
+              />
+            </div>
+
+            {!formOpen && (
+              <button
+                onClick={openAdd}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-accent/90 transition-all active:scale-95"
+              >
+                <PlusIcon className="h-4 w-4" />
+                <span>Agregar empleado</span>
+              </button>
+            )}
+          </div>
+
+          {/* Formulario Agregar / Editar */}
+          {formOpen && (
+            <section className="space-y-3 rounded-2xl border border-line bg-card p-4 shadow-sm animate-in fade-in duration-200">
+              <p className="font-serif text-sm font-semibold">
+                {editId ? "Editar empleado" : "Nuevo empleado"}
+              </p>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nombre completo"
+                className={inputClass}
+                autoFocus
+              />
+              <input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="Cargo / Rol (ej. Diseñador, Desarrollador)"
+                className={inputClass}
+              />
+              <div className="flex gap-2">
+                <MoneyInput
+                  value={salary}
+                  onValueChange={setSalary}
+                  placeholder="Salario quincenal"
+                  className={inputClass}
+                />
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+                  className="rounded-xl border border-line bg-card px-3 text-sm outline-none"
+                >
+                  <option value="USD">USD</option>
+                  <option value="VES">VES</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+
+              {error && (
+                <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={submit}
+                  disabled={!name || salary <= 0 || pending}
+                  className="flex-1 rounded-xl bg-accent py-2.5 text-xs font-medium text-white disabled:opacity-40"
+                >
+                  {pending ? "Guardando…" : "Guardar empleado"}
+                </button>
+                <button
+                  onClick={() => setFormOpen(false)}
+                  className="rounded-xl border border-line px-4 py-2.5 text-xs text-muted hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* Lista de Empleados */}
+          <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
+            <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
+              <span>Nómina de Empleados ({filteredEmployees.length})</span>
+              <span>Salario Quincenal</span>
+            </div>
+
+            {filteredEmployees.length === 0 ? (
+              <div className="py-10 text-center text-sm text-hint">
+                No se encontraron empleados registrados.
+              </div>
+            ) : (
+              <div className="divide-y divide-line">
+                {filteredEmployees.map((e) => (
+                  <div key={e.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-bg font-serif font-bold text-accent">
+                        {(e.name || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold">{e.name}</p>
+                          <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
+                            {e.code || "Mas-Corp-0001"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-hint">{e.role}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pl-13 sm:pl-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
+                      <span className="tnum text-sm font-semibold text-foreground">
+                        {formatCurrency(e.salary, e.currency)}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Botón Descargar Recibo Individual PDF */}
+                        <button
+                          type="button"
+                          onClick={() => exportPayrollReceiptPdf(e)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
+                          title={`Descargar Recibo de Pago PDF para ${e.name}`}
+                        >
+                          <DownloadIcon className="h-3 w-3" />
+                          <span>Recibo PDF</span>
+                        </button>
+
+                        <button
+                          onClick={() => openEdit(e)}
+                          aria-label={`Editar ${e.name}`}
+                          className="grid h-7 w-7 place-items-center rounded-lg text-hint hover:text-foreground hover:bg-soft"
+                        >
+                          <EditIcon className="h-3.5 w-3.5" />
+                        </button>
+
+                        <DeleteButton
+                          action={() => deactivateEmployee(e.id)}
+                          ariaLabel={`Quitar ${e.name}`}
+                        />
+
+                        <ActionButton
+                          label="Pagar"
+                          doneLabel="Pagado"
+                          action={() => payEmployee(e.id)}
+                          className="px-3 py-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Botón Pagar Nómina Completa */}
+          {paid ? (
+            <p className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-income/10 py-3.5 text-sm font-semibold text-income border border-income/20">
+              <CheckIcon className="h-4 w-4" /> Nómina pagada y registrada en egresos
+            </p>
+          ) : (
+            <button
+              onClick={pay}
+              disabled={employees.length === 0 || pending}
+              className="w-full rounded-2xl bg-accent py-3.5 text-sm font-semibold text-white shadow-md hover:bg-accent/90 active:scale-[0.98] disabled:opacity-40 transition-all"
+            >
+              {pending ? "Procesando pagos…" : "Pagar toda la nómina quincenal"}
+            </button>
+          )}
+        </div>
       )}
 
-      {/* Lista */}
-      <section>
-        <h2 className="mb-1 font-serif text-[15px]">Empleados</h2>
-        {employees.map((e) => (
-          <div key={e.id} className="border-t border-line py-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-bg font-serif text-accent-text">
-                {(e.name || "?").charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-[13px] font-medium">{e.name}</p>
-                  <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] text-muted">
-                    {e.code || "Mas-Corp-0001"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-hint">{e.role}</p>
-              </div>
-              <span className="tnum text-sm font-medium">
-                {formatCurrency(e.salary, e.currency)}
-              </span>
+      {/* PESTAÑA 2: HISTORIAL DE PAGOS DE NÓMINA */}
+      {tab === "historial" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
+            <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
+              <span>Historial de Períodos & Quincenas Liquidadas</span>
+              <span>Total & Recibo</span>
             </div>
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <button
-                onClick={() => openEdit(e)}
-                aria-label={`Editar ${e.name}`}
-                className="grid h-8 w-8 place-items-center rounded-lg text-hint active:scale-90 hover:text-accent"
-              >
-                <EditIcon className="h-4 w-4" />
-              </button>
-              <DeleteButton
-                action={() => deactivateEmployee(e.id)}
-                ariaLabel={`Quitar ${e.name}`}
-              />
-              <ActionButton
-                label="Pagar"
-                doneLabel="Pagado"
-                action={() => payEmployee(e.id)}
-                className="px-4"
-              />
-            </div>
-          </div>
-        ))}
-      </section>
 
-      {/* Pagar nómina */}
-      {paid ? (
-        <p className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-income/10 py-3.5 text-sm font-medium text-income">
-          <CheckIcon className="h-4 w-4" /> Nómina pagada · registrada en gastos
-        </p>
-      ) : (
-        <button
-          onClick={pay}
-          disabled={employees.length === 0 || pending}
-          className="w-full rounded-full bg-accent py-3.5 text-sm font-medium text-white shadow-[0_8px_20px_rgba(59,91,219,0.35)] active:scale-[0.98] disabled:opacity-40"
-        >
-          {pending ? "Procesando…" : "Pagar toda la nómina"}
-        </button>
+            {payrollPeriods.length === 0 ? (
+              <div className="py-10 text-center text-sm text-hint">
+                Aún no hay períodos de nómina registrados.
+              </div>
+            ) : (
+              <div className="divide-y divide-line">
+                {payrollPeriods.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-4 flex items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          Quincena {p.label}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            p.status === "pagada"
+                              ? "bg-income/10 text-income border border-income/20"
+                              : "bg-pending/10 text-pending border border-pending/20"
+                          }`}
+                        >
+                          {p.status === "pagada" ? "Liquidada" : "Pendiente"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-hint mt-0.5">
+                        Fecha de pago: {formatDate(p.payDate)} · {p.startDate} al {p.endDate}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="tnum text-sm font-bold text-foreground">
+                        {formatMoney(p.total)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          exportPayrollReceiptPdf({
+                            id: p.id,
+                            code: "Mas-Corp-NOM-LQD",
+                            name: `Nómina General (${p.label})`,
+                            role: "Personal General",
+                            salary: p.total,
+                            currency: "USD",
+                            payDate: p.payDate,
+                            period: p.label,
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
+                      >
+                        <DownloadIcon className="h-3.5 w-3.5" />
+                        <span>Recibo PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

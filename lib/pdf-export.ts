@@ -295,3 +295,122 @@ export function exportSamplePdf(branding: Partial<SystemConfig>): void {
     ],
   });
 }
+
+/**
+ * Genera y descarga el Comprobante Individual de Gasto / Egreso en PDF.
+ */
+export function exportExpenseVoucherPdf(
+  expense: { id: string; code?: string; category: string; note: string; amount: number; date: string; currency?: string },
+  branding?: Partial<SystemConfig>
+): void {
+  const code = expense.code || "Mas-Corp-GAS-0001";
+  exportPdfReport({
+    title: "Comprobante de Egreso / Gasto",
+    subtitle: `Comprobante Nº: ${code} · Fecha: ${expense.date}`,
+    filename: `Comprobante_Gasto_${code}`,
+    branding,
+    kpis: [
+      { label: "Código de Registro", value: code },
+      { label: "Categoría", value: expense.category },
+      { label: "Monto del Egreso", value: `$ ${expense.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+      { label: "Estado", value: "Aprobado / Contabilizado" },
+    ],
+    columns: [
+      { header: "Código", dataKey: "code", align: "left" },
+      { header: "Concepto / Detalle del Gasto", dataKey: "note", align: "left" },
+      { header: "Categoría", dataKey: "cat", align: "left" },
+      { header: "Fecha de Pago", dataKey: "date", align: "center" },
+      { header: "Monto", dataKey: "amount", align: "right" },
+    ],
+    data: [
+      {
+        code,
+        note: expense.note,
+        cat: expense.category,
+        date: expense.date,
+        amount: `$ ${expense.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+      },
+    ],
+  });
+}
+
+/**
+ * Genera y descarga el Recibo Individual de Pago de Nómina en PDF.
+ */
+export function exportPayrollReceiptPdf(
+  employee: { id: string; code?: string; name: string; role: string; salary: number; currency: string; payDate?: string; period?: string },
+  branding?: Partial<SystemConfig>
+): void {
+  const code = employee.code || "Mas-Corp-NOM-0001";
+  const period = employee.period || "Quincena Actual (15 y último)";
+  const payDate = employee.payDate || new Date().toISOString().slice(0, 10);
+
+  exportPdfReport({
+    title: "Recibo de Pago de Nómina",
+    subtitle: `Empleado: ${employee.name} (${code}) · Período: ${period}`,
+    filename: `Recibo_Nomina_${employee.name.replace(/\s+/g, "_")}_${code}`,
+    branding,
+    kpis: [
+      { label: "Código Empleado", value: code },
+      { label: "Cargo / Rol", value: employee.role },
+      { label: "Período Liquidado", value: period },
+      { label: "Salario Quincenal", value: `${employee.currency} ${employee.salary.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+    ],
+    columns: [
+      { header: "Concepto", dataKey: "concept", align: "left" },
+      { header: "Beneficiario", dataKey: "name", align: "left" },
+      { header: "Cargo", dataKey: "role", align: "left" },
+      { header: "Fecha de Pago", dataKey: "date", align: "center" },
+      { header: "Neto a Cobrar", dataKey: "amount", align: "right" },
+    ],
+    data: [
+      {
+        concept: `Honorarios / Sueldo Quincenal (${period})`,
+        name: employee.name,
+        role: employee.role,
+        date: payDate,
+        amount: `${employee.currency} ${employee.salary.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+      },
+    ],
+  });
+}
+
+/**
+ * Genera y descarga el Comprobante Individual de Pago de Servicio en PDF.
+ */
+export function exportServiceVoucherPdf(
+  service: { id: string; code?: string; name: string; category: string; cycle: string; amount: number; currency: string; nextChargeDate: string },
+  branding?: Partial<SystemConfig>
+): void {
+  const code = service.code || "Mas-Corp-SRV-0001";
+  exportPdfReport({
+    title: "Comprobante de Pago de Servicio Recurrente",
+    subtitle: `Servicio: ${service.name} (${code}) · Ciclo: ${service.cycle}`,
+    filename: `Comprobante_Servicio_${service.name.replace(/\s+/g, "_")}_${code}`,
+    branding,
+    kpis: [
+      { label: "Código de Servicio", value: code },
+      { label: "Proveedor / Servicio", value: service.name },
+      { label: "Ciclo de Facturación", value: service.cycle === "anual" ? "Anual" : "Mensual" },
+      { label: "Monto Pagado", value: `${service.currency} ${service.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+    ],
+    columns: [
+      { header: "Código", dataKey: "code", align: "left" },
+      { header: "Servicio / Plataforma", dataKey: "name", align: "left" },
+      { header: "Categoría", dataKey: "category", align: "left" },
+      { header: "Frecuencia", dataKey: "cycle", align: "center" },
+      { header: "Próxima Renovación", dataKey: "next", align: "center" },
+      { header: "Monto", dataKey: "amount", align: "right" },
+    ],
+    data: [
+      {
+        code,
+        name: service.name,
+        category: service.category,
+        cycle: service.cycle,
+        next: service.nextChargeDate,
+        amount: `${service.currency} ${service.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+      },
+    ],
+  });
+}
