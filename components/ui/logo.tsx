@@ -4,20 +4,15 @@
  */
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-3 select-none ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-2.5 select-none ${className ?? ""}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/logo-m-mark.svg"
-        alt="Massivo Corp"
-        className="block h-9 w-auto shrink-0 drop-shadow-sm"
+        src="/logo-massivo-creativo.png"
+        alt="Massivo Creativo"
+        className="block h-9 sm:h-10 w-auto shrink-0 object-contain drop-shadow-sm"
       />
-      <span className="flex items-baseline gap-2 leading-none">
-        <span className="font-serif text-[22px] font-bold tracking-tight text-foreground">
-          Massivo Corp
-        </span>
-        <span className="font-sans text-[20px] font-semibold text-[#2C21FF] dark:text-[#7293FF]">
-          Wallet
-        </span>
+      <span className="font-sans text-[16px] sm:text-[18px] font-extrabold text-[#2C21FF] dark:text-[#7293FF] tracking-wider uppercase">
+        Wallet
       </span>
     </span>
   );

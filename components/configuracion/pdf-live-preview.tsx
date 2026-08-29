@@ -48,16 +48,13 @@ export function PdfLivePreview({ config }: PdfLivePreviewProps) {
       <div className={`rounded-xl border border-line/80 bg-white p-4 sm:p-5 text-[#14151A] shadow-md space-y-3.5 text-[11px] select-none ${paperDetails.ratio} transition-all`}>
         {/* Encabezado */}
         <div className="rounded-lg bg-[#F5F6FF] p-3 flex items-center justify-between border border-line/40">
-          <div className="space-y-0.5">
-            <p
-              className="text-xs font-bold tracking-tight"
-              style={{ color: primaryColor }}
-            >
-              M-WALLET
-            </p>
-            <p className="text-sm font-bold text-gray-900 leading-tight">
-              {config.pdfCompanyName || "Massivo Corp"}
-            </p>
+          <div className="space-y-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-massivo-creativo.png"
+              alt="Massivo Creativo"
+              className="h-6 w-auto object-contain"
+            />
             <p className="text-[10px] text-gray-500">
               {config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF:{" "}
               {config.pdfCompanyRif || "J-50000000-0"}

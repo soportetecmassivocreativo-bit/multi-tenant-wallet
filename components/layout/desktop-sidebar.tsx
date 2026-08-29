@@ -51,21 +51,16 @@ export function DesktopSidebar() {
     <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 z-30 border-r border-line bg-card/95 backdrop-blur">
       {/* Brand Header */}
       <div className="flex h-16 items-center gap-3 border-b border-line px-5">
-        <Link href="/dashboard" className="flex items-center gap-2.5 group">
-          {/* Glowing purple logo */}
-          <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-violet-700 shadow-[0_0_20px_rgba(124,58,237,0.45)]">
-            <span className="font-serif text-xl font-black text-white italic tracking-tighter">
-              M
-            </span>
-          </div>
-          <div className="flex flex-col leading-none">
-            <span className="font-serif text-[18px] font-bold tracking-tight text-foreground group-hover:text-accent transition-colors">
-              Massivo Corp
-            </span>
-            <span className="text-[11px] font-semibold text-accent tracking-widest uppercase mt-0.5">
-              Wallet
-            </span>
-          </div>
+        <Link href="/dashboard" className="flex items-center gap-2 group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-massivo-creativo.png"
+            alt="Massivo Creativo"
+            className="h-8 w-auto shrink-0 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+          />
+          <span className="text-[12px] font-extrabold text-accent tracking-widest uppercase ml-1">
+            Wallet
+          </span>
         </Link>
       </div>
 

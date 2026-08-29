@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { DEFAULT_SYSTEM_CONFIG, type SystemConfig } from "@/lib/config";
+import { MASSIVO_LOGO_BASE64 } from "@/lib/logo-base64";
 
 export interface PdfReportColumn {
   header: string;
@@ -62,23 +63,24 @@ export function exportPdfReport(options: PdfReportOptions): void {
   doc.setFillColor(245, 246, 255);
   doc.roundedRect(margin, margin, pageWidth - margin * 2, 26, 3, 3, "F");
 
-  // Logo / Texto de Marca Massivo Corp
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(prR, prG, prB);
-  doc.text("M-WALLET", margin + 5, margin + 8);
+  // Logo Imagen Oficial Massivo Creativo
+  try {
+    doc.addImage(MASSIVO_LOGO_BASE64, "PNG", margin + 5, margin + 4, 38, 10);
+  } catch {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(prR, prG, prB);
+    doc.text("MASSIVO CREATIVO", margin + 5, margin + 11);
+  }
 
-  doc.setFontSize(12);
-  doc.setTextColor(20, 20, 30);
-  doc.text(config.pdfCompanyName || "Massivo Corp", margin + 5, margin + 15);
-
+  // Subtítulo y RIF
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(100, 100, 120);
+  doc.setFontSize(8);
+  doc.setTextColor(90, 90, 110);
   doc.text(
     `${config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF: ${config.pdfCompanyRif || "J-50000000-0"}`,
     margin + 5,
-    margin + 20
+    margin + 19
   );
 
   // Fecha y Tasa a la derecha
