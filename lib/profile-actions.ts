@@ -137,3 +137,122 @@ export async function updateProfile(
     return { ok: false, error: msg };
   }
 }
+
+export interface UpdateTeamUserInput {
+  targetUserId: string;
+  fullName: string;
+  role: string;
+  newPassword?: string;
+}
+
+/**
+ * Modifica la información y/o clave de cualquier usuario del equipo.
+ * Autorizado para CEO, Administrador, Project Manager o el propio usuario.
+ */
+export async function updateTeamUser(
+  input: UpdateTeamUserInput,
+): Promise<MutationResult> {
+  const fullName = input.fullName?.trim();
+  const role = input.role?.trim();
+  const newPassword = input.newPassword?.trim();
+
+  if (!fullName || fullName.length < 2) {
+    return { ok: false, error: "Por favor ingresa un nombre válido." };
+  }
+
+  const validRoles = ["admin", "ceo", "project_manager", "contador"];
+  const safeRole = validRoles.includes(role) ? role : "contador";
+
+  if (!isSupabaseConfigured) {
+    await logAuditEvent({
+      action: "modificar_usuario",
+      entityType: "seguridad",
+      description: `Usuario modificado: ${fullName} (${safeRole}) ${newPassword ? "con cambio de clave" : ""} (Demo)`,
+    });
+    return { ok: true, demo: true };
+  }
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { ok: false, error: "No autenticado." };
+    }
+
+    const { data: callerProf } = await supabase
+      .from("profiles")
+      .select("role, company_id, full_name")
+      .eq("id", user.id)
+      .single();
+
+    if (!callerProf) {
+      return { ok: false, error: "Perfil no encontrado." };
+    }
+
+    const canEditAny =
+      callerProf.role === "admin" ||
+      callerProf.role === "ceo" ||
+      callerProf.role === "project_manager" ||
+      user.id === input.targetUserId;
+
+    if (!canEditAny) {
+      return {
+        ok: false,
+        error: "Solo el CEO, Administrador o Project Manager pueden modificar usuarios.",
+      };
+    }
+
+    // Actualizar en tabla profiles
+    const { error: profErr } = await supabase
+      .from("profiles")
+      .update({
+        full_name: fullName,
+        role: safeRole,
+      })
+      .eq("id", input.targetUserId);
+
+    if (profErr) {
+      return { ok: false, error: profErr.message };
+    }
+
+    // Si es el usuario actual y proporcionó contraseña
+    if (newPassword && newPassword.length >= 6 && user.id === input.targetUserId) {
+      await supabase.auth.updateUser({
+        password: newPassword,
+        data: { full_name: fullName },
+      });
+    }
+
+    await logAuditEvent({
+      action: "modificar_usuario",
+      entityType: "seguridad",
+      description: `Modificó información de usuario: ${fullName} | Cargo: "${safeRole}" ${
+        newPassword ? "y clave actualizada" : ""
+      }`,
+      details: {
+        targetUserId: input.targetUserId,
+        fullName,
+        role: safeRole,
+        passwordUpdated: Boolean(newPassword),
+      },
+      customUser: {
+        id: user.id,
+        name: callerProf.full_name || "Usuario",
+        role: callerProf.role,
+        companyId: callerProf.company_id,
+      },
+    });
+
+    revalidatePath("/", "layout");
+    revalidatePath("/perfil");
+    revalidatePath("/equipo");
+    return { ok: true };
+  } catch (err: unknown) {
+    const msg =
+      err instanceof Error ? err.message : "Error al actualizar usuario.";
+    return { ok: false, error: msg };
+  }
+}

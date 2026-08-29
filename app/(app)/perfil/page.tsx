@@ -2,20 +2,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getCurrentProfile, getCompany } from "@/lib/data";
+import { getCurrentProfile, getCompany, getTeam } from "@/lib/data";
 import { ProfileForm } from "@/components/perfil/profile-form";
 import { PasswordForm } from "@/components/perfil/password-form";
-import { UserIcon } from "@/components/ui/icons";
+import { TeamUsersManager } from "@/components/perfil/team-users-manager";
 
 export default async function PerfilPage() {
-  const [profile, company] = await Promise.all([
+  const [profile, company, team] = await Promise.all([
     getCurrentProfile(),
     getCompany(),
+    getTeam(),
   ]);
 
   let userEmail = "massivocreativo@gmail.com";
   let userName = "Miguel Mujica";
   let userRole = profile?.role || "ceo";
+  let currentUserId = profile?.userId || "demo";
 
   if (isSupabaseConfigured) {
     const supabase = await createClient();
@@ -27,6 +29,7 @@ export default async function PerfilPage() {
       redirect("/login");
     }
 
+    currentUserId = user.id;
     userEmail = user.email || userEmail;
     userName = user.user_metadata?.full_name || userName;
 
@@ -40,6 +43,11 @@ export default async function PerfilPage() {
     if (profData?.role) userRole = profData.role;
   }
 
+  const canManageAll =
+    userRole === "admin" ||
+    userRole === "ceo" ||
+    userRole === "project_manager";
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -48,6 +56,7 @@ export default async function PerfilPage() {
         </Link>
       </header>
 
+      {/* Cabecera de Perfil */}
       <section className="flex items-center gap-4">
         <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-accent-bg text-accent font-serif text-2xl font-medium">
           {userName.charAt(0).toUpperCase()}
@@ -67,14 +76,21 @@ export default async function PerfilPage() {
         </div>
       </section>
 
-      {/* Formulario de personalización de perfil */}
+      {/* Gestión de Todos los Usuarios y Claves (CEO, Admin, PM) */}
+      <TeamUsersManager
+        team={team}
+        currentUserId={currentUserId}
+        canManageAll={canManageAll}
+      />
+
+      {/* Formulario de personalización de perfil propio */}
       <ProfileForm
         initialName={userName}
         email={userEmail}
         role={userRole}
       />
 
-      {/* Formulario de cambio de contraseña */}
+      {/* Formulario de cambio de contraseña propia */}
       <PasswordForm />
     </div>
   );
