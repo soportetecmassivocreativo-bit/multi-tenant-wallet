@@ -159,11 +159,12 @@ export async function getAuditLogs(filterType?: string): Promise<AuditLogItem[]>
     }
 
     const { data, error } = await query;
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.warn("Aviso al consultar audit_logs en Supabase:", error.message);
       return mockAuditLogs;
     }
 
-    return data.map((d) => ({
+    return (data ?? []).map((d) => ({
       id: d.id,
       userName: d.user_name,
       userRole: d.user_role,
