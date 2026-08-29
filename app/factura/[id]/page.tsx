@@ -33,12 +33,13 @@ export default async function FacturaPage({
           <div className="mb-2 flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo-mwallet.svg"
+              src="/logo-m-mark.svg"
               alt="Massivo Corp"
-              className="h-8 w-auto"
+              className="h-7 w-auto"
             />
             <span className="font-serif text-lg font-bold text-[#14151A]">
-              {company?.name || "Massivo Corp"}
+              {company?.name || "Massivo Corp"}{" "}
+              <span className="font-sans font-normal text-[#2C21FF]">Wallet</span>
             </span>
           </div>
           <p className="mt-1 text-xs text-neutral-500">
