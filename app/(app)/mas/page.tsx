@@ -26,16 +26,17 @@ type Item = {
 };
 
 const modules: Item[] = [
-  { href: "/configuracion", label: "Configuración", desc: "Personalización PDF y contabilizadores Mas-Corp-", Icon: SettingsIcon },
-  { href: "/perfil", label: "Mi Perfil & Seguridad", desc: "Cambiar clave y datos de cuenta", Icon: UserIcon },
-  { href: "/auditoria", label: "Auditoría", desc: "Registro de movimientos y acciones", Icon: ShieldCheckIcon },
-  { href: "/reportes", label: "Reportes", desc: "Ingresos vs egresos del mes", Icon: ChartIcon },
-  { href: "/clientes", label: "Clientes", desc: "Fichas, historial y score", Icon: UsersIcon },
-  { href: "/gastos", label: "Gastos", desc: "Egresos y categorías", Icon: ReceiptIcon },
-  { href: "/servicios", label: "Servicios", desc: "Suscripciones recurrentes", Icon: RepeatIcon },
-  { href: "/nomina", label: "Nómina", desc: "Empleados y pagos quincenales", Icon: PayrollIcon },
-  { href: "/empresas", label: "Empresas", desc: "Datos fiscales e impuestos", Icon: BuildingIcon },
-  { href: "/equipo", label: "Equipo", desc: "Gestión de roles y miembros", Icon: UserPlusIcon },
+  { href: "/cobros",        label: "Facturación",          desc: "Facturas, cobros y cuentas por cobrar",    Icon: ReceiptIcon },
+  { href: "/gastos",        label: "Gastos",               desc: "Egresos y categorías",                    Icon: ChartIcon },
+  { href: "/nomina",        label: "Nómina",               desc: "Empleados y pagos quincenales",           Icon: PayrollIcon },
+  { href: "/servicios",     label: "Servicios",            desc: "Suscripciones recurrentes",               Icon: RepeatIcon },
+  { href: "/clientes",      label: "Clientes",             desc: "Fichas, historial y score",               Icon: UsersIcon },
+  { href: "/equipo",        label: "Equipo",               desc: "Gestión de roles y miembros",             Icon: UserPlusIcon },
+  { href: "/reportes",      label: "Reportes",             desc: "Ingresos vs egresos del mes",             Icon: ChartIcon },
+  { href: "/auditoria",     label: "Auditoría",            desc: "Registro de movimientos y acciones",      Icon: ShieldCheckIcon },
+  { href: "/perfil",        label: "Mi Perfil & Seguridad",desc: "Cambiar clave y datos de cuenta",         Icon: UserIcon },
+  { href: "/configuracion", label: "Configuración",        desc: "Personalización PDF y contabilizadores",  Icon: SettingsIcon },
+  { href: "/empresas",      label: "Empresas",             desc: "Datos fiscales e impuestos",              Icon: BuildingIcon },
 ];
 
 export default function MasPage() {
