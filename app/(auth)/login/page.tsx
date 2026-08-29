@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-4 py-3 text-sm outline-none focus:border-accent placeholder:text-muted disabled:opacity-60";
@@ -17,36 +15,29 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-
-    if (!isSupabaseConfigured) {
-      setError("Configura Supabase para iniciar sesión.");
-      return;
-    }
+    setLoading(true);
 
     const form = e.currentTarget;
     const email = (form.elements.namedItem("email") as HTMLInputElement).value.trim();
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
-    if (!email) { setError("Escribe tu correo electrónico."); return; }
-    if (!password) { setError("Escribe tu contraseña."); return; }
-
-    setLoading(true);
     try {
-      const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      // Llamada a la API Edge de Vercel (sin cold start, sin límite de 10s)
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      if (authError) {
-        if (authError.message === "Invalid login credentials")
-          setError("Correo o contraseña incorrectos.");
-        else if (authError.message === "Email not confirmed")
-          setError("Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.");
-        else
-          setError(authError.message);
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        setError(data.error || "Error al iniciar sesión.");
         setLoading(false);
         return;
       }
 
-      // Sesión iniciada — redirigimos
+      // Sesión establecida via cookies — navegamos al dashboard
       router.push("/dashboard");
       router.refresh();
     } catch {
