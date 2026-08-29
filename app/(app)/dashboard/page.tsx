@@ -12,6 +12,10 @@ import { getDashboardSummary } from "@/lib/data";
 export default async function DashboardPage() {
   const s = await getDashboardSummary();
 
+  const currentMonth = new Intl.DateTimeFormat("es-VE", { month: "long" }).format(new Date());
+  const vesEquivalent = s.balance * s.bcv.usd;
+  const eurEquivalent = s.bcv.eur > 0 ? (s.balance * s.bcv.usd) / s.bcv.eur : 0;
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -20,12 +24,29 @@ export default async function DashboardPage() {
       </header>
 
       <section>
-        <p className="font-serif text-[15px] text-muted">Saldo · julio</p>
-        <HeroBalance value={s.balance} />
-        <p className="mt-2.5 text-xs text-hint">
-          ≈ {formatCurrency(s.balance * s.bcv.usd, "VES")} · tasa BCV{" "}
-          {formatDate(s.bcv.date)}
+        <p className="font-serif text-[15px] text-muted capitalize">
+          Saldo · {currentMonth}
         </p>
+        <HeroBalance value={s.balance} />
+
+        {/* Equivalencia en Bolívares y Euros */}
+        <p className="mt-2 text-xs text-hint">
+          ≈ {formatCurrency(vesEquivalent, "VES")} · ≈ {formatCurrency(eurEquivalent, "EUR")}
+        </p>
+
+        {/* Tasas oficiales del día (siempre visibles) */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl bg-soft px-3 py-2 text-xs text-muted">
+          <span className="font-medium text-foreground">
+            Tasas del día ({formatDate(s.bcv.date)}):
+          </span>
+          <span>
+            $ 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.usd, "VES")}</strong>
+          </span>
+          <span className="text-hint">·</span>
+          <span>
+            € 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.eur, "VES")}</strong>
+          </span>
+        </div>
       </section>
 
       <MiniLineChart series={s.chartSeries} hasData={s.hasMovements} />
