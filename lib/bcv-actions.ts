@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { syncAndSaveBcvRates } from "@/lib/bcv";
+import { logAuditEvent } from "@/lib/audit";
 import type { MutationResult } from "@/lib/mutations";
 
 export interface ManualBcvInput {
@@ -62,6 +63,13 @@ export async function saveManualBcvRates(
       return { ok: false, error: `Error en base de datos: ${error.message}` };
     }
 
+    await logAuditEvent({
+      action: "ajuste_tasa_manual",
+      entityType: "tasa",
+      description: `Ajuste manual de tasas para fecha ${date}: USD ${usd} Bs., EUR ${eur} Bs.`,
+      details: { usd, eur, date },
+    });
+
     revalidatePath("/", "layout");
     revalidatePath("/empresas");
     revalidatePath("/dashboard");
@@ -83,6 +91,13 @@ export async function saveManualBcvRates(
 export async function syncBcvRates(): Promise<BcvActionResult> {
   try {
     const res = await syncAndSaveBcvRates();
+    await logAuditEvent({
+      action: "sincronizar_tasa_bcv",
+      entityType: "tasa",
+      description: `Sincronización automática de tasas con ${res.source}: USD ${res.usd} Bs., EUR ${res.eur} Bs.`,
+      details: { usd: res.usd, eur: res.eur, date: res.date, source: res.source },
+    });
+
     revalidatePath("/", "layout");
     revalidatePath("/empresas");
     revalidatePath("/dashboard");

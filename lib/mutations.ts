@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { computeInvoice } from "@/lib/calc";
+import { logAuditEvent } from "@/lib/audit";
 import type { CurrencyCode, RateRef } from "@/lib/currency";
 
 export interface MutationResult {
@@ -15,7 +16,7 @@ export interface MutationResult {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** Cliente Supabase + perfil (empresa/rol) del usuario autenticado. */
+/** Cliente Supabase + perfil (empresa/rol/nombre) del usuario autenticado. */
 async function getContext() {
   const supabase = await createClient();
   const {
@@ -24,11 +25,17 @@ async function getContext() {
   if (!user) return null;
   const { data: profile } = await supabase
     .from("profiles")
-    .select("company_id, role")
+    .select("company_id, role, full_name")
     .eq("id", user.id)
     .single();
   if (!profile) return null;
-  return { supabase, companyId: profile.company_id as string, role: profile.role as string };
+  return {
+    supabase,
+    userId: user.id,
+    userName: profile.full_name || "Usuario",
+    companyId: profile.company_id as string,
+    role: profile.role as string,
+  };
 }
 
 /* ------------------------------- Crear ------------------------------- */
@@ -108,6 +115,20 @@ export async function createInvoice(
     .update({ next_invoice_number: number + 1 })
     .eq("id", companyId);
 
+  await logAuditEvent({
+    action: "crear_factura",
+    entityType: "factura",
+    entityId: inv.id as string,
+    description: `Creó la factura #${number} por ${result.total.toFixed(2)} ${input.currency}`,
+    details: { number, total: result.total, currency: input.currency },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
+
   revalidatePath("/cobros");
   revalidatePath("/dashboard");
   return { ok: true, id: inv.id as string };
@@ -127,16 +148,35 @@ export async function createExpense(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  const { error } = await ctx.supabase.from("expenses").insert({
-    company_id: ctx.companyId,
-    category: input.category || "General",
-    note: input.note,
-    amount: input.amount,
-    currency: input.currency ?? "USD",
-    spent_on: today(),
-    source: "manual",
-  });
+  const currency = input.currency ?? "USD";
+  const { data: exp, error } = await ctx.supabase
+    .from("expenses")
+    .insert({
+      company_id: ctx.companyId,
+      category: input.category || "General",
+      note: input.note,
+      amount: input.amount,
+      currency,
+      spent_on: today(),
+      source: "manual",
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "crear_gasto",
+    entityType: "gasto",
+    entityId: exp?.id,
+    description: `Registró gasto en ${input.category || "General"}: ${input.amount.toFixed(2)} ${currency} ("${input.note || "Sin nota"}")`,
+    details: { category: input.category, amount: input.amount, currency },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
 
   revalidatePath("/gastos");
   revalidatePath("/dashboard");
@@ -158,14 +198,32 @@ export async function addClient(
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const score = Math.min(100, Math.max(0, Math.round(input.score ?? 80)));
-  const { error } = await ctx.supabase.from("clients").insert({
-    company_id: ctx.companyId,
-    name: input.name,
-    rif: input.rif ?? "",
-    score,
-    term_days: input.termDays ?? 0,
-  });
+  const { data: cl, error } = await ctx.supabase
+    .from("clients")
+    .insert({
+      company_id: ctx.companyId,
+      name: input.name,
+      rif: input.rif ?? "",
+      score,
+      term_days: input.termDays ?? 0,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "crear_cliente",
+    entityType: "cliente",
+    entityId: cl?.id,
+    description: `Creó el cliente "${input.name}" (RIF: ${input.rif || "N/A"})`,
+    details: { name: input.name, rif: input.rif },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
 
   revalidatePath("/clientes");
   return { ok: true };
@@ -184,7 +242,7 @@ export async function registerPayment(
 
   const { data: inv } = await ctx.supabase
     .from("invoices")
-    .select("total, currency")
+    .select("number, total, currency")
     .eq("id", invoiceId)
     .single();
   if (!inv) return { ok: false, error: "Factura no encontrada." };
@@ -208,6 +266,20 @@ export async function registerPayment(
     paid >= Number(inv.total) ? "pagada" : paid > 0 ? "parcial" : "pendiente";
   await ctx.supabase.from("invoices").update({ status }).eq("id", invoiceId);
 
+  await logAuditEvent({
+    action: "registrar_pago",
+    entityType: "pago",
+    entityId: invoiceId,
+    description: `Registró pago de ${amount.toFixed(2)} ${inv.currency} para la factura #${inv.number} vía ${method}`,
+    details: { invoiceId, number: inv.number, amount, method, status },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
+
   revalidatePath("/cobros");
   revalidatePath(`/cobros/${invoiceId}`);
   revalidatePath("/dashboard");
@@ -215,7 +287,7 @@ export async function registerPayment(
 }
 
 /* ------------------------------ Eliminar ----------------------------- */
-/* Solo el rol 'admin' puede eliminar. */
+/* Solo rol 'admin' o 'ceo' puede eliminar. */
 
 async function deleteRow(
   table: "invoices" | "expenses" | "clients",
@@ -225,11 +297,24 @@ async function deleteRow(
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
-  if (ctx.role !== "admin")
-    return { ok: false, error: "Solo el administrador puede eliminar." };
+  if (ctx.role !== "admin" && ctx.role !== "ceo")
+    return { ok: false, error: "Solo el administrador o CEO puede eliminar." };
 
   const { error } = await ctx.supabase.from(table).delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: `eliminar_${table === "invoices" ? "factura" : table === "expenses" ? "gasto" : "cliente"}`,
+    entityType: table === "invoices" ? "factura" : table === "expenses" ? "gasto" : "cliente",
+    entityId: id,
+    description: `Eliminó registro de ${table} (ID: ${id})`,
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
 
   paths.forEach((p) => revalidatePath(p));
   return { ok: true };

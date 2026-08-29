@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { logAuditEvent } from "@/lib/audit";
 import type { MutationResult } from "@/lib/mutations";
 
 export interface CompanyInput {
@@ -16,7 +17,7 @@ export interface CompanyInput {
   logoUrl: string;
 }
 
-/** Edita los datos de la empresa. Solo admin. */
+/** Edita los datos de la empresa. Solo admin o CEO. */
 export async function updateCompany(
   input: CompanyInput,
 ): Promise<MutationResult> {
@@ -28,7 +29,7 @@ export async function updateCompany(
   if (!user) return { ok: false, error: "No autenticado." };
   const { data: prof } = await supabase
     .from("profiles")
-    .select("company_id, role")
+    .select("company_id, role, full_name")
     .eq("id", user.id)
     .single();
   if (!prof) return { ok: false, error: "No autenticado." };
@@ -49,6 +50,20 @@ export async function updateCompany(
     })
     .eq("id", prof.company_id);
   if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "actualizar_empresa",
+    entityType: "empresa",
+    entityId: prof.company_id,
+    description: `Actualizó datos fiscales e información de la empresa "${input.name}"`,
+    details: { name: input.name, rif: input.rif, currency: input.defaultCurrency },
+    customUser: {
+      id: user.id,
+      name: prof.full_name || "Usuario",
+      role: prof.role || "admin",
+      companyId: prof.company_id,
+    },
+  });
 
   revalidatePath("/empresas");
   return { ok: true };

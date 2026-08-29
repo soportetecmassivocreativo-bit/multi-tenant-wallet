@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { logAuditEvent } from "@/lib/audit";
 import type { MutationResult } from "@/lib/mutations";
 
 async function getContext() {
@@ -13,19 +14,20 @@ async function getContext() {
   if (!user) return null;
   const { data: profile } = await supabase
     .from("profiles")
-    .select("company_id, role")
+    .select("company_id, role, full_name")
     .eq("id", user.id)
     .single();
   if (!profile) return null;
   return {
     supabase,
     userId: user.id,
+    userName: profile.full_name || "Usuario",
     companyId: profile.company_id as string,
     role: profile.role as string,
   };
 }
 
-/** Invita a un miembro (contador o admin) por correo. Solo admin. */
+/** Invita a un miembro (contador, CEO, PM, admin) por correo. Solo admin/CEO. */
 export async function inviteMember(
   email: string,
   role: string,
@@ -50,6 +52,19 @@ export async function inviteMember(
   });
   if (error) return { ok: false, error: error.message };
 
+  await logAuditEvent({
+    action: "invitar_miembro",
+    entityType: "equipo",
+    description: `Invitación enviada a ${clean} con cargo "${safeRole}"`,
+    details: { email: clean, role: safeRole },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
+
   revalidatePath("/equipo");
   return { ok: true };
 }
@@ -67,6 +82,19 @@ export async function cancelInvitation(id: string): Promise<MutationResult> {
     .delete()
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "cancelar_invitacion",
+    entityType: "equipo",
+    entityId: id,
+    description: `Canceló la invitación pendiente (ID: ${id})`,
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
 
   revalidatePath("/equipo");
   return { ok: true };

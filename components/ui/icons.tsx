@@ -205,3 +205,26 @@ export const ArrowPathIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const LockIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    <circle cx="12" cy="16" r="1" />
+  </Icon>
+);
+
+export const UserIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M6 20v-1a6 6 0 0 1 12 0v1" />
+  </Icon>
+);
+
+export const ShieldCheckIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M12 3s7 2 7 8c0 5.25-4.5 8.5-7 10-2.5-1.5-7-4.75-7-10 0-6 7-8 7-8Z" />
+    <path d="m9 12 2 2 4-4" />
+  </Icon>
+);
+
+
