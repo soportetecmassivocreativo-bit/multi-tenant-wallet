@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-4 py-3 text-sm outline-none focus:border-accent placeholder:text-muted disabled:opacity-60";
@@ -21,27 +22,78 @@ export default function LoginPage() {
     const email = (form.elements.namedItem("email") as HTMLInputElement).value.trim();
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
+    if (!email) {
+      setError("Escribe tu correo electrónico.");
+      setLoading(false);
+      return;
+    }
+    if (!password) {
+      setError("Escribe tu contraseña.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Llamada a la API Edge de Vercel (sin cold start, sin límite de 10s)
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      // 1. Intentar a través del intermediario de Vercel (/api/auth/login)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s de espera máxima para Vercel
 
-      const data = await res.json();
+      let loginSuccessful = false;
 
-      if (!res.ok || data.error) {
-        setError(data.error || "Error al iniciar sesión.");
-        setLoading(false);
-        return;
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        const data = await res.json().catch(() => null);
+
+        if (res.ok && data?.ok) {
+          loginSuccessful = true;
+          router.push("/dashboard");
+          router.refresh();
+          return;
+        }
+
+        // Si el servidor devolvió error explícito de credenciales inválidas
+        if (data?.error && res.status === 401) {
+          setError(data.error);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Vercel tardó o se agotó el tiempo
       }
 
-      // Sesión establecida via cookies — navegamos al dashboard
-      router.push("/dashboard");
-      router.refresh();
+      if (!loginSuccessful) {
+        // 2. Conexión directa inmediata para no hacer esperar al usuario
+        const supabase = createClient();
+        const { error: clientAuthError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (clientAuthError) {
+          if (clientAuthError.message === "Invalid login credentials") {
+            setError("Correo o contraseña incorrectos.");
+          } else if (clientAuthError.message === "Email not confirmed") {
+            setError("Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.");
+          } else {
+            setError(clientAuthError.message);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Éxito inmediato
+        router.push("/dashboard");
+        router.refresh();
+      }
     } catch {
-      setError("Error de conexión. Verifica tu internet e intenta de nuevo.");
+      setError("Error de conexión. Verifica tus datos e intenta de nuevo.");
       setLoading(false);
     }
   }
@@ -81,7 +133,7 @@ export default function LoginPage() {
 
         {loading && (
           <p className="text-center text-xs text-muted animate-pulse">
-            Verificando credenciales…
+            Verificando credenciales con el servidor…
           </p>
         )}
 

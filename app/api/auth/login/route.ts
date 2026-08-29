@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from "@/lib/supabase/config";
 
-// Edge Runtime: sin cold start, ~100ms arranque, sin límite de 10s
-export const runtime = "edge";
+// Permitir hasta 30 segundos de duración en Vercel
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   if (!isSupabaseConfigured) {
@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let email: string, password: string;
+  let email = "";
+  let password = "";
   try {
     const body = await request.json();
     email = String(body.email ?? "").trim();
@@ -40,15 +41,22 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    let msg = error.message;
-    if (msg === "Invalid login credentials") msg = "Correo o contraseña incorrectos.";
-    else if (msg === "Email not confirmed")
-      msg = "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.";
-    return NextResponse.json({ error: msg }, { status: 401 });
+    if (error) {
+      let msg = error.message;
+      if (msg === "Invalid login credentials" || msg.includes("invalid_credentials")) {
+        msg = "Correo o contraseña incorrectos.";
+      } else if (msg === "Email not confirmed") {
+        msg = "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.";
+      }
+      return NextResponse.json({ error: msg }, { status: 401 });
+    }
+
+    return response;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error al conectar con el servidor.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
-
-  return response;
 }
