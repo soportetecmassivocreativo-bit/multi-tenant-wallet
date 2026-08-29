@@ -50,6 +50,8 @@ function formatTimestamp(iso: string) {
   }
 }
 
+import { PdfDownloadButton } from "@/components/ui/pdf-download-button";
+
 export function AuditFeed({ initialLogs }: AuditFeedProps) {
   const [filter, setFilter] = useState("todos");
 
@@ -58,23 +60,56 @@ export function AuditFeed({ initialLogs }: AuditFeedProps) {
       ? initialLogs
       : initialLogs.filter((l) => l.entityType === filter);
 
+  function getPdfReportOptions() {
+    return {
+      title: "Reporte de Auditoría y Trazabilidad",
+      subtitle: `Movimientos registrados: ${filtered.length} | Filtro: ${filter.toUpperCase()}`,
+      filename: "Massivo Corp - Reporte de Auditoria",
+      kpis: [
+        { label: "Total Registros", value: String(filtered.length) },
+        { label: "Categoría", value: filter === "todos" ? "Todas" : filter.toUpperCase() },
+      ],
+      columns: [
+        { header: "Fecha / Hora", dataKey: "createdAtFormatted" },
+        { header: "Usuario", dataKey: "userName" },
+        { header: "Cargo", dataKey: "userRole" },
+        { header: "Módulo", dataKey: "entityLabel" },
+        { header: "Descripción del Movimiento", dataKey: "description" },
+      ],
+      data: filtered.map((l) => ({
+        createdAtFormatted: formatTimestamp(l.createdAt),
+        userName: l.userName || "Usuario",
+        userRole: (l.userRole || "admin").toUpperCase(),
+        entityLabel: ENTITY_CONFIG[l.entityType]?.label || l.entityType,
+        description: l.description || "Sin detalle",
+      })),
+    };
+  }
+
   return (
     <div className="space-y-4">
-      {/* Filtros horizontales scrolleables */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all ${
-              filter === f.id
-                ? "bg-accent text-white"
-                : "bg-card border border-line text-muted hover:text-foreground"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Barra de filtros y botón de descarga PDF */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar flex-1">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                filter === f.id
+                  ? "bg-accent text-white"
+                  : "bg-card border border-line text-muted hover:text-foreground"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <PdfDownloadButton
+          reportOptions={getPdfReportOptions}
+          label="Descargar PDF"
+        />
       </div>
 
       {/* Listado de movimientos */}

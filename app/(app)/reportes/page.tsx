@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReportePdfButton } from "@/components/reportes/reporte-pdf-button";
 import { formatMoney } from "@/lib/format";
 import { getReport } from "@/lib/data";
 
@@ -43,6 +44,12 @@ export default async function ReportesPage() {
         <Link href="/mas" className="text-sm text-muted active:scale-95">
           ‹ Más
         </Link>
+        <ReportePdfButton
+          ingresos={r.ingresos}
+          egresos={r.egresos}
+          neto={r.neto}
+          porCategoria={r.porCategoria}
+        />
       </header>
 
       <div>

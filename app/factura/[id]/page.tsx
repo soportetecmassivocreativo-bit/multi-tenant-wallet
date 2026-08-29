@@ -30,25 +30,24 @@ export default async function FacturaPage({
       {/* Membrete */}
       <div className="flex items-start justify-between gap-4 border-b border-neutral-200 pb-4">
         <div className="min-w-0">
-          {company?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+          <div className="mb-2 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={company.logoUrl}
-              alt={company.name}
-              className="mb-2 h-12 w-auto"
+              src="/logo-mwallet.svg"
+              alt="Massivo Corp"
+              className="h-8 w-auto"
             />
-          ) : (
-            <p className="font-serif text-2xl leading-none">
-              {company?.name ?? "Mi empresa"}
-            </p>
-          )}
-          <p className="mt-2 text-xs text-neutral-500">
-            {company?.name} · RIF {company?.rif}
+            <span className="font-serif text-lg font-bold text-[#14151A]">
+              {company?.name || "Massivo Corp"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">
+            {company?.name || "Massivo Corp"} · RIF {company?.rif || "J-50000000-0"}
             {company?.address ? ` · ${company.address}` : ""}
           </p>
           {(company?.phone || company?.email) && (
             <p className="text-xs text-neutral-500">
-              {[company?.phone, company?.email].filter(Boolean).join(" · ")}
+              {[company?.phone, company?.email || "contacto@massivocorp.com"].filter(Boolean).join(" · ")}
             </p>
           )}
         </div>

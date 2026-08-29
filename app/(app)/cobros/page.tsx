@@ -7,6 +7,8 @@ import { deleteInvoice } from "@/lib/mutations";
 import { formatMoney, formatDate } from "@/lib/format";
 import { getInvoices, getClients, isAdmin } from "@/lib/data";
 
+import { CobrosPdfButton } from "@/components/cobros/cobros-pdf-button";
+
 const OPEN = ["pendiente", "parcial", "vencida"];
 
 export default async function CobrosPage() {
@@ -27,13 +29,21 @@ export default async function CobrosPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="font-serif text-2xl tracking-tight">Cobros</h1>
-        <Link
-          href="/cobros/nueva"
-          className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white shadow-[0_6px_16px_rgba(59,91,219,0.35)] active:scale-95"
-        >
-          <PlusIcon className="h-4 w-4" />
-          Nueva factura
-        </Link>
+        <div className="flex items-center gap-2">
+          <CobrosPdfButton
+            invoices={invoices}
+            clients={clients}
+            porCobrar={porCobrar}
+            vencidas={vencidas}
+          />
+          <Link
+            href="/cobros/nueva"
+            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-white shadow-[0_6px_16px_rgba(59,91,219,0.35)] active:scale-95"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Nueva factura
+          </Link>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 gap-3">

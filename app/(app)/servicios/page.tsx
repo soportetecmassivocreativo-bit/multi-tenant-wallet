@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ServicesManager } from "@/components/servicios/services-manager";
+import { ServiciosPdfButton } from "@/components/servicios/servicios-pdf-button";
 import { getServices } from "@/lib/data";
 
 export default async function ServiciosPage() {
@@ -11,6 +12,7 @@ export default async function ServiciosPage() {
         <Link href="/mas" className="text-sm text-muted active:scale-95">
           ‹ Más
         </Link>
+        <ServiciosPdfButton services={services} />
       </header>
 
       <div>

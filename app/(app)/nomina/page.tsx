@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EmployeesManager } from "@/components/nomina/employees-manager";
+import { NominaPdfButton } from "@/components/nomina/nomina-pdf-button";
 import { getEmployees } from "@/lib/data";
 
 export default async function NominaPage() {
@@ -11,6 +12,7 @@ export default async function NominaPage() {
         <Link href="/mas" className="text-sm text-muted active:scale-95">
           ‹ Más
         </Link>
+        <NominaPdfButton employees={employees} />
       </header>
 
       <div>

@@ -1,4 +1,5 @@
 import { NuevoGastoForm } from "@/components/gastos/nuevo-gasto-form";
+import { GastosPdfButton } from "@/components/gastos/gastos-pdf-button";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteExpense } from "@/lib/mutations";
 import { formatMoney, formatDate } from "@/lib/format";
@@ -12,7 +13,10 @@ export default async function GastosPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="font-serif text-2xl tracking-tight">Gastos</h1>
-        <NuevoGastoForm />
+        <div className="flex items-center gap-2">
+          <GastosPdfButton expenses={expenses} total={total} />
+          <NuevoGastoForm />
+        </div>
       </header>
 
       <div className="rounded-2xl bg-soft p-4">

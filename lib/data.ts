@@ -12,6 +12,16 @@ import type {
   Product,
 } from "@/lib/mock-data";
 
+export type {
+  Client,
+  Invoice,
+  Expense,
+  Employee,
+  PayrollPeriod,
+  Service,
+  Product,
+};
+
 /**
  * Capa de acceso a datos. Si Supabase está configurado, consulta la base;
  * si no, devuelve los datos de ejemplo (modo demo). Las páginas solo usan esto.

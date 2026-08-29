@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Reveal } from "@/components/ui/reveal";
 import { ScoreChip } from "@/components/clientes/score-chip";
 import { NuevoClienteForm } from "@/components/clientes/nuevo-cliente-form";
+import { ClientesPdfButton } from "@/components/clientes/clientes-pdf-button";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { ChevronRightIcon } from "@/components/ui/icons";
 import { deleteClient } from "@/lib/mutations";
@@ -15,7 +16,10 @@ export default async function ClientesPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="font-serif text-2xl tracking-tight">Clientes</h1>
-        <NuevoClienteForm />
+        <div className="flex items-center gap-2">
+          <ClientesPdfButton clients={clients} />
+          <NuevoClienteForm />
+        </div>
       </header>
 
       {clients.length === 0 ? (
