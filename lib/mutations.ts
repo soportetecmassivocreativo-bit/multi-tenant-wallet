@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { computeInvoice } from "@/lib/calc";
 import { logAuditEvent } from "@/lib/audit";
 import type { CurrencyCode, RateRef } from "@/lib/currency";
+import { getNextCode } from "@/lib/config-actions";
 
 export interface MutationResult {
   ok: boolean;
@@ -149,6 +150,7 @@ export async function createExpense(
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const currency = input.currency ?? "USD";
+  const code = await getNextCode("expense");
   const { data: exp, error } = await ctx.supabase
     .from("expenses")
     .insert({
@@ -159,6 +161,7 @@ export async function createExpense(
       currency,
       spent_on: today(),
       source: "manual",
+      code,
     })
     .select("id")
     .single();

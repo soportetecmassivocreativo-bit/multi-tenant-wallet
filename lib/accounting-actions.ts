@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
+import { getNextCode } from "@/lib/config-actions";
+
 export interface ActionResult {
   ok: boolean;
   demo?: boolean;
@@ -31,6 +33,8 @@ export async function payPayroll(periodId: string): Promise<ActionResult> {
     .single();
   if (!period) return { ok: false };
 
+  const code = await getNextCode("expense");
+
   await supabase.from("expenses").insert({
     company_id: period.company_id,
     category: "Nómina",
@@ -40,6 +44,7 @@ export async function payPayroll(periodId: string): Promise<ActionResult> {
     spent_on: period.pay_date,
     source: "nomina",
     ref_id: periodId,
+    code,
   });
   await supabase
     .from("payroll_periods")
@@ -64,6 +69,8 @@ export async function payService(serviceId: string): Promise<ActionResult> {
   if (!svc) return { ok: false };
 
   const today = new Date().toISOString().slice(0, 10);
+  const code = await getNextCode("expense");
+
   await supabase.from("expenses").insert({
     company_id: svc.company_id,
     category: svc.category,
@@ -73,6 +80,7 @@ export async function payService(serviceId: string): Promise<ActionResult> {
     spent_on: today,
     source: "servicio",
     ref_id: serviceId,
+    code,
   });
   await supabase
     .from("services")

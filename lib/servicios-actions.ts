@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { MutationResult } from "@/lib/mutations";
 import type { CurrencyCode } from "@/lib/currency";
+import { getNextCode } from "@/lib/config-actions";
 
 async function getContext() {
   const supabase = await createClient();
@@ -35,6 +36,9 @@ export async function addService(input: ServiceInput): Promise<MutationResult> {
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
+  // Genera el código correlativo automáticamente (ej: Mas-Corp-0003)
+  const code = await getNextCode("service");
+
   const { error } = await ctx.supabase.from("services").insert({
     company_id: ctx.companyId,
     name: input.name,
@@ -44,6 +48,7 @@ export async function addService(input: ServiceInput): Promise<MutationResult> {
     category: input.category || "Software",
     next_charge_date: input.nextChargeDate,
     active: true,
+    code,
   });
   if (error) return { ok: false, error: error.message };
 

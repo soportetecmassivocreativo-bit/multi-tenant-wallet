@@ -9,6 +9,45 @@ import type { MutationResult } from "@/lib/mutations";
 
 let memoryConfig: SystemConfig = { ...DEFAULT_SYSTEM_CONFIG };
 
+/** Devuelve el siguiente código correlativo para un módulo dado (sin incrementar).
+ * Si Supabase está configurado, cuenta los registros activos para determinar el número.
+ * Si no, usa el contador de memoryConfig.
+ */
+export async function getNextCode(
+  module: "invoice" | "expense" | "employee" | "service",
+): Promise<string> {
+  const tableMap = {
+    invoice: "invoices",
+    expense: "expenses",
+    employee: "employees",
+    service: "services",
+  } as const;
+
+  const counterKey = `${module}Counter` as keyof SystemConfig;
+  const prefixKey = `${module}Prefix` as keyof SystemConfig;
+
+  const prefix = String(memoryConfig[prefixKey] ?? "Mas-Corp-");
+  const digits = memoryConfig.codeDigits ?? 4;
+
+  if (!isSupabaseConfigured) {
+    const counter = Number(memoryConfig[counterKey] ?? 1);
+    return `${prefix}${String(counter).padStart(digits, "0")}`;
+  }
+
+  try {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from(tableMap[module])
+      .select("id", { count: "exact", head: true });
+
+    const nextNum = (count ?? 0) + 1;
+    return `${prefix}${String(nextNum).padStart(digits, "0")}`;
+  } catch {
+    const counter = Number(memoryConfig[counterKey] ?? 1);
+    return `${prefix}${String(counter).padStart(digits, "0")}`;
+  }
+}
+
 async function getContext() {
   const supabase = await createClient();
   const {

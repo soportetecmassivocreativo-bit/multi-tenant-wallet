@@ -38,7 +38,12 @@ export default async function GastosPage() {
               className="flex items-center gap-3 border-t border-line py-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px]">{e.note}</p>
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-[13px] font-medium">{e.note}</p>
+                  <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] text-muted">
+                    {e.code || "Mas-Corp-0001"}
+                  </span>
+                </div>
                 <p className="text-[11px] text-hint">
                   {e.category} · {formatDate(e.date)}
                 </p>

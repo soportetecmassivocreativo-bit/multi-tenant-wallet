@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { MutationResult } from "@/lib/mutations";
 import type { CurrencyCode } from "@/lib/currency";
+import { getNextCode } from "@/lib/config-actions";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -37,6 +38,9 @@ export async function addEmployee(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
+  // Genera el código correlativo automáticamente (ej: Mas-Corp-0005)
+  const code = await getNextCode("employee");
+
   const { error } = await ctx.supabase.from("employees").insert({
     company_id: ctx.companyId,
     full_name: input.fullName,
@@ -44,6 +48,7 @@ export async function addEmployee(
     salary: input.salary,
     currency: input.currency,
     active: true,
+    code,
   });
   if (error) return { ok: false, error: error.message };
 

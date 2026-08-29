@@ -101,6 +101,7 @@ export const invoices: Invoice[] = [
 
 export interface Expense {
   id: string;
+  code?: string;
   category: string;
   note: string;
   amount: number;
@@ -108,10 +109,10 @@ export interface Expense {
 }
 
 export const expenses: Expense[] = [
-  { id: "g1", category: "Transporte", note: "Combustible", amount: 2400, date: "2026-07-10" },
-  { id: "g2", category: "Local", note: "Alquiler de oficina", amount: 25000, date: "2026-07-01" },
-  { id: "g3", category: "Marketing", note: "Publicidad Meta Ads", amount: 4800, date: "2026-07-06" },
-  { id: "g4", category: "Materiales", note: "Insumos de impresión", amount: 7300, date: "2026-07-04" },
+  { id: "g1", code: "Mas-Corp-0001", category: "Transporte", note: "Combustible", amount: 2400, date: "2026-07-10" },
+  { id: "g2", code: "Mas-Corp-0002", category: "Local", note: "Alquiler de oficina", amount: 25000, date: "2026-07-01" },
+  { id: "g3", code: "Mas-Corp-0003", category: "Marketing", note: "Publicidad Meta Ads", amount: 4800, date: "2026-07-06" },
+  { id: "g4", code: "Mas-Corp-0004", category: "Materiales", note: "Insumos de impresión", amount: 7300, date: "2026-07-04" },
 ];
 
 /* -------------------------- Movimientos (home) ---------------------- */
