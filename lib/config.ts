@@ -26,13 +26,13 @@ export interface SystemConfig {
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   basePrefix: "Mas-Corp-",
   codeDigits: 4,
-  invoicePrefix: "Mas-Corp-",
+  invoicePrefix: "Mas-Corp-Fact-",
   invoiceCounter: 1,
-  expensePrefix: "Mas-Corp-",
+  expensePrefix: "Mas-Corp-Egre-",
   expenseCounter: 1,
-  employeePrefix: "Mas-Corp-",
+  employeePrefix: "Mas-Corp-Nom-",
   employeeCounter: 1,
-  servicePrefix: "Mas-Corp-",
+  servicePrefix: "Mas-Corp-Serv-",
   serviceCounter: 1,
 
   pdfCompanyName: "Massivo Corp",

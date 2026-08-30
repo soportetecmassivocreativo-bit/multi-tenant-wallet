@@ -1,5 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { getSystemConfig } from "@/lib/config-actions";
+import { formatEntityCode } from "@/lib/config";
 import * as mock from "@/lib/mock-data";
 import type { CurrencyCode } from "@/lib/currency";
 import type {
@@ -297,7 +299,17 @@ export async function getRecentMovements(limit = 8): Promise<Movement[]> {
 }
 
 export async function getExpenses(): Promise<Expense[]> {
-  if (!isSupabaseConfigured) return mock.expenses;
+  const config = await getSystemConfig();
+  const prefix = config.expensePrefix || config.basePrefix || "Mas-Corp-Egre-";
+  const digits = config.codeDigits || 4;
+  const startNum = Number(config.expenseCounter || 1);
+
+  if (!isSupabaseConfigured) {
+    return mock.expenses.map((e, idx) => ({
+      ...e,
+      code: formatEntityCode(prefix, startNum + idx, digits),
+    }));
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("expenses")
@@ -305,12 +317,22 @@ export async function getExpenses(): Promise<Expense[]> {
     .order("spent_on", { ascending: false });
   return (data ?? []).map((e, idx) => ({
     ...e,
-    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+    code: formatEntityCode(prefix, startNum + idx, digits),
   })) as unknown as Expense[];
 }
 
 export async function getEmployees(): Promise<Employee[]> {
-  if (!isSupabaseConfigured) return mock.employees;
+  const config = await getSystemConfig();
+  const prefix = config.employeePrefix || config.basePrefix || "Mas-Corp-Nom-";
+  const digits = config.codeDigits || 4;
+  const startNum = Number(config.employeeCounter || 1);
+
+  if (!isSupabaseConfigured) {
+    return mock.employees.map((e, idx) => ({
+      ...e,
+      code: formatEntityCode(prefix, startNum + idx, digits),
+    }));
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("employees")
@@ -319,7 +341,7 @@ export async function getEmployees(): Promise<Employee[]> {
     .order("full_name");
   return (data ?? []).map((e, idx) => ({
     ...e,
-    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+    code: formatEntityCode(prefix, startNum + idx, digits),
   })) as unknown as Employee[];
 }
 
@@ -336,7 +358,17 @@ export async function getPayrollPeriods(): Promise<PayrollPeriod[]> {
 }
 
 export async function getServices(): Promise<Service[]> {
-  if (!isSupabaseConfigured) return mock.services;
+  const config = await getSystemConfig();
+  const prefix = config.servicePrefix || config.basePrefix || "Mas-Corp-Serv-";
+  const digits = config.codeDigits || 4;
+  const startNum = Number(config.serviceCounter || 1);
+
+  if (!isSupabaseConfigured) {
+    return mock.services.map((s, idx) => ({
+      ...s,
+      code: formatEntityCode(prefix, startNum + idx, digits),
+    }));
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("services")
@@ -347,7 +379,7 @@ export async function getServices(): Promise<Service[]> {
     .order("next_charge_date");
   return (data ?? []).map((s, idx) => ({
     ...s,
-    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+    code: formatEntityCode(prefix, startNum + idx, digits),
   })) as unknown as Service[];
 }
 
