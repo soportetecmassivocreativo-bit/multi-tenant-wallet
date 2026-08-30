@@ -301,11 +301,11 @@ export async function getExpenses(): Promise<Expense[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("expenses")
-    .select("id, category, note, amount, date:spent_on, code")
+    .select("id, category, note, amount, currency, date:spent_on")
     .order("spent_on", { ascending: false });
   return (data ?? []).map((e, idx) => ({
     ...e,
-    code: e.code || `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
   })) as unknown as Expense[];
 }
 
@@ -314,12 +314,12 @@ export async function getEmployees(): Promise<Employee[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("employees")
-    .select("id, name:full_name, role, salary, currency, code")
+    .select("id, name:full_name, role, salary, currency")
     .eq("active", true)
     .order("full_name");
   return (data ?? []).map((e, idx) => ({
     ...e,
-    code: e.code || `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
   })) as unknown as Employee[];
 }
 
@@ -341,13 +341,13 @@ export async function getServices(): Promise<Service[]> {
   const { data } = await supabase
     .from("services")
     .select(
-      "id, name, amount, currency, cycle, category, nextChargeDate:next_charge_date, code",
+      "id, name, amount, currency, cycle, category, nextChargeDate:next_charge_date",
     )
     .eq("active", true)
     .order("next_charge_date");
   return (data ?? []).map((s, idx) => ({
     ...s,
-    code: s.code || `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
+    code: `Mas-Corp-${String(idx + 1).padStart(4, "0")}`,
   })) as unknown as Service[];
 }
 

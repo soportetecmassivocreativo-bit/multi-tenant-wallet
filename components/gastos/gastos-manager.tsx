@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { formatMoney, formatDate } from "@/lib/format";
 import { DeleteButton } from "@/components/ui/delete-button";
-import { deleteExpense } from "@/lib/mutations";
+import { deleteExpense, updateExpense } from "@/lib/mutations";
 import { exportExpenseVoucherPdf } from "@/lib/pdf-export";
-import { DownloadIcon, SearchIcon, ReceiptIcon } from "@/components/ui/icons";
+import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon } from "@/components/ui/icons";
+import { MoneyInput } from "@/components/ui/money-input";
 import type { Expense } from "@/lib/mock-data";
 
 interface GastosManagerProps {
@@ -17,6 +18,14 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
   const [activeExpense, setActiveExpense] = useState<Expense | null>(null);
+
+  // Estado para modal de edición
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editNote, setEditNote] = useState("");
+  const [editAmount, setEditAmount] = useState(0);
+  const [editCategory, setEditCategory] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   const categories = Array.from(
     new Set(expenses.map((e) => e.category || "General"))
@@ -34,6 +43,35 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
       (e.category || "").toLowerCase().includes(q);
     return matchesCat && matchesQuery;
   });
+
+  function startEdit(e: Expense) {
+    setEditingExpense(e);
+    setEditNote(e.note);
+    setEditAmount(e.amount);
+    setEditCategory(e.category || "General");
+    setEditError(null);
+  }
+
+  function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingExpense || editAmount <= 0) return;
+    setEditError(null);
+
+    startTransition(async () => {
+      const res = await updateExpense(editingExpense.id, {
+        note: editNote,
+        amount: editAmount,
+        category: editCategory || "General",
+        currency: (editingExpense as unknown as { currency?: "USD" | "VES" | "EUR" }).currency ?? "USD",
+      });
+
+      if (res.ok) {
+        setEditingExpense(null);
+      } else {
+        setEditError(res.error || "No se pudo actualizar el gasto.");
+      }
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -85,7 +123,7 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
       <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
         <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
           <span>Historial de Gastos & Comprobantes ({filtered.length})</span>
-          <span>Monto</span>
+          <span>Monto & Acciones</span>
         </div>
 
         {filtered.length === 0 ? (
@@ -113,8 +151,8 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="tnum text-sm font-semibold text-overdue">
+                <div className="flex items-center gap-2">
+                  <span className="tnum text-sm font-semibold text-overdue mr-1">
                     − {formatMoney(e.amount)}
                   </span>
 
@@ -122,34 +160,123 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
                   <button
                     type="button"
                     onClick={() => setActiveExpense(e)}
-                    className="rounded-lg border border-line bg-card px-2.5 py-1 text-[11px] font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
+                    className="rounded-lg border border-line bg-card px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
                   >
                     Ver
+                  </button>
+
+                  {/* Botón Editar Gasto */}
+                  <button
+                    type="button"
+                    onClick={() => startEdit(e)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-hint hover:text-foreground hover:bg-soft transition-all"
+                    title={`Editar ${e.note}`}
+                  >
+                    <EditIcon className="h-3.5 w-3.5" />
                   </button>
 
                   {/* Botón Descargar PDF Comprobante */}
                   <button
                     type="button"
                     onClick={() => exportExpenseVoucherPdf(e)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
+                    className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
                     title={`Descargar Comprobante PDF de ${e.note}`}
                   >
                     <DownloadIcon className="h-3 w-3" />
                     <span>PDF</span>
                   </button>
 
-                  {admin && (
-                    <DeleteButton
-                      action={deleteExpense.bind(null, e.id)}
-                      ariaLabel={`Eliminar ${e.note}`}
-                    />
-                  )}
+                  {/* Botón Eliminar */}
+                  <DeleteButton
+                    action={deleteExpense.bind(null, e.id)}
+                    ariaLabel={`Eliminar ${e.note}`}
+                  />
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Modal de Edición de Gasto */}
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <form
+            onSubmit={handleSaveEdit}
+            className="w-full max-w-md rounded-3xl border border-line bg-card p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div className="flex items-center gap-2">
+                <EditIcon className="h-5 w-5 text-accent" />
+                <h3 className="font-serif text-base font-semibold">
+                  Modificar Gasto
+                </h3>
+              </div>
+              <span className="rounded-full bg-soft font-mono px-2.5 py-1 text-xs font-bold text-accent">
+                {editingExpense.code || "Mas-Corp-0001"}
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-muted block mb-1">Concepto / Detalle:</label>
+                <input
+                  type="text"
+                  required
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-muted block mb-1">Monto:</label>
+                  <MoneyInput
+                    value={editAmount}
+                    onValueChange={setEditAmount}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="text-muted block mb-1">Categoría:</label>
+                  <input
+                    type="text"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+                    placeholder="General, Servicios, etc."
+                  />
+                </div>
+              </div>
+
+              {editError && (
+                <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue">
+                  {editError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setEditingExpense(null)}
+                disabled={pending}
+                className="rounded-xl border border-line px-4 py-2 text-xs font-medium text-muted hover:text-foreground hover:bg-soft"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={pending || !editNote || editAmount <= 0}
+                className="rounded-xl bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-accent/90 disabled:opacity-50"
+              >
+                {pending ? "Guardando…" : "Guardar Cambios"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Modal de Detalle de Gasto */}
       {activeExpense && (

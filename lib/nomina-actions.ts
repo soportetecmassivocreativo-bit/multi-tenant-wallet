@@ -38,9 +38,6 @@ export async function addEmployee(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  // Genera el código correlativo automáticamente (ej: Mas-Corp-0005)
-  const code = await getNextCode("employee");
-
   const { error } = await ctx.supabase.from("employees").insert({
     company_id: ctx.companyId,
     full_name: input.fullName,
@@ -48,7 +45,6 @@ export async function addEmployee(
     salary: input.salary,
     currency: input.currency,
     active: true,
-    code,
   });
   if (error) return { ok: false, error: error.message };
 
@@ -81,21 +77,30 @@ export async function updateEmployee(
   return { ok: true };
 }
 
-/** Baja lógica: el empleado deja de aparecer, sin borrar su historial. */
-export async function deactivateEmployee(id: string): Promise<MutationResult> {
+export async function deleteEmployee(id: string): Promise<MutationResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const { error } = await ctx.supabase
     .from("employees")
-    .update({ active: false })
+    .delete()
     .eq("id", id);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // Si hay registros vinculados, hacer baja lógica
+    await ctx.supabase
+      .from("employees")
+      .update({ active: false })
+      .eq("id", id);
+  }
 
   revalidatePath("/nomina");
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+export async function deactivateEmployee(id: string): Promise<MutationResult> {
+  return deleteEmployee(id);
 }
 
 /** Paga la nómina: registra un egreso por cada empleado activo (en su moneda). */

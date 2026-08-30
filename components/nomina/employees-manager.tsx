@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import {
   addEmployee,
   updateEmployee,
-  deactivateEmployee,
+  deleteEmployee,
   payPayroll,
   payEmployee,
 } from "@/lib/nomina-actions";
@@ -299,8 +299,8 @@ export function EmployeesManager({
                         </button>
 
                         <DeleteButton
-                          action={() => deactivateEmployee(e.id)}
-                          ariaLabel={`Quitar ${e.name}`}
+                          action={() => deleteEmployee(e.id)}
+                          ariaLabel={`Eliminar ${e.name}`}
                         />
 
                         <ActionButton

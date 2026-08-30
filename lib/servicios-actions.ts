@@ -36,9 +36,6 @@ export async function addService(input: ServiceInput): Promise<MutationResult> {
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  // Genera el código correlativo automáticamente (ej: Mas-Corp-0003)
-  const code = await getNextCode("service");
-
   const { error } = await ctx.supabase.from("services").insert({
     company_id: ctx.companyId,
     name: input.name,
@@ -48,7 +45,6 @@ export async function addService(input: ServiceInput): Promise<MutationResult> {
     category: input.category || "Software",
     next_charge_date: input.nextChargeDate,
     active: true,
-    code,
   });
   if (error) return { ok: false, error: error.message };
 
@@ -83,18 +79,28 @@ export async function updateService(
   return { ok: true };
 }
 
-export async function deactivateService(id: string): Promise<MutationResult> {
+export async function deleteService(id: string): Promise<MutationResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const { error } = await ctx.supabase
     .from("services")
-    .update({ active: false })
+    .delete()
     .eq("id", id);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // Si hay restricciones de FK, hacer baja lógica
+    await ctx.supabase
+      .from("services")
+      .update({ active: false })
+      .eq("id", id);
+  }
 
   revalidatePath("/servicios");
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+export async function deactivateService(id: string): Promise<MutationResult> {
+  return deleteService(id);
 }

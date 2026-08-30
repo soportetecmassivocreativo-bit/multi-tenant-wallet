@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import {
   addService,
   updateService,
-  deactivateService,
+  deleteService,
 } from "@/lib/servicios-actions";
 import { payService } from "@/lib/accounting-actions";
 import { DeleteButton } from "@/components/ui/delete-button";
@@ -320,8 +320,8 @@ export function ServicesManager({ services }: ServicesManagerProps) {
                         </button>
 
                         <DeleteButton
-                          action={() => deactivateService(s.id)}
-                          ariaLabel={`Quitar ${s.name}`}
+                          action={() => deleteService(s.id)}
+                          ariaLabel={`Eliminar ${s.name}`}
                         />
 
                         <ActionButton

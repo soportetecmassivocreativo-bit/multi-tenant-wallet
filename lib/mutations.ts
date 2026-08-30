@@ -150,7 +150,6 @@ export async function createExpense(
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const currency = input.currency ?? "USD";
-  const code = await getNextCode("expense");
   const { data: exp, error } = await ctx.supabase
     .from("expenses")
     .insert({
@@ -161,7 +160,6 @@ export async function createExpense(
       currency,
       spent_on: today(),
       source: "manual",
-      code,
     })
     .select("id")
     .single();
@@ -173,6 +171,44 @@ export async function createExpense(
     entityId: exp?.id,
     description: `Registró gasto en ${input.category || "General"}: ${input.amount.toFixed(2)} ${currency} ("${input.note || "Sin nota"}")`,
     details: { category: input.category, amount: input.amount, currency },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
+
+  revalidatePath("/gastos");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function updateExpense(
+  id: string,
+  input: CreateExpenseInput,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+
+  const { error } = await ctx.supabase
+    .from("expenses")
+    .update({
+      category: input.category || "General",
+      note: input.note,
+      amount: input.amount,
+      currency: input.currency ?? "USD",
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "editar_gasto",
+    entityType: "gasto",
+    entityId: id,
+    description: `Modificó gasto: ${input.amount.toFixed(2)} ${input.currency ?? "USD"} ("${input.note}")`,
+    details: { category: input.category, amount: input.amount, currency: input.currency },
     customUser: {
       id: ctx.userId,
       name: ctx.userName,
@@ -229,6 +265,78 @@ export async function addClient(
   });
 
   revalidatePath("/clientes");
+  return { ok: true };
+}
+
+export async function updateClient(
+  id: string,
+  input: CreateClientInput,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+
+  const score = Math.min(100, Math.max(0, Math.round(input.score ?? 80)));
+  const { error } = await ctx.supabase
+    .from("clients")
+    .update({
+      name: input.name,
+      rif: input.rif ?? "",
+      score,
+      term_days: input.termDays ?? 0,
+    })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "editar_cliente",
+    entityType: "cliente",
+    entityId: id,
+    description: `Modificó cliente "${input.name}" (RIF: ${input.rif || "N/A"})`,
+    details: { name: input.name, rif: input.rif },
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
+
+  revalidatePath("/clientes");
+  return { ok: true };
+}
+
+/** Actualiza el estado de una factura (ej. marcar como pagada, anulada o pendiente) */
+export async function updateInvoiceStatus(
+  id: string,
+  status: string,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+
+  const { error } = await ctx.supabase
+    .from("invoices")
+    .update({ status })
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  await logAuditEvent({
+    action: "editar_factura",
+    entityType: "factura",
+    entityId: id,
+    description: `Cambió estado de la factura a ${status}`,
+    customUser: {
+      id: ctx.userId,
+      name: ctx.userName,
+      role: ctx.role,
+      companyId: ctx.companyId,
+    },
+  });
+
+  revalidatePath("/cobros");
+  revalidatePath(`/cobros/${id}`);
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -290,10 +398,9 @@ export async function registerPayment(
 }
 
 /* ------------------------------ Eliminar ----------------------------- */
-/* Solo rol 'admin' o 'ceo' puede eliminar. */
 
 async function deleteRow(
-  table: "invoices" | "expenses" | "clients",
+  table: "invoices" | "expenses" | "clients" | "payments",
   id: string,
   paths: string[],
 ): Promise<MutationResult> {
@@ -307,8 +414,8 @@ async function deleteRow(
   if (error) return { ok: false, error: error.message };
 
   await logAuditEvent({
-    action: `eliminar_${table === "invoices" ? "factura" : table === "expenses" ? "gasto" : "cliente"}`,
-    entityType: table === "invoices" ? "factura" : table === "expenses" ? "gasto" : "cliente",
+    action: `eliminar_${table === "invoices" ? "factura" : table === "expenses" ? "gasto" : table === "clients" ? "cliente" : "pago"}`,
+    entityType: table === "invoices" ? "factura" : table === "expenses" ? "gasto" : table === "clients" ? "cliente" : "pago",
     entityId: id,
     description: `Eliminó registro de ${table} (ID: ${id})`,
     customUser: {
@@ -333,4 +440,8 @@ export async function deleteExpense(id: string): Promise<MutationResult> {
 
 export async function deleteClient(id: string): Promise<MutationResult> {
   return deleteRow("clients", id, ["/clientes"]);
+}
+
+export async function deletePayment(id: string): Promise<MutationResult> {
+  return deleteRow("payments", id, ["/cobros", "/dashboard"]);
 }
