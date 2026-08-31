@@ -11,6 +11,8 @@ interface Props {
   searchParams: Promise<{ empresa?: string }>;
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function ConfiguracionPage({ searchParams }: Props) {
   const { empresa } = await searchParams;
   const cookieStore = await cookies();

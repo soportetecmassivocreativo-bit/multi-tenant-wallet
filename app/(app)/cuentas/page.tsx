@@ -5,6 +5,8 @@ export const metadata = {
   title: "Cuentas Bancarias & Métodos de Pago · M-Wallet",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function CuentasPage() {
   const accounts = await getCompanyAccounts();
 
