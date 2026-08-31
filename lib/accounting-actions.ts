@@ -74,7 +74,7 @@ export async function payService(serviceId: string): Promise<ActionResult> {
   await supabase.from("expenses").insert({
     company_id: svc.company_id,
     category: svc.category,
-    note: svc.name,
+    note: `${svc.name} [Servicio Recurrente · Por Aprobar]`,
     amount: svc.amount,
     currency: svc.currency,
     spent_on: today,

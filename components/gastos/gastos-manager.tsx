@@ -159,68 +159,89 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {filtered.map((e) => (
-              <div
-                key={e.id}
-                className="flex items-center gap-3 p-3.5 hover:bg-soft/40 transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {e.note}
+            {filtered.map((e) => {
+              const isPending = (e.note || "").includes("Por Aprobar") || (e.note || "").includes("A Crédito") || (e.note || "").includes("Pendiente");
+              return (
+                <div
+                  key={e.id}
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 hover:bg-soft/40 transition-colors ${
+                    isPending ? "bg-pending/5 border-l-4 border-l-pending" : ""
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {e.note}
+                      </p>
+                      <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
+                        {e.code || "Mas-Corp-0001"}
+                      </span>
+                      {isPending && (
+                        <span className="rounded-full bg-pending/15 text-pending font-semibold px-2 py-0.5 text-[10px]">
+                          Por Aprobar / Pendiente
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-hint mt-0.5">
+                      {e.category} · {formatDate(e.date)}
                     </p>
-                    <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
-                      {e.code || "Mas-Corp-0001"}
-                    </span>
                   </div>
-                  <p className="text-[11px] text-hint mt-0.5">
-                    {e.category} · {formatDate(e.date)}
-                  </p>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
+                    <span className="tnum text-sm font-semibold text-overdue mr-1">
+                      − {formatMoney(e.amount)}
+                    </span>
+
+                    {/* Botón Aprobar y Pagar (si está pendiente) */}
+                    {isPending && (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(e)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-accent/90 transition-all active:scale-95 shadow-sm"
+                      >
+                        Aprobar y Pagar
+                      </button>
+                    )}
+
+                    {/* Botón Ver Detalles */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveExpense(e)}
+                      className="rounded-lg border border-line bg-card px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
+                    >
+                      Ver
+                    </button>
+
+                    {/* Botón Editar Gasto */}
+                    <button
+                      type="button"
+                      onClick={() => startEdit(e)}
+                      className="grid h-7 w-7 place-items-center rounded-lg text-hint hover:text-foreground hover:bg-soft transition-all"
+                      title={`Editar ${e.note}`}
+                    >
+                      <EditIcon className="h-3.5 w-3.5" />
+                    </button>
+
+                    {/* Botón Descargar PDF Comprobante */}
+                    <button
+                      type="button"
+                      onClick={() => exportExpenseVoucherPdf(e)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
+                      title={`Descargar Comprobante PDF de ${e.note}`}
+                    >
+                      <DownloadIcon className="h-3 w-3" />
+                      <span>PDF</span>
+                    </button>
+
+                    {/* Botón Eliminar */}
+                    <DeleteButton
+                      action={deleteExpense.bind(null, e.id)}
+                      ariaLabel={`Eliminar ${e.note}`}
+                    />
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="tnum text-sm font-semibold text-overdue mr-1">
-                    − {formatMoney(e.amount)}
-                  </span>
-
-                  {/* Botón Ver Detalles */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveExpense(e)}
-                    className="rounded-lg border border-line bg-card px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
-                  >
-                    Ver
-                  </button>
-
-                  {/* Botón Editar Gasto */}
-                  <button
-                    type="button"
-                    onClick={() => startEdit(e)}
-                    className="grid h-7 w-7 place-items-center rounded-lg text-hint hover:text-foreground hover:bg-soft transition-all"
-                    title={`Editar ${e.note}`}
-                  >
-                    <EditIcon className="h-3.5 w-3.5" />
-                  </button>
-
-                  {/* Botón Descargar PDF Comprobante */}
-                  <button
-                    type="button"
-                    onClick={() => exportExpenseVoucherPdf(e)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
-                    title={`Descargar Comprobante PDF de ${e.note}`}
-                  >
-                    <DownloadIcon className="h-3 w-3" />
-                    <span>PDF</span>
-                  </button>
-
-                  {/* Botón Eliminar */}
-                  <DeleteButton
-                    action={deleteExpense.bind(null, e.id)}
-                    ariaLabel={`Eliminar ${e.note}`}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

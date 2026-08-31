@@ -50,6 +50,11 @@ export interface CreateInvoiceInput {
   creditDays: number;
   rateRef: RateRef;
   rate: number;
+  // Opciones de pago de contado
+  accountId?: string;
+  accountName?: string;
+  paymentMethod?: string;
+  paymentReference?: string;
 }
 
 export async function createInvoice(
@@ -69,6 +74,7 @@ export async function createInvoice(
     issueDateISO,
   });
   const isForeign = input.currency !== "VES";
+  const isCash = input.creditDays === 0;
 
   const { data: company } = await supabase
     .from("companies")
@@ -76,6 +82,8 @@ export async function createInvoice(
     .eq("id", companyId)
     .single();
   const number = company?.next_invoice_number ?? 1;
+
+  const initialStatus = isCash && input.accountId ? "pagada" : "pendiente";
 
   const { data: inv, error } = await supabase
     .from("invoices")
@@ -92,7 +100,7 @@ export async function createInvoice(
       ves_rate: isForeign ? input.rate : null,
       ves_rate_ref: isForeign ? input.rateRef : null,
       ves_total: isForeign ? result.total * input.rate : null,
-      status: "pendiente",
+      status: initialStatus,
       issue_date: issueDateISO,
       due_date: result.dueDateISO,
     })
@@ -111,6 +119,27 @@ export async function createInvoice(
       })),
     );
   }
+
+  // Si fue de contado y se especificó cuenta de destino, registrar cobro inmediatamente
+  if (isCash && input.accountId) {
+    let formattedMethod = (input.paymentMethod || "Transferencia Bancaria").trim();
+    const metaParts: string[] = [];
+    if (input.accountName) metaParts.push(input.accountName.trim());
+    if (input.paymentReference) metaParts.push(`Ref: ${input.paymentReference.trim()}`);
+    if (metaParts.length > 0) {
+      formattedMethod = `${formattedMethod} · ${metaParts.join(" · ")}`;
+    }
+
+    await supabase.from("payments").insert({
+      company_id: companyId,
+      invoice_id: inv.id,
+      amount: result.total,
+      currency: input.currency,
+      paid_on: issueDateISO,
+      method: formattedMethod,
+    });
+  }
+
   await supabase
     .from("companies")
     .update({ next_invoice_number: number + 1 })
@@ -120,8 +149,8 @@ export async function createInvoice(
     action: "crear_factura",
     entityType: "factura",
     entityId: inv.id as string,
-    description: `Creó la factura #${number} por ${result.total.toFixed(2)} ${input.currency}`,
-    details: { number, total: result.total, currency: input.currency },
+    description: `Creó la factura #${number} por ${result.total.toFixed(2)} ${input.currency} (${isCash ? "De Contado" : `Crédito ${input.creditDays} días`})`,
+    details: { number, total: result.total, currency: input.currency, isCash, accountName: input.accountName },
     customUser: {
       id: ctx.userId,
       name: ctx.userName,

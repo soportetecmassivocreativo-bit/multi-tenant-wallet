@@ -18,6 +18,7 @@ import { computeInvoice, predictPaymentDays } from "@/lib/calc";
 import { createInvoice } from "@/lib/mutations";
 import { syncBcvRates, saveManualBcvRates } from "@/lib/bcv-actions";
 import type { Client, Product } from "@/lib/mock-data";
+import type { CompanyAccount } from "@/lib/cuentas-actions";
 
 const TODAY = "2026-07-10";
 
@@ -44,10 +45,12 @@ export function NuevaFacturaForm({
   clients,
   products,
   bcv,
+  accounts = [],
 }: {
   clients: Client[];
   products: Product[];
   bcv: { usd: number; eur: number; date: string };
+  accounts?: CompanyAccount[];
 }) {
   const [currentBcv, setCurrentBcv] = useState(bcv);
   const [clientId, setClientId] = useState("");
@@ -62,7 +65,12 @@ export function NuevaFacturaForm({
   ]);
   const [taxRate, setTaxRate] = useState(0.16);
   const [discountPct, setDiscountPct] = useState(0);
-  const [creditDays, setCreditDays] = useState(30);
+  const [creditDays, setCreditDays] = useState(0);
+  const [accountId, setAccountId] = useState<string>(
+    accounts.find((a) => a.isDefault || a.currency === "USD")?.id || accounts[0]?.id || ""
+  );
+  const [paymentMethod, setPaymentMethod] = useState("Transferencia Bancaria");
+  const [paymentReference, setPaymentReference] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
@@ -113,8 +121,10 @@ export function NuevaFacturaForm({
   }
   function onSelectClient(id: string) {
     setClientId(id);
-    const c = clients.find((x) => x.id === id);
-    if (c) setCreditDays(c.termDays);
+    const cl = clients.find((c) => c.id === id);
+    if (cl && cl.termDays !== undefined) {
+      setCreditDays(cl.termDays);
+    }
   }
   function onSelectRateRef(ref: RateRef) {
     setRateRef(ref);
@@ -168,6 +178,8 @@ export function NuevaFacturaForm({
 
   function submit() {
     setError(null);
+    const selectedAcc = accounts.find((a) => a.id === accountId);
+
     startSaving(async () => {
       const r = await createInvoice({
         clientId,
@@ -182,6 +194,10 @@ export function NuevaFacturaForm({
         creditDays,
         rateRef,
         rate,
+        accountId: creditDays === 0 ? accountId : undefined,
+        accountName: creditDays === 0 && selectedAcc ? selectedAcc.name : undefined,
+        paymentMethod: creditDays === 0 ? paymentMethod : undefined,
+        paymentReference: creditDays === 0 ? paymentReference : undefined,
       });
       if (r.ok) setSaved(true);
       else setError(r.error ?? "No se pudo crear la factura.");
@@ -273,20 +289,26 @@ export function NuevaFacturaForm({
       {/* Conceptos y Líneas de Facturación */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-foreground">
-            Descripción / Conceptos del Cobro o Factura
+          <label className="text-xs font-bold text-foreground">
+            Descripción / Concepto del Cobro o Factura *
           </label>
-          <span className="text-[10px] text-hint">Detalle de ítems y servicios</span>
+          <span className="text-[10px] text-hint font-medium">Define los ítems y servicios a facturar</span>
         </div>
         {lines.map((l) => (
-          <div key={l.id} className="rounded-2xl border border-line bg-card p-3 shadow-sm space-y-2">
-            <input
-              value={l.description}
-              onChange={(e) => updateLine(l.id, { description: e.target.value })}
-              placeholder="Descripción del concepto o servicio (Ej: Consultoría mensual, diseño, materiales...)"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-hint font-medium"
-            />
-            <div className="mt-2 flex items-center gap-2">
+          <div key={l.id} className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-muted mb-1">
+                Concepto / Detalle del Ítem *
+              </label>
+              <input
+                value={l.description}
+                onChange={(e) => updateLine(l.id, { description: e.target.value })}
+                placeholder="Escribe aquí el concepto o servicio (Ej: Consultoría mensual, diseño, materiales...)"
+                className="w-full rounded-xl border border-line bg-soft px-3.5 py-2.5 text-sm font-medium outline-none focus:border-accent focus:bg-card focus:ring-1 focus:ring-accent transition-all"
+                autoFocus={l.id === 1}
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
               <div className="flex items-center gap-1">
                 <span className="text-[11px] text-hint">Cant.</span>
                 <MoneyInput
@@ -308,7 +330,7 @@ export function NuevaFacturaForm({
               <button
                 onClick={() => removeLine(l.id)}
                 aria-label="Eliminar línea"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-hint active:scale-90"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-hint hover:text-overdue hover:bg-overdue/10 active:scale-90 transition-all"
               >
                 <TrashIcon className="h-4 w-4" />
               </button>
@@ -322,7 +344,7 @@ export function NuevaFacturaForm({
               <button
                 key={p.id}
                 onClick={() => addProduct(p.name, p.price)}
-                className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-xs text-muted active:scale-95"
+                className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-xs text-muted active:scale-95 hover:border-accent hover:text-accent transition-all"
               >
                 <PlusIcon className="h-3 w-3" />
                 {p.name}
@@ -355,11 +377,11 @@ export function NuevaFacturaForm({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[11px] text-muted">Crédito</label>
+          <label className="text-[11px] text-muted font-semibold text-foreground">Condición de Crédito</label>
           <select
             value={creditDays}
             onChange={(e) => setCreditDays(Number(e.target.value))}
-            className={inputClass}
+            className={`${inputClass} font-semibold text-accent`}
           >
             {termOptions.map((t) => (
               <option key={t.days} value={t.days}>
@@ -369,6 +391,79 @@ export function NuevaFacturaForm({
           </select>
         </div>
       </section>
+
+      {/* Selector condicional: Cuenta de Acreditación si es de Contado, o Aviso de Crédito */}
+      {creditDays === 0 ? (
+        <section className="rounded-2xl border border-accent/20 bg-accent-bg/30 p-4 space-y-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <p className="font-serif text-sm font-bold text-foreground">
+              Acreditación de Fondos (Pago de Contado)
+            </p>
+            <span className="text-[11px] font-bold text-accent bg-accent/10 px-2.5 py-0.5 rounded-full">
+              Contado Inmediato
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-hint">Cuenta de Destino *</label>
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className={inputClass}
+              >
+                {accounts.length === 0 ? (
+                  <option value="">Cuenta Principal</option>
+                ) : (
+                  accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency}) {a.bankName ? `· ${a.bankName}` : ""}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-hint">Método de Pago</label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className={inputClass}
+              >
+                <option value="Transferencia Bancaria">Transferencia Bancaria</option>
+                <option value="Pago Móvil">Pago Móvil</option>
+                <option value="Zelle">Zelle</option>
+                <option value="Efectivo / Caja">Efectivo / Caja</option>
+                <option value="Binance USDT">Binance USDT / Cripto</option>
+                <option value="Punto de Venta / Tarjeta">Punto de Venta / Tarjeta</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-hint">Referencia (Opcional)</label>
+              <input
+                type="text"
+                maxLength={8}
+                placeholder="Ej: 84920194"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                className={`${inputClass} font-mono`}
+              />
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-line bg-soft/50 p-3.5 text-xs text-muted flex flex-col sm:flex-row sm:items-center justify-between gap-2 animate-in fade-in duration-200">
+          <div>
+            <p className="font-semibold text-foreground">Factura emitida a Crédito ({creditDays} días)</p>
+            <p className="text-[11px] text-hint">No se solicita cuenta inmediata. Quedará registrada como <strong>Pendiente de Cobro</strong>.</p>
+          </div>
+          <span className="rounded-full bg-pending/10 px-2.5 py-1 text-[11px] font-semibold text-pending self-start sm:self-auto">
+            Abono registrable luego
+          </span>
+        </section>
+      )}
 
       {/* Conversión a Bolívares (BCV / Manual) */}
       {isForeign && (

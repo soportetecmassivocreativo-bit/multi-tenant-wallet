@@ -16,6 +16,7 @@ interface NuevoGastoFormProps {
 
 export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
   const [open, setOpen] = useState(false);
+  const [paymentType, setPaymentType] = useState<"contado" | "credito">("contado");
   const [note, setNote] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -35,8 +36,12 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
     }
     setError(null);
 
-    const selectedAcc = accounts.find((a) => a.id === selectedAccountId);
-    const fullNote = description.trim() ? `${note.trim()} (${description.trim()})` : note.trim();
+    const isCash = paymentType === "contado";
+    const selectedAcc = isCash ? accounts.find((a) => a.id === selectedAccountId) : undefined;
+    let fullNote = description.trim() ? `${note.trim()} (${description.trim()})` : note.trim();
+    if (!isCash) {
+      fullNote = `${fullNote} [A Crédito / Por Pagar]`;
+    }
 
     start(async () => {
       const r = await createExpense({
@@ -44,9 +49,9 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
         category: category.trim() || "General",
         amount,
         currency,
-        accountId: selectedAccountId || undefined,
-        accountName: selectedAcc ? selectedAcc.name : undefined,
-        reference: reference.trim() ? reference.trim() : undefined,
+        accountId: isCash ? (selectedAccountId || undefined) : undefined,
+        accountName: isCash && selectedAcc ? selectedAcc.name : undefined,
+        reference: isCash && reference.trim() ? reference.trim() : undefined,
       });
 
       if (r.ok) {
@@ -55,6 +60,7 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
         setCategory("");
         setAmount(0);
         setReference("");
+        setPaymentType("contado");
         setOpen(false);
       } else {
         setError(r.error ?? "No se pudo registrar el gasto.");
@@ -87,6 +93,32 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
             </button>
           </div>
 
+          {/* Tipo de Pago: Contado vs Crédito */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPaymentType("contado")}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                paymentType === "contado"
+                  ? "border-accent bg-accent-bg text-accent shadow-sm ring-1 ring-accent"
+                  : "border-line bg-soft text-muted hover:text-foreground"
+              }`}
+            >
+              Pago de Contado (Débito Inmediato)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentType("credito")}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                paymentType === "credito"
+                  ? "border-accent bg-accent-bg text-accent shadow-sm ring-1 ring-accent"
+                  : "border-line bg-soft text-muted hover:text-foreground"
+              }`}
+            >
+              A Crédito / Por Pagar (Sin cuenta)
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label className="block text-[11px] text-hint font-medium mb-1">
@@ -114,48 +146,56 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-[11px] text-hint font-medium mb-1">
-                Cuenta de Origen (Desde donde se debita) *
-              </label>
-              <select
-                value={selectedAccountId}
-                onChange={(e) => {
-                  setSelectedAccountId(e.target.value);
-                  const acc = accounts.find((a) => a.id === e.target.value);
-                  if (acc && (acc.currency === "USD" || acc.currency === "VES" || acc.currency === "EUR")) {
-                    setCurrency(acc.currency);
-                  }
-                }}
-                className={inputClass}
-              >
-                {accounts.length === 0 ? (
-                  <option value="">Cuenta Principal</option>
-                ) : (
-                  accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.currency}) {a.bankName ? `· ${a.bankName}` : ""}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
+          {/* Cuenta de origen sólo si es de CONTADO */}
+          {paymentType === "contado" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 rounded-xl border border-accent/20 bg-accent-bg/20 p-3 animate-in fade-in duration-200">
+              <div>
+                <label className="block text-[11px] text-hint font-medium mb-1">
+                  Cuenta de Origen (Desde donde se debita) *
+                </label>
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => {
+                    setSelectedAccountId(e.target.value);
+                    const acc = accounts.find((a) => a.id === e.target.value);
+                    if (acc && (acc.currency === "USD" || acc.currency === "VES" || acc.currency === "EUR")) {
+                      setCurrency(acc.currency);
+                    }
+                  }}
+                  className={inputClass}
+                >
+                  {accounts.length === 0 ? (
+                    <option value="">Cuenta Principal</option>
+                  ) : (
+                    accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.currency}) {a.bankName ? `· ${a.bankName}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-[11px] text-hint font-medium mb-1">
-                Referencia (Últimos 8 dígitos)
-              </label>
-              <input
-                type="text"
-                maxLength={8}
-                placeholder="Ej: 83920194"
-                value={reference}
-                onChange={(e) => setReference(e.target.value.replace(/\D/g, "").slice(0, 8))}
-                className={`${inputClass} font-mono`}
-              />
+              <div>
+                <label className="block text-[11px] text-hint font-medium mb-1">
+                  Referencia (Últimos 8 dígitos)
+                </label>
+                <input
+                  type="text"
+                  maxLength={8}
+                  placeholder="Ej: 83920194"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  className={`${inputClass} font-mono`}
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-line bg-soft/60 p-3 text-xs text-muted flex items-center justify-between animate-in fade-in duration-200">
+              <span>Gasto registrado <strong>A Crédito / Por Pagar</strong>. No se debitará ninguna cuenta inmediatamente.</span>
+              <span className="rounded-full bg-pending/10 text-pending px-2 py-0.5 text-[10px] font-semibold">Pendiente de Pago</span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>

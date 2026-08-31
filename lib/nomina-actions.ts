@@ -120,7 +120,7 @@ export async function payPayroll(): Promise<MutationResult> {
   const rows = emps.map((e) => ({
     company_id: ctx.companyId,
     category: "Nómina",
-    note: `Nómina · ${e.full_name}`,
+    note: `Nómina · ${e.full_name} [Por Aprobar / Pendiente de Pago]`,
     amount: e.salary,
     currency: e.currency,
     spent_on: today(),
@@ -153,7 +153,7 @@ export async function payEmployee(
   const { error } = await ctx.supabase.from("expenses").insert({
     company_id: ctx.companyId,
     category: "Nómina",
-    note: `Nómina · ${emp.full_name}`,
+    note: `Nómina · ${emp.full_name} [Por Aprobar / Pendiente de Pago]`,
     amount: emp.salary,
     currency: emp.currency,
     spent_on: today(),
