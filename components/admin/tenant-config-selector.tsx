@@ -6,6 +6,25 @@ import { BuildingIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { getAdminTenants } from "@/lib/tenant-admin-actions";
 import type { TenantConfig } from "@/lib/supabase/tenants-config";
 
+const DEFAULT_PRESETS: TenantConfig[] = [
+  {
+    slug: "massivo",
+    name: "Massivo Creativo",
+    supabaseUrl: "https://fguxdeqqwwtrbizqnguv.supabase.co",
+    supabaseAnonKey: "sb_publishable_l565KUwsXphFZSpmXGWpAg_wrJYLP_r",
+    description: "Entorno Principal Corporativo",
+    isDefault: true,
+  },
+  {
+    slug: "demo",
+    name: "Empresa Demo Multi-Tenant",
+    supabaseUrl: "https://fguxdeqqwwtrbizqnguv.supabase.co",
+    supabaseAnonKey: "sb_publishable_l565KUwsXphFZSpmXGWpAg_wrJYLP_r",
+    description: "Espacio de pruebas",
+    isDefault: false,
+  },
+];
+
 interface TenantConfigSelectorProps {
   initialTenants?: TenantConfig[];
   activeSlug?: string;
@@ -20,20 +39,20 @@ export function TenantConfigSelector({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [tenants, setTenants] = useState<TenantConfig[]>(initialTenants || []);
+  const [tenants, setTenants] = useState<TenantConfig[]>(
+    initialTenants && initialTenants.length > 0 ? initialTenants : DEFAULT_PRESETS
+  );
   const [selectedSlug, setSelectedSlug] = useState<string>(
     propActiveSlug || searchParams.get("empresa") || "massivo"
   );
 
   useEffect(() => {
-    if (!initialTenants || initialTenants.length === 0) {
-      getAdminTenants().then((data) => {
-        if (data && data.length > 0) {
-          setTenants(data);
-        }
-      });
-    }
-  }, [initialTenants]);
+    getAdminTenants().then((data) => {
+      if (data && data.length > 0) {
+        setTenants(data);
+      }
+    });
+  }, []);
 
   const handleSelect = (newSlug: string) => {
     setSelectedSlug(newSlug);

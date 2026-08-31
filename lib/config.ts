@@ -11,6 +11,14 @@ export interface SystemConfig {
   servicePrefix: string; // "Mas-Corp-" o "Mas-Corp-SRV-"
   serviceCounter: number; // ej: 1
 
+  // Identidad, Branding y Logos
+  systemLogoUrl: string; // URL o Base64 del logo en el sistema / header
+  pdfLogoUrl: string; // URL o Base64 del logo en el PDF
+  brandPrimaryColor: string; // Color primario de marca (ej: "#2C21FF")
+  brandAccentColor: string; // Color secundario / botones (ej: "#3b82f6")
+  defaultCurrency: string; // "USD" | "VES" | "EUR"
+  defaultTaxRate: number; // 16%
+
   // Personalización de Reportes PDF
   pdfCompanyName: string; // "Massivo Corp"
   pdfCompanyRif: string; // "J-50000000-0"
@@ -21,6 +29,7 @@ export interface SystemConfig {
   pdfContactPhone: string; // "+58 412-0000000"
   pdfShowBcvRates: boolean; // true
   pdfFooterText: string; // "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet"
+  pdfTermsAndConditions: string; // Términos y condiciones
 }
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
@@ -35,6 +44,13 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   servicePrefix: "Mas-Corp-Serv-",
   serviceCounter: 1,
 
+  systemLogoUrl: "/logo-massivo-creativo.png",
+  pdfLogoUrl: "/logo-massivo-creativo.png",
+  brandPrimaryColor: "#2C21FF",
+  brandAccentColor: "#3b82f6",
+  defaultCurrency: "USD",
+  defaultTaxRate: 16,
+
   pdfCompanyName: "Massivo Corp",
   pdfCompanyRif: "J-50000000-0",
   pdfHeaderSubtitle: "Sistema Financiero & Facturación",
@@ -44,6 +60,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfContactPhone: "+58 412-0000000",
   pdfShowBcvRates: true,
   pdfFooterText: "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet",
+  pdfTermsAndConditions: "Factura emitida conforme a las regulaciones vigentes. Pagadera a la fecha de vencimiento.",
 };
 
 /**

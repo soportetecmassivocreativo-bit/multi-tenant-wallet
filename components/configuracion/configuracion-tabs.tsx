@@ -3,19 +3,25 @@
 import { useState, useEffect, useTransition } from "react";
 import { saveSystemConfig } from "@/lib/config-actions";
 import { PdfLivePreview } from "@/components/configuracion/pdf-live-preview";
-import { SettingsIcon, CheckIcon, ReceiptIcon, PayrollIcon, RepeatIcon } from "@/components/ui/icons";
+import {
+  SettingsIcon,
+  CheckIcon,
+  ReceiptIcon,
+  PayrollIcon,
+  RepeatIcon,
+  BuildingIcon,
+} from "@/components/ui/icons";
 import type { SystemConfig } from "@/lib/config";
 
-const COLOR_PRESETS = [
-  { label: "Azul Índigo (Oficial)", value: "#2C21FF" },
-  { label: "Violeta Profundo", value: "#4F46E5" },
-  { label: "Azul Océano", value: "#0284C7" },
-  { label: "Verde Esmeralda", value: "#059669" },
-  { label: "Ámbar Corporativo", value: "#D97706" },
-  { label: "Negro Ejecutivo", value: "#18181B" },
+const BRAND_PALETTES = [
+  { label: "Azul Índigo (Massivo)", primary: "#2C21FF", accent: "#3B82F6" },
+  { label: "Azul Real Corporativo", primary: "#1E40AF", accent: "#3B82F6" },
+  { label: "Violeta Profundo", primary: "#6D28D9", accent: "#8B5CF6" },
+  { label: "Verde Esmeralda", primary: "#047857", accent: "#10B981" },
+  { label: "Ámbar / Dorado", primary: "#B45309", accent: "#F59E0B" },
+  { label: "Rojo Carmesí", primary: "#B91C1C", accent: "#EF4444" },
+  { label: "Negro Ejecutivo", primary: "#09090B", accent: "#27272A" },
 ];
-
-const LOCAL_STORAGE_KEY = "m_wallet_system_config";
 
 interface ConfiguracionTabsProps {
   initialConfig: SystemConfig;
@@ -23,22 +29,15 @@ interface ConfiguracionTabsProps {
 }
 
 export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsProps) {
-  const [activeTab, setActiveTab] = useState<"contabilizadores" | "pdf">("contabilizadores");
+  const [activeTab, setActiveTab] = useState<"contabilizadores" | "branding" | "pdf">("contabilizadores");
   const [config, setConfig] = useState<SystemConfig>(initialConfig);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Cargar preferencias locales al montar en el navegador
   useEffect(() => {
-    try {
-      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (local) {
-        const parsed = JSON.parse(local);
-        setConfig((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch {}
-  }, []);
+    setConfig(initialConfig);
+  }, [initialConfig]);
 
   function updateField<K extends keyof SystemConfig>(key: K, value: SystemConfig[K]) {
     setConfig((prev) => ({
@@ -47,21 +46,29 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
     }));
   }
 
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>, field: "systemLogoUrl" | "pdfLogoUrl") {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Convertir a base64 para persistir localmente y en base de datos sin depender de storage
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      updateField(field, base64);
+    };
+    reader.readAsDataURL(file);
+  }
+
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!canEdit) return;
     setMsg(null);
     setError(null);
 
-    // Guardar en localStorage de inmediato para persistencia permanente en el navegador
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
-    } catch {}
-
     startTransition(async () => {
       const res = await saveSystemConfig(config);
       if (res.ok) {
-        setMsg("Configuración guardada permanentemente y aplicada a todo el sistema.");
+        setMsg("¡Configuración y personalización de la empresa guardadas con éxito!");
       } else {
         setError(res.error || "No se pudo guardar la configuración.");
       }
@@ -75,18 +82,31 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
   return (
     <div className="space-y-6">
       {/* Selector de pestañas */}
-      <div className="flex gap-2 border-b border-line pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-line pb-2">
         <button
           type="button"
           onClick={() => setActiveTab("contabilizadores")}
           className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
             activeTab === "contabilizadores"
-              ? "bg-accent text-white shadow-sm"
+              ? "bg-accent text-white shadow-sm font-semibold"
               : "bg-card border border-line text-muted hover:text-foreground"
           }`}
         >
           <SettingsIcon className="h-4 w-4" />
-          <span>Contabilizadores Mas-Corp-</span>
+          <span>Contabilizadores & Prefijos</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("branding")}
+          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+            activeTab === "branding"
+              ? "bg-accent text-white shadow-sm font-semibold"
+              : "bg-card border border-line text-muted hover:text-foreground"
+          }`}
+        >
+          <BuildingIcon className="h-4 w-4" />
+          <span>Logos, Colores & Branding</span>
         </button>
 
         <button
@@ -94,12 +114,12 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
           onClick={() => setActiveTab("pdf")}
           className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
             activeTab === "pdf"
-              ? "bg-accent text-white shadow-sm"
+              ? "bg-accent text-white shadow-sm font-semibold"
               : "bg-card border border-line text-muted hover:text-foreground"
           }`}
         >
           <ReceiptIcon className="h-4 w-4" />
-          <span>Personalización PDF & Vista Previa</span>
+          <span>Reportes PDF & Membrete</span>
         </button>
       </div>
 
@@ -122,9 +142,9 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
           <div className="space-y-5">
             <section className="rounded-2xl border border-line bg-card p-4 space-y-4">
               <div>
-                <h2 className="font-serif text-[15px] font-medium">Nomenclatura Base del Sistema</h2>
+                <h2 className="font-serif text-[15px] font-medium">Nomenclatura Base de la Empresa</h2>
                 <p className="text-xs text-muted">
-                  Configura el prefijo corporativo y los ceros de relleno (hasta 4 dígitos) para correlativos.
+                  Configura el prefijo de los códigos y la cantidad de ceros de relleno (hasta 4 dígitos).
                 </p>
               </div>
 
@@ -139,16 +159,16 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                       setConfig((prev) => ({
                         ...prev,
                         basePrefix: val,
-                        invoicePrefix: val,
-                        expensePrefix: val,
-                        employeePrefix: val,
-                        servicePrefix: val,
+                        invoicePrefix: val.includes("-") ? `${val}FAC-` : `${val}-FAC-`,
+                        expensePrefix: val.includes("-") ? `${val}GAS-` : `${val}-GAS-`,
+                        employeePrefix: val.includes("-") ? `${val}NOM-` : `${val}-NOM-`,
+                        servicePrefix: val.includes("-") ? `${val}SRV-` : `${val}-SRV-`,
                       }));
                     }}
-                    placeholder="Mas-Corp-"
+                    placeholder="Mas-Corp- o MiEmpresa-"
                     className="w-full rounded-xl border border-line bg-soft px-3.5 py-2.5 text-sm font-mono outline-none focus:border-accent"
                   />
-                  <p className="mt-1 text-[11px] text-hint">Ejemplo: Mas-Corp-</p>
+                  <p className="mt-1 text-[11px] text-hint">Ejemplo: Mas-Corp- o EmpresaX-</p>
                 </div>
 
                 <div>
@@ -160,10 +180,10 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                     onChange={(e) => updateField("codeDigits", Number(e.target.value))}
                     className="w-full rounded-xl border border-line bg-soft px-3.5 py-2.5 text-sm outline-none focus:border-accent"
                   >
-                    <option value={4}>4 dígitos con ceros (ej: Mas-Corp-0001)</option>
-                    <option value={3}>3 dígitos con ceros (ej: Mas-Corp-001)</option>
-                    <option value={2}>2 dígitos con ceros (ej: Mas-Corp-01)</option>
-                    <option value={1}>1 dígito sin relleno (ej: Mas-Corp-1)</option>
+                    <option value={4}>4 dígitos con ceros (ej: 0001)</option>
+                    <option value={3}>3 dígitos con ceros (ej: 001)</option>
+                    <option value={2}>2 dígitos con ceros (ej: 01)</option>
+                    <option value={1}>1 dígito sin relleno (ej: 1)</option>
                   </select>
                 </div>
               </div>
@@ -314,7 +334,180 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
           </div>
         )}
 
-        {/* PESTAÑA 2: PERSONALIZACIÓN DE PDF */}
+        {/* PESTAÑA 2: LOGOS, COLORES & BRANDING */}
+        {activeTab === "branding" && (
+          <div className="space-y-5">
+            <section className="rounded-2xl border border-line bg-card p-4 space-y-4">
+              <div>
+                <h2 className="font-serif text-[15px] font-medium">Logotipos Oficiales de la Empresa</h2>
+                <p className="text-xs text-muted">
+                  Personaliza el logo que aparece en la barra superior del sistema y en las facturas PDF.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
+                {/* Logo del Sistema */}
+                <div className="rounded-xl border border-line bg-soft/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground">Logo de la Aplicación / Web</label>
+                    <span className="text-[10px] text-hint">Header & Sidebar</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 w-28 rounded-xl border border-line bg-card grid place-items-center overflow-hidden p-1">
+                      {config.systemLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={config.systemLogoUrl} alt="Logo Sistema" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="text-[10px] text-hint">Sin logo</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleLogoUpload(e, "systemLogoUrl")}
+                        className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-white hover:file:bg-accent/90 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        placeholder="O pega la URL de la imagen..."
+                        value={config.systemLogoUrl}
+                        onChange={(e) => updateField("systemLogoUrl", e.target.value)}
+                        className="w-full rounded-lg border border-line bg-card px-2.5 py-1 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logo para Facturas PDF */}
+                <div className="rounded-xl border border-line bg-soft/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground">Logo para Facturas & Reportes PDF</label>
+                    <span className="text-[10px] text-hint">Membrete Oficial</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 w-28 rounded-xl border border-line bg-card grid place-items-center overflow-hidden p-1">
+                      {config.pdfLogoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={config.pdfLogoUrl} alt="Logo PDF" className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="text-[10px] text-hint">Sin logo</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleLogoUpload(e, "pdfLogoUrl")}
+                        className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-white hover:file:bg-accent/90 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        placeholder="O pega la URL del logo PDF..."
+                        value={config.pdfLogoUrl}
+                        onChange={(e) => updateField("pdfLogoUrl", e.target.value)}
+                        className="w-full rounded-lg border border-line bg-card px-2.5 py-1 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Colores y Paleta de la Empresa */}
+            <section className="rounded-2xl border border-line bg-card p-4 space-y-4">
+              <div>
+                <h2 className="font-serif text-[15px] font-medium">Paleta de Colores de la Marca</h2>
+                <p className="text-xs text-muted">
+                  Define el color corporativo que identifica a esta empresa en sus encabezados, botones y documentos.
+                </p>
+              </div>
+
+              {/* Presets */}
+              <div className="flex flex-wrap gap-2">
+                {BRAND_PALETTES.map((pal) => (
+                  <button
+                    key={pal.label}
+                    type="button"
+                    onClick={() => {
+                      updateField("brandPrimaryColor", pal.primary);
+                      updateField("brandAccentColor", pal.accent);
+                      updateField("pdfPrimaryColor", pal.primary);
+                    }}
+                    className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-all ${
+                      config.brandPrimaryColor === pal.primary
+                        ? "border-accent bg-accent-bg text-accent font-semibold shadow-sm ring-1 ring-accent"
+                        : "border-line bg-soft text-foreground hover:bg-card"
+                    }`}
+                  >
+                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: pal.primary }} />
+                    <span>{pal.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Selector personalizado */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="mb-1 block text-xs text-muted">Color Primario Hexadecimal</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={config.brandPrimaryColor || "#2C21FF"}
+                      onChange={(e) => {
+                        updateField("brandPrimaryColor", e.target.value);
+                        updateField("pdfPrimaryColor", e.target.value);
+                      }}
+                      className="h-9 w-12 cursor-pointer rounded-lg border border-line bg-transparent p-1"
+                    />
+                    <input
+                      type="text"
+                      value={config.brandPrimaryColor || "#2C21FF"}
+                      onChange={(e) => {
+                        updateField("brandPrimaryColor", e.target.value);
+                        updateField("pdfPrimaryColor", e.target.value);
+                      }}
+                      className="w-full rounded-xl border border-line bg-soft px-3 py-2 text-xs font-mono outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs text-muted">Moneda e Impuestos Predeterminados</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={config.defaultCurrency || "USD"}
+                      onChange={(e) => updateField("defaultCurrency", e.target.value)}
+                      className="w-full rounded-xl border border-line bg-soft px-3 py-2 text-xs font-medium outline-none focus:border-accent"
+                    >
+                      <option value="USD">USD ($) Dólares</option>
+                      <option value="VES">VES (Bs) Bolívares</option>
+                      <option value="EUR">EUR (€) Euros</option>
+                    </select>
+
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={config.defaultTaxRate || 16}
+                        onChange={(e) => updateField("defaultTaxRate", Number(e.target.value))}
+                        className="w-full rounded-xl border border-line bg-soft px-3 py-2 text-xs outline-none focus:border-accent"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-hint">% IVA</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* PESTAÑA 3: PERSONALIZACIÓN DE PDF & REPORTES */}
         {activeTab === "pdf" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Formulario de opciones */}
@@ -390,56 +583,41 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                         onClick={() => updateField("pdfPaperSize", fmt.id as "a4" | "letter" | "legal")}
                         className={`rounded-xl border p-2 text-left transition-all ${
                           (config.pdfPaperSize || "a4") === fmt.id
-                            ? "border-accent bg-accent-bg text-accent shadow-sm"
+                            ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
                             : "border-line bg-card hover:bg-soft text-foreground"
                         }`}
                       >
-                        <p className="text-xs font-semibold">{fmt.name}</p>
+                        <p className="text-xs">{fmt.name}</p>
                         <p className="text-[10px] text-muted">{fmt.sub}</p>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Color Primario */}
+                {/* Términos y Condiciones */}
                 <div>
-                  <label className="mb-1.5 block text-xs text-muted">Color de Encabezados y Tablas</label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {COLOR_PRESETS.map((col) => (
-                      <button
-                        key={col.value}
-                        type="button"
-                        onClick={() => updateField("pdfPrimaryColor", col.value)}
-                        className={`h-7 w-7 rounded-full border-2 transition-all ${
-                          config.pdfPrimaryColor === col.value
-                            ? "border-foreground scale-110 shadow-md"
-                            : "border-transparent opacity-80 hover:opacity-100"
-                        }`}
-                        style={{ backgroundColor: col.value }}
-                        title={col.label}
-                      />
-                    ))}
-                    <input
-                      type="color"
-                      value={config.pdfPrimaryColor}
-                      onChange={(e) => updateField("pdfPrimaryColor", e.target.value)}
-                      className="h-7 w-8 cursor-pointer rounded border border-line bg-transparent"
-                    />
-                  </div>
+                  <label className="mb-1 block text-xs text-muted">Términos y Condiciones / Nota Legal</label>
+                  <textarea
+                    rows={2}
+                    value={config.pdfTermsAndConditions || ""}
+                    onChange={(e) => updateField("pdfTermsAndConditions", e.target.value)}
+                    placeholder="Nota que aparece al pie de la factura..."
+                    className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                  />
                 </div>
 
                 {/* Interruptor BCV */}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV)</span>
+                  <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en el reporte</span>
                   <input
                     type="checkbox"
                     checked={config.pdfShowBcvRates}
                     onChange={(e) => updateField("pdfShowBcvRates", e.target.checked)}
-                    className="h-4 w-4 rounded text-accent focus:ring-accent"
+                    className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
                   />
                 </div>
 
-                {/* Pie de página legal */}
+                {/* Pie de página */}
                 <div>
                   <label className="mb-1 block text-xs text-muted">Pie de Página / Confidencialidad</label>
                   <textarea
@@ -467,7 +645,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
               disabled={pending}
               className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white shadow-md hover:opacity-90 disabled:opacity-50 active:scale-95 transition-all"
             >
-              {pending ? "Guardando Configuración..." : "Guardar Toda la Configuración"}
+              {pending ? "Guardando Configuración..." : "Guardar Personalización de la Empresa"}
             </button>
           </div>
         )}

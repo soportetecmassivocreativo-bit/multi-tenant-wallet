@@ -49,12 +49,18 @@ export function PdfLivePreview({ config }: PdfLivePreviewProps) {
         {/* Encabezado */}
         <div className="rounded-lg bg-[#F5F6FF] p-3 flex items-center justify-between border border-line/40">
           <div className="space-y-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-massivo-creativo.png"
-              alt="Massivo Creativo"
-              className="h-6 w-auto object-contain"
-            />
+            {config.pdfLogoUrl || config.systemLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={config.pdfLogoUrl || config.systemLogoUrl}
+                alt={config.pdfCompanyName}
+                className="h-7 w-auto max-w-[140px] object-contain"
+              />
+            ) : (
+              <span className="font-serif text-sm font-bold text-gray-900 block">
+                {config.pdfCompanyName}
+              </span>
+            )}
             <p className="text-[10px] text-gray-500">
               {config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF:{" "}
               {config.pdfCompanyRif || "J-50000000-0"}
