@@ -11,7 +11,7 @@ import {
   RepeatIcon,
   BuildingIcon,
 } from "@/components/ui/icons";
-import type { SystemConfig } from "@/lib/config";
+import { type SystemConfig, applyBrandColor } from "@/lib/config";
 
 const BRAND_PALETTES = [
   { label: "Azul Índigo (Massivo)", primary: "#2C21FF", accent: "#3B82F6" },
@@ -37,6 +37,9 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
 
   useEffect(() => {
     setConfig(initialConfig);
+    if (initialConfig.brandPrimaryColor) {
+      applyBrandColor(initialConfig.brandPrimaryColor);
+    }
   }, [initialConfig]);
 
   function updateField<K extends keyof SystemConfig>(key: K, value: SystemConfig[K]) {
@@ -44,6 +47,15 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
       ...prev,
       [key]: value,
     }));
+  }
+
+  function handleColorChange(color: string) {
+    updateField("brandPrimaryColor", color);
+    updateField("pdfPrimaryColor", color);
+    applyBrandColor(color);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("m_wallet_brand_color", color);
+    }
   }
 
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>, field: "systemLogoUrl" | "pdfLogoUrl") {
@@ -64,6 +76,14 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
     if (!canEdit) return;
     setMsg(null);
     setError(null);
+
+    // Aplicar color de inmediato
+    if (config.brandPrimaryColor) {
+      applyBrandColor(config.brandPrimaryColor);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("m_wallet_brand_color", config.brandPrimaryColor);
+      }
+    }
 
     startTransition(async () => {
       const res = await saveSystemConfig(config);
@@ -434,9 +454,8 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                     key={pal.label}
                     type="button"
                     onClick={() => {
-                      updateField("brandPrimaryColor", pal.primary);
+                      handleColorChange(pal.primary);
                       updateField("brandAccentColor", pal.accent);
-                      updateField("pdfPrimaryColor", pal.primary);
                     }}
                     className={`flex items-center gap-2 rounded-xl border p-2 text-xs transition-all ${
                       config.brandPrimaryColor === pal.primary
@@ -444,7 +463,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                         : "border-line bg-soft text-foreground hover:bg-card"
                     }`}
                   >
-                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: pal.primary }} />
+                    <span className="h-4 w-4 rounded-full border border-black/10 shadow-inner" style={{ backgroundColor: pal.primary }} />
                     <span>{pal.label}</span>
                   </button>
                 ))}
@@ -458,19 +477,13 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                     <input
                       type="color"
                       value={config.brandPrimaryColor || "#2C21FF"}
-                      onChange={(e) => {
-                        updateField("brandPrimaryColor", e.target.value);
-                        updateField("pdfPrimaryColor", e.target.value);
-                      }}
+                      onChange={(e) => handleColorChange(e.target.value)}
                       className="h-9 w-12 cursor-pointer rounded-lg border border-line bg-transparent p-1"
                     />
                     <input
                       type="text"
                       value={config.brandPrimaryColor || "#2C21FF"}
-                      onChange={(e) => {
-                        updateField("brandPrimaryColor", e.target.value);
-                        updateField("pdfPrimaryColor", e.target.value);
-                      }}
+                      onChange={(e) => handleColorChange(e.target.value)}
                       className="w-full rounded-xl border border-line bg-soft px-3 py-2 text-xs font-mono outline-none focus:border-accent"
                     />
                   </div>

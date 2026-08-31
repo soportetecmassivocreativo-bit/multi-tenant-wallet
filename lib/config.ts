@@ -64,6 +64,27 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
 };
 
 /**
+ * Aplica el color corporativo seleccionado en tiempo real a todo el sistema
+ * mediante variables CSS (--accent, --accent-strong, --accent-bg, --accent-text).
+ */
+export function applyBrandColor(primaryHex?: string) {
+  if (typeof document === "undefined") return;
+  const hex = primaryHex || "#2C21FF";
+  const root = document.documentElement;
+
+  try {
+    root.style.setProperty("--accent", hex);
+    root.style.setProperty("--accent-strong", hex);
+    
+    // Crear fondo suave y color de texto adaptativo
+    root.style.setProperty("--accent-bg", hex.startsWith("#") && hex.length === 7 ? `${hex}1a` : "rgba(44, 33, 255, 0.1)");
+    root.style.setProperty("--accent-text", hex);
+  } catch (err) {
+    console.error("Error applying brand color:", err);
+  }
+}
+
+/**
  * Formatea un código correlativo con prefijo y relleno de ceros (hasta 4 dígitos).
  * Ej: formatEntityCode("Mas-Corp-", 5, 4) -> "Mas-Corp-0005"
  */
@@ -76,3 +97,4 @@ export function formatEntityCode(
   const padded = String(counter).padStart(cleanDigits, "0");
   return `${prefix}${padded}`;
 }
+
