@@ -77,56 +77,67 @@ async function getContext() {
  */
 export async function getSystemConfig(): Promise<SystemConfig> {
   let cookieConfig: Partial<SystemConfig> = {};
+  let hasCookie = false;
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(CONFIG_COOKIE_NAME)?.value;
     if (raw) {
       cookieConfig = JSON.parse(decodeURIComponent(raw));
+      hasCookie = true;
     }
   } catch {}
 
-  let merged: SystemConfig = {
+  const merged: SystemConfig = {
     ...DEFAULT_SYSTEM_CONFIG,
     ...cookieConfig,
   };
 
-  if (!isSupabaseConfigured) {
+  // Si ya tenemos la configuración en cookie o no hay Supabase, retornar de inmediato (0ms latencia)
+  if (hasCookie || !isSupabaseConfigured) {
     return merged;
   }
 
+  // Si no hay cookie aún, intentar leer de DB con timeout estricto de 1s para jamás colgar la app
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return merged;
+    const dbPromise = (async () => {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return merged;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("company_id")
-      .eq("id", user.id)
-      .single();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("id", user.id)
+        .single();
 
-    if (!profile?.company_id) return merged;
+      if (!profile?.company_id) return merged;
 
-    const { data: company } = await supabase
-      .from("companies")
-      .select("name, rif, email, phone, next_invoice_number")
-      .eq("id", profile.company_id)
-      .single();
+      const { data: company } = await supabase
+        .from("companies")
+        .select("name, rif, email, phone, next_invoice_number")
+        .eq("id", profile.company_id)
+        .single();
 
-    if (company) {
-      return {
-        ...merged,
-        pdfCompanyName: company.name || merged.pdfCompanyName,
-        pdfCompanyRif: company.rif || merged.pdfCompanyRif,
-        pdfContactEmail: company.email || merged.pdfContactEmail,
-        pdfContactPhone: company.phone || merged.pdfContactPhone,
-        invoiceCounter: company.next_invoice_number || merged.invoiceCounter,
-      };
-    }
+      if (company) {
+        return {
+          ...merged,
+          pdfCompanyName: company.name || merged.pdfCompanyName,
+          pdfCompanyRif: company.rif || merged.pdfCompanyRif,
+          pdfContactEmail: company.email || merged.pdfContactEmail,
+          pdfContactPhone: company.phone || merged.pdfContactPhone,
+          invoiceCounter: company.next_invoice_number || merged.invoiceCounter,
+        };
+      }
+      return merged;
+    })();
 
-    return merged;
+    const timeoutPromise = new Promise<SystemConfig>((resolve) =>
+      setTimeout(() => resolve(merged), 1000)
+    );
+
+    return await Promise.race([dbPromise, timeoutPromise]);
   } catch {
     return merged;
   }
