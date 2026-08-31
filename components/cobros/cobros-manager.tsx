@@ -4,22 +4,27 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
-import { deleteInvoice, deletePayment, updateInvoiceStatus } from "@/lib/mutations";
+import { deleteInvoice, deletePayment, updateInvoiceStatus, registerPayment } from "@/lib/mutations";
 import { formatMoney, formatDate } from "@/lib/format";
+import { MoneyInput } from "@/components/ui/money-input";
 import {
   InvoiceIcon,
   CashIcon,
   SearchIcon,
   DownloadIcon,
   EditIcon,
+  PlusIcon,
 } from "@/components/ui/icons";
 import type { Invoice, Client, InvoiceStatus } from "@/lib/mock-data";
 import type { Payment } from "@/lib/data";
+import type { CompanyAccount } from "@/lib/cuentas-actions";
+import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
 
 interface CobrosManagerProps {
   invoices: Invoice[];
   clients: Client[];
   payments: Payment[];
+  accounts?: CompanyAccount[];
   admin: boolean;
 }
 
@@ -27,6 +32,7 @@ export function CobrosManager({
   invoices,
   clients,
   payments,
+  accounts = [],
   admin,
 }: CobrosManagerProps) {
   const [tab, setTab] = useState<"facturas" | "historial">("facturas");
@@ -37,6 +43,16 @@ export function CobrosManager({
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus>("pendiente");
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Estado para modal de Registrar Abono
+  const [abonoInvoice, setAbonoInvoice] = useState<Invoice | null>(null);
+  const [abonoAmount, setAbonoAmount] = useState(0);
+  const [abonoAccountId, setAbonoAccountId] = useState("");
+  const [abonoMethod, setAbonoMethod] = useState("Transferencia Bancaria");
+  const [abonoReference, setAbonoReference] = useState("");
+  const [abonoDescription, setAbonoDescription] = useState("");
+  const [abonoError, setAbonoError] = useState<string | null>(null);
+
   const [pending, startTransition] = useTransition();
 
   const clientMap = new Map(clients.map((c) => [c.id, c.name]));
@@ -53,6 +69,51 @@ export function CobrosManager({
       clientName.toLowerCase().includes(q);
     return matchesStatus && matchesQuery;
   });
+
+  function getInvoiceBalance(inv: Invoice) {
+    const paid = payments
+      .filter((p) => p.invoiceId === inv.id)
+      .reduce((s, p) => s + Number(p.amount), 0);
+    return Math.max(0, inv.total - paid);
+  }
+
+  function startAbono(inv: Invoice) {
+    setAbonoInvoice(inv);
+    const bal = getInvoiceBalance(inv);
+    setAbonoAmount(bal > 0 ? bal : inv.total);
+    const initialAcc = accounts[0];
+    setAbonoAccountId(initialAcc?.id || "");
+    const methods = getPaymentMethodsForAccount(initialAcc);
+    setAbonoMethod(methods[0] || "Transferencia Bancaria");
+    setAbonoReference("");
+    setAbonoDescription("");
+    setAbonoError(null);
+  }
+
+  function handleSaveAbono(e: React.FormEvent) {
+    e.preventDefault();
+    if (!abonoInvoice || abonoAmount <= 0) return;
+    setAbonoError(null);
+
+    const selectedAcc = accounts.find((a) => a.id === abonoAccountId);
+
+    startTransition(async () => {
+      const res = await registerPayment(abonoInvoice.id, {
+        amount: abonoAmount,
+        method: abonoMethod,
+        accountId: abonoAccountId || undefined,
+        accountName: selectedAcc ? selectedAcc.name : undefined,
+        reference: abonoReference.trim() ? abonoReference.trim() : undefined,
+        description: abonoDescription.trim() ? abonoDescription.trim() : undefined,
+      });
+
+      if (res.ok) {
+        setAbonoInvoice(null);
+      } else {
+        setAbonoError(res.error || "No se pudo registrar el abono.");
+      }
+    });
+  }
 
   function startEdit(inv: Invoice) {
     setEditingInvoice(inv);
@@ -178,6 +239,18 @@ export function CobrosManager({
                       </span>
 
                       <div className="flex items-center gap-1.5">
+                        {inv.status !== "pagada" && (
+                          <button
+                            type="button"
+                            onClick={() => startAbono(inv)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-accent/90 transition-all active:scale-95 shadow-sm"
+                            title={`Registrar Abono a Factura #${inv.number}`}
+                          >
+                            <PlusIcon className="h-3 w-3" />
+                            <span>Abonar</span>
+                          </button>
+                        )}
+
                         <Link
                           href={`/cobros/${inv.id}`}
                           className="rounded-lg border border-line bg-card px-2.5 py-1 text-[11px] font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
@@ -357,6 +430,144 @@ export function CobrosManager({
                 className="rounded-xl bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-accent/90 disabled:opacity-50"
               >
                 {pending ? "Guardando…" : "Guardar Cambios"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL DE REGISTRAR ABONO A FACTURA */}
+      {abonoInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <form
+            onSubmit={handleSaveAbono}
+            className="w-full max-w-md space-y-4 rounded-3xl border border-line bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <h3 className="font-serif text-base font-bold text-foreground">
+                  Registrar Abono a Factura #{abonoInvoice.number}
+                </h3>
+                <p className="text-xs text-hint">
+                  {clientMap.get(abonoInvoice.clientId) || "Cliente General"}
+                </p>
+              </div>
+              <span className="rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent">
+                Total: {formatMoney(abonoInvoice.total)}
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="rounded-2xl bg-soft/60 p-3 flex items-center justify-between">
+                <span className="text-muted">Saldo Pendiente:</span>
+                <span className="text-sm font-bold text-pending">
+                  {formatMoney(getInvoiceBalance(abonoInvoice))}
+                </span>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">
+                  Monto a Abonar / Cobrar ({abonoInvoice.currency || "USD"}) *
+                </label>
+                <MoneyInput
+                  value={abonoAmount}
+                  onValueChange={setAbonoAmount}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm font-semibold outline-none focus:border-accent"
+                />
+                <p className="text-[11px] text-hint mt-1">
+                  Permite registrar pagos parciales o el monto total.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">
+                  Cuenta de Destino (Donde se acreditan los fondos) *
+                </label>
+                <select
+                  value={abonoAccountId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setAbonoAccountId(id);
+                    const acc = accounts.find((a) => a.id === id);
+                    const methods = getPaymentMethodsForAccount(acc);
+                    if (!methods.includes(abonoMethod)) {
+                      setAbonoMethod(methods[0] || "Transferencia Bancaria");
+                    }
+                  }}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                >
+                  {accounts.length === 0 ? (
+                    <option value="">Cuenta Principal</option>
+                  ) : (
+                    accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.currency}) {a.bankName ? `· ${a.bankName}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">Método de Pago *</label>
+                <select
+                  value={abonoMethod}
+                  onChange={(e) => setAbonoMethod(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                >
+                  {getPaymentMethodsForAccount(accounts.find((a) => a.id === abonoAccountId)).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">Referencia (Últimos 8 dígitos)</label>
+                <input
+                  type="text"
+                  maxLength={8}
+                  placeholder="Ej: 84920194"
+                  value={abonoReference}
+                  onChange={(e) => setAbonoReference(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-mono outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">Descripción / Concepto del Abono (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Abono quincenal, anticipo de materiales..."
+                  value={abonoDescription}
+                  onChange={(e) => setAbonoDescription(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                />
+              </div>
+
+              {abonoError && (
+                <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue font-medium">
+                  {abonoError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setAbonoInvoice(null)}
+                disabled={pending}
+                className="rounded-xl border border-line px-4 py-2 text-xs font-medium text-muted hover:text-foreground hover:bg-soft"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={pending || abonoAmount <= 0}
+                className="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 disabled:opacity-40 transition-all"
+              >
+                {pending ? "Registrando…" : "Registrar Abono"}
               </button>
             </div>
           </form>

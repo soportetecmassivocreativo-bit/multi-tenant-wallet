@@ -4,17 +4,19 @@ import Link from "next/link";
 import { PlusIcon } from "@/components/ui/icons";
 import { formatMoney } from "@/lib/format";
 import { getInvoices, getClients, getPayments, isAdmin } from "@/lib/data";
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { CobrosPdfButton } from "@/components/cobros/cobros-pdf-button";
 import { CobrosManager } from "@/components/cobros/cobros-manager";
 
 const OPEN = ["pendiente", "parcial", "vencida"];
 
 export default async function CobrosPage() {
-  const [invoices, clients, payments, admin] = await Promise.all([
+  const [invoices, clients, payments, admin, accounts] = await Promise.all([
     getInvoices(),
     getClients(),
     getPayments(),
     isAdmin(),
+    getCompanyAccounts(),
   ]);
 
   const porCobrar = invoices
@@ -65,6 +67,7 @@ export default async function CobrosPage() {
         invoices={invoices}
         clients={clients}
         payments={payments}
+        accounts={accounts}
         admin={admin}
       />
     </div>

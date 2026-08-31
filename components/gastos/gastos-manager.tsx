@@ -5,10 +5,11 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteExpense, updateExpense } from "@/lib/mutations";
 import { exportExpenseVoucherPdf } from "@/lib/pdf-export";
-import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon } from "@/components/ui/icons";
+import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon, PlusIcon } from "@/components/ui/icons";
 import { MoneyInput } from "@/components/ui/money-input";
 import type { Expense } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
+import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
 
 interface GastosManagerProps {
   expenses: Expense[];
@@ -29,6 +30,16 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
   const [editAccountId, setEditAccountId] = useState("");
   const [editReference, setEditReference] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Estado para modal de Registrar Abono / Pago a Gasto
+  const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
+  const [payAmount, setPayAmount] = useState(0);
+  const [payAccountId, setPayAccountId] = useState("");
+  const [payMethod, setPayMethod] = useState("Transferencia Bancaria");
+  const [payReference, setPayReference] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [payError, setPayError] = useState<string | null>(null);
+
   const [pending, startTransition] = useTransition();
 
   const categories = Array.from(
@@ -96,6 +107,64 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
         setEditingExpense(null);
       } else {
         setEditError(res.error || "No se pudo actualizar el gasto.");
+      }
+    });
+  }
+
+  function startPayExpense(e: Expense) {
+    setPayingExpense(e);
+    setPayAmount(e.amount);
+    const initialAcc = accounts[0];
+    setPayAccountId(initialAcc?.id || "");
+    const methods = getPaymentMethodsForAccount(initialAcc);
+    setPayMethod(methods[0] || "Transferencia Bancaria");
+    setPayReference("");
+    setPayNote("");
+    setPayError(null);
+  }
+
+  function handleSaveExpensePayment(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!payingExpense || payAmount <= 0) return;
+    setPayError(null);
+
+    const selectedAcc = accounts.find((a) => a.id === payAccountId);
+    const cleanBaseNote = payingExpense.note.replace(/\s*\[.*?\]\s*$/, "").trim();
+
+    let newNote = cleanBaseNote;
+    if (payAmount >= payingExpense.amount) {
+      // Pago completo
+      const metaParts: string[] = [];
+      if (selectedAcc?.name) metaParts.push(`Pagado desde ${selectedAcc.name}`);
+      if (payReference.trim()) metaParts.push(`Ref: ${payReference.trim()}`);
+      if (payNote.trim()) metaParts.push(`"${payNote.trim()}"`);
+      newNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
+    } else {
+      // Abono parcial
+      const remaining = payingExpense.amount - payAmount;
+      const metaParts: string[] = [];
+      if (selectedAcc?.name) metaParts.push(`Abonado ${formatMoney(payAmount)} desde ${selectedAcc.name}`);
+      if (payReference.trim()) metaParts.push(`Ref: ${payReference.trim()}`);
+      metaParts.push(`Pendiente ${formatMoney(remaining)}`);
+      if (payNote.trim()) metaParts.push(`"${payNote.trim()}"`);
+      newNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
+    }
+
+    startTransition(async () => {
+      const res = await updateExpense(payingExpense.id, {
+        note: newNote,
+        amount: payingExpense.amount,
+        category: payingExpense.category || "General",
+        currency: (payingExpense as unknown as { currency?: "USD" | "VES" | "EUR" }).currency ?? "USD",
+        accountId: payAccountId || undefined,
+        accountName: selectedAcc ? selectedAcc.name : undefined,
+        reference: payReference.trim() ? payReference.trim() : undefined,
+      });
+
+      if (res.ok) {
+        setPayingExpense(null);
+      } else {
+        setPayError(res.error || "No se pudo registrar el pago del gasto.");
       }
     });
   }
@@ -192,14 +261,26 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
                       − {formatMoney(e.amount)}
                     </span>
 
-                    {/* Botón Aprobar y Pagar (si está pendiente) */}
-                    {isPending && (
+                    {/* Botón Abonar / Pagar */}
+                    {isPending ? (
                       <button
                         type="button"
-                        onClick={() => startEdit(e)}
+                        onClick={() => startPayExpense(e)}
                         className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-accent/90 transition-all active:scale-95 shadow-sm"
+                        title={`Abonar o Pagar ${e.note}`}
                       >
-                        Aprobar y Pagar
+                        <PlusIcon className="h-3 w-3" />
+                        <span>Abonar / Pagar</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startPayExpense(e)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1 text-[11px] font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
+                        title={`Registrar Abono a ${e.note}`}
+                      >
+                        <PlusIcon className="h-3 w-3" />
+                        <span>Abonar</span>
                       </button>
                     )}
 
@@ -353,6 +434,144 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
                 className="rounded-xl bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-accent/90 disabled:opacity-50"
               >
                 {pending ? "Guardando…" : "Guardar Cambios"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL DE REGISTRAR ABONO / PAGO A GASTO */}
+      {payingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <form
+            onSubmit={handleSaveExpensePayment}
+            className="w-full max-w-md space-y-4 rounded-3xl border border-line bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <h3 className="font-serif text-base font-bold text-foreground">
+                  Registrar Abono / Pago de Gasto
+                </h3>
+                <p className="text-xs text-hint">
+                  {payingExpense.code || "Mas-Corp-0001"} · {payingExpense.category}
+                </p>
+              </div>
+              <span className="rounded-full bg-overdue/10 px-2.5 py-1 text-[11px] font-semibold text-overdue">
+                Total: {formatMoney(payingExpense.amount)}
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="rounded-2xl bg-soft/60 p-3">
+                <span className="text-muted block text-[11px]">Concepto del Gasto:</span>
+                <p className="text-xs font-semibold text-foreground mt-0.5">
+                  {payingExpense.note}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">
+                  Monto a Abonar / Pagar *
+                </label>
+                <MoneyInput
+                  value={payAmount}
+                  onValueChange={setPayAmount}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm font-semibold outline-none focus:border-accent"
+                />
+                <p className="text-[11px] text-hint mt-1">
+                  Permite pagar el total o registrar abonos parciales.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">
+                  Cuenta de Origen (Donde se debitan los fondos) *
+                </label>
+                <select
+                  value={payAccountId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setPayAccountId(id);
+                    const acc = accounts.find((a) => a.id === id);
+                    const methods = getPaymentMethodsForAccount(acc);
+                    if (!methods.includes(payMethod)) {
+                      setPayMethod(methods[0] || "Transferencia Bancaria");
+                    }
+                  }}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                >
+                  {accounts.length === 0 ? (
+                    <option value="">Cuenta Principal</option>
+                  ) : (
+                    accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.currency}) {a.bankName ? `· ${a.bankName}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">Método de Pago *</label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                >
+                  {getPaymentMethodsForAccount(accounts.find((a) => a.id === payAccountId)).map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">Referencia (Últimos 8 dígitos)</label>
+                <input
+                  type="text"
+                  maxLength={8}
+                  placeholder="Ej: 84920194"
+                  value={payReference}
+                  onChange={(e) => setPayReference(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-mono outline-none focus:border-accent"
+                />
+              </div>
+
+              <div>
+                <label className="text-muted block mb-1 font-medium">Nota / Detalle del Pago (Opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Abono quincenal, pago de primera cuota..."
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                />
+              </div>
+
+              {payError && (
+                <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue font-medium">
+                  {payError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setPayingExpense(null)}
+                disabled={pending}
+                className="rounded-xl border border-line px-4 py-2 text-xs font-medium text-muted hover:text-foreground hover:bg-soft"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={pending || payAmount <= 0}
+                className="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 disabled:opacity-40 transition-all"
+              >
+                {pending ? "Registrando…" : "Registrar Pago"}
               </button>
             </div>
           </form>
