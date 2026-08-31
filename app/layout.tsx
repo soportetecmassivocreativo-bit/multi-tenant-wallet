@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Geist } from "next/font/google";
+import { headers } from "next/headers";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AdaptiveFavicon } from "@/components/providers/adaptive-favicon";
 import "./globals.css";
@@ -17,21 +18,45 @@ const instrument = Instrument_Serif({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Massivo-Wallet",
-  description: "Finanzas, cobros y facturación en la palma de la mano.",
-  applicationName: "Massivo-Wallet",
-  manifest: "/manifest.webmanifest",
-  icons: {
-    icon: [
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon.png", sizes: "64x64", type: "image/png" },
-      { url: "/icon.svg", type: "image/svg+xml" },
-    ],
-    apple: "/apple-touch-icon.png",
-  },
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Massivo-Wallet" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = await headers();
+  const host = headersList.get("host") || "";
+  const isMassivo = host.includes("m-wallet-gamma");
+
+  if (isMassivo) {
+    return {
+      title: "Massivo-Wallet",
+      description: "Finanzas, cobros y facturación en la palma de la mano.",
+      applicationName: "Massivo-Wallet",
+      manifest: "/manifest.webmanifest",
+      icons: {
+        icon: [
+          { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+          { url: "/favicon.png", sizes: "64x64", type: "image/png" },
+          { url: "/icon.svg", type: "image/svg+xml" },
+        ],
+        apple: "/apple-touch-icon.png",
+      },
+      appleWebApp: { capable: true, statusBarStyle: "default", title: "Massivo-Wallet" },
+    };
+  }
+
+  // Multi-Tenant Portal (Default)
+  return {
+    title: "M-Wallet",
+    description: "Finanzas, cobros y facturación en la palma de la mano.",
+    applicationName: "M-Wallet",
+    manifest: "/manifest.webmanifest",
+    icons: {
+      icon: [
+        { url: "/logo-m-icon.png", type: "image/png" },
+        { url: "/icon.svg", type: "image/svg+xml" },
+      ],
+      apple: "/logo-m-icon.png",
+    },
+    appleWebApp: { capable: true, statusBarStyle: "default", title: "M-Wallet" },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#3b5bdb",
@@ -52,6 +77,25 @@ export default function RootLayout({
       className={`${geist.variable} ${instrument.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var host = window.location.host;
+                  var isMultiTenant = host.includes("multi-tenant") || host.includes("muti-tenant");
+                  if (isMultiTenant) {
+                    document.title = "M-Wallet";
+                  } else {
+                    document.title = "Massivo-Wallet";
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="bg-page text-ink font-sans antialiased">
         <ThemeProvider>
           <AdaptiveFavicon />
