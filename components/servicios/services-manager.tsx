@@ -46,10 +46,17 @@ export function ServicesManager({ services }: ServicesManagerProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  // Costo mensual por moneda (los anuales prorrateados).
-  const totals = services.reduce<Record<string, number>>((acc, s) => {
-    const monthly = s.cycle === "anual" ? s.amount / 12 : s.amount;
-    acc[s.currency] = (acc[s.currency] ?? 0) + monthly;
+  // Servicios mensuales únicamente (NO se suman con los anuales)
+  const monthlyServices = services.filter((s) => (s.cycle || "").toLowerCase() !== "anual");
+  const annualServices = services.filter((s) => (s.cycle || "").toLowerCase() === "anual");
+
+  const monthlyTotals = monthlyServices.reduce<Record<string, number>>((acc, s) => {
+    acc[s.currency] = (acc[s.currency] ?? 0) + s.amount;
+    return acc;
+  }, {});
+
+  const annualTotals = annualServices.reduce<Record<string, number>>((acc, s) => {
+    acc[s.currency] = (acc[s.currency] ?? 0) + s.amount;
     return acc;
   }, {});
 
@@ -102,23 +109,42 @@ export function ServicesManager({ services }: ServicesManagerProps) {
 
   return (
     <div className="space-y-5">
-      {/* Resumen de costos */}
-      <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-        <p className="text-xs text-muted font-medium">Costo Mensual Estimado de Suscripciones</p>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-          {Object.keys(totals).length === 0 ? (
-            <p className="text-lg font-medium text-hint">—</p>
-          ) : (
-            Object.entries(totals).map(([cur, amt]) => (
-              <p key={cur} className="tnum text-xl font-bold text-overdue">
-                {formatCurrency(amt, cur as CurrencyCode)}
-              </p>
-            ))
-          )}
+      {/* Resumen de costos separados */}
+      <div className={`grid gap-3 ${annualServices.length > 0 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted font-medium">Total Servicios Mensuales</p>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+            {Object.keys(monthlyTotals).length === 0 ? (
+              <p className="text-lg font-medium text-hint">—</p>
+            ) : (
+              Object.entries(monthlyTotals).map(([cur, amt]) => (
+                <p key={cur} className="tnum text-xl font-bold text-overdue">
+                  {formatCurrency(amt, cur as CurrencyCode)}
+                </p>
+              ))
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-hint">
+            {monthlyServices.length} {monthlyServices.length === 1 ? "servicio mensual activo" : "servicios mensuales activos"} · Facturación mensual
+          </p>
         </div>
-        <p className="mt-1 text-[11px] text-hint">
-          {services.length} servicios recurrentes activos · Contabilizados automáticamente
-        </p>
+
+        {annualServices.length > 0 && (
+          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+            <p className="text-xs text-muted font-medium">Total Servicios Anuales</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              {Object.entries(annualTotals).map(([cur, amt]) => (
+                <p key={cur} className="tnum text-xl font-bold text-accent">
+                  {formatCurrency(amt, cur as CurrencyCode)}
+                  <span className="text-xs font-normal text-muted ml-1">/ año</span>
+                </p>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-hint">
+              {annualServices.length} {annualServices.length === 1 ? "servicio anual activo" : "servicios anuales activos"} · Facturación anual
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Selector de Pestañas: Servicios Activos / Historial de Pagos */}

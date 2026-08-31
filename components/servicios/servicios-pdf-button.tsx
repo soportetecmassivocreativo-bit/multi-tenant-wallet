@@ -11,19 +11,25 @@ interface ServiciosPdfButtonProps {
 
 export function ServiciosPdfButton({ services }: ServiciosPdfButtonProps) {
   function getReportOptions() {
-    // Agrupar costo mensual en USD como referencia
+    // Agrupar costo mensual exclusivamente de servicios mensuales
     const monthlyTotal = services.reduce((s, sv) => {
-      const monthly = sv.cycle === "anual" ? sv.amount / 12 : sv.amount;
-      return s + (sv.currency === "USD" ? monthly : 0);
+      const isMonthly = (sv.cycle || "").toLowerCase() !== "anual";
+      return s + (isMonthly && sv.currency === "USD" ? sv.amount : 0);
+    }, 0);
+
+    const annualTotal = services.reduce((s, sv) => {
+      const isAnnual = (sv.cycle || "").toLowerCase() === "anual";
+      return s + (isAnnual && sv.currency === "USD" ? sv.amount : 0);
     }, 0);
 
     return {
       title: "Reporte de Servicios y Suscripciones Recurrentes",
-      subtitle: `Total servicios activos: ${services.length} | Costo mensual estimado: ${formatCurrency(monthlyTotal, "USD")}`,
+      subtitle: `Total servicios activos: ${services.length} | Costo mensual: ${formatCurrency(monthlyTotal, "USD")}`,
       filename: "Massivo Corp - Reporte de Servicios",
       kpis: [
         { label: "Servicios Activos", value: String(services.length) },
-        { label: "Costo Mensual Est.", value: formatCurrency(monthlyTotal, "USD") },
+        { label: "Total Mensual", value: formatCurrency(monthlyTotal, "USD") },
+        ...(annualTotal > 0 ? [{ label: "Total Anual", value: formatCurrency(annualTotal, "USD") }] : []),
       ],
       columns: [
         { header: "Servicio", dataKey: "name" },
