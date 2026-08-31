@@ -33,7 +33,7 @@ export function AdaptiveFavicon() {
       // Portal Massivo Creativo Wallet
       faviconEl.href = "/logo-massivo-creativo.png";
       faviconEl.type = "image/png";
-      document.title = "MASSIVO CREATIVO WALLET";
+      document.title = "Massivo-Wallet";
     }
   }, [pathname]);
 
