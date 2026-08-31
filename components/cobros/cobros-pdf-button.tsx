@@ -8,26 +8,28 @@ interface CobrosPdfButtonProps {
   invoices: Invoice[];
   clients: Client[];
   porCobrar: number;
-  vencidas: number;
+  cobrado?: number;
+  vencidas?: number;
 }
 
 export function CobrosPdfButton({
   invoices,
   clients,
   porCobrar,
-  vencidas,
+  cobrado = 0,
+  vencidas = 0,
 }: CobrosPdfButtonProps) {
   const clientMap = new Map(clients.map((c) => [c.id, c.name]));
 
   function getReportOptions() {
     return {
       title: "Reporte de Facturas y Cuentas por Cobrar",
-      subtitle: `Total facturas: ${invoices.length} | Por cobrar: ${formatMoney(porCobrar)} | Vencidas: ${vencidas}`,
+      subtitle: `Total facturas: ${invoices.length} | Por cobrar: ${formatMoney(porCobrar)} | Cobrado: ${formatMoney(cobrado)}`,
       filename: "Massivo Corp - Reporte de Cobros",
       kpis: [
         { label: "Total Facturas", value: String(invoices.length) },
         { label: "Por Cobrar", value: formatMoney(porCobrar) },
-        { label: "Vencidas", value: String(vencidas) },
+        { label: "Cobradas (Acreditado)", value: formatMoney(cobrado) },
       ],
       columns: [
         { header: "Nº Factura", dataKey: "number" },
