@@ -5,6 +5,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { registerPayment } from "@/lib/mutations";
 import { formatCurrency, type CurrencyCode } from "@/lib/currency";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
+import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent";
@@ -20,11 +21,12 @@ export function RegistrarPagoForm({
   balance: number;
   accounts?: CompanyAccount[];
 }) {
+  const initialAcc = accounts.find((a) => a.isDefault || a.currency === currency) || accounts[0];
+  const initialMethods = getPaymentMethodsForAccount(initialAcc);
+
   const [amount, setAmount] = useState(balance > 0 ? balance : 0);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(
-    accounts.find((a) => a.isDefault || a.currency === currency)?.id || accounts[0]?.id || ""
-  );
-  const [method, setMethod] = useState("Transferencia Bancaria");
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(initialAcc?.id || "");
+  const [method, setMethod] = useState(initialMethods[0] || "Transferencia Bancaria");
   const [reference, setReference] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +94,15 @@ export function RegistrarPagoForm({
           </label>
           <select
             value={selectedAccountId}
-            onChange={(e) => setSelectedAccountId(e.target.value)}
+            onChange={(e) => {
+              const newId = e.target.value;
+              setSelectedAccountId(newId);
+              const acc = accounts.find((a) => a.id === newId);
+              const methods = getPaymentMethodsForAccount(acc);
+              if (!methods.includes(method)) {
+                setMethod(methods[0] || "Transferencia Bancaria");
+              }
+            }}
             className={inputClass}
           >
             {accounts.length === 0 ? (
@@ -116,12 +126,11 @@ export function RegistrarPagoForm({
             onChange={(e) => setMethod(e.target.value)}
             className={inputClass}
           >
-            <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-            <option value="Pago Móvil">Pago Móvil</option>
-            <option value="Zelle">Zelle</option>
-            <option value="Efectivo / Caja">Efectivo / Caja</option>
-            <option value="Binance USDT">Binance USDT / Cripto</option>
-            <option value="Punto de Venta / Tarjeta">Punto de Venta / Tarjeta</option>
+            {getPaymentMethodsForAccount(accounts.find((a) => a.id === selectedAccountId)).map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
           </select>
         </div>
       </div>

@@ -19,6 +19,7 @@ import { createInvoice } from "@/lib/mutations";
 import { syncBcvRates, saveManualBcvRates } from "@/lib/bcv-actions";
 import type { Client, Product } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
+import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
 
 const TODAY = "2026-07-10";
 
@@ -409,7 +410,15 @@ export function NuevaFacturaForm({
               <label className="text-[11px] font-semibold text-hint">Cuenta de Destino *</label>
               <select
                 value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                onChange={(e) => {
+                  const newId = e.target.value;
+                  setAccountId(newId);
+                  const acc = accounts.find((a) => a.id === newId);
+                  const methods = getPaymentMethodsForAccount(acc);
+                  if (!methods.includes(paymentMethod)) {
+                    setPaymentMethod(methods[0] || "Transferencia Bancaria");
+                  }
+                }}
                 className={inputClass}
               >
                 {accounts.length === 0 ? (
@@ -431,12 +440,11 @@ export function NuevaFacturaForm({
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className={inputClass}
               >
-                <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-                <option value="Pago Móvil">Pago Móvil</option>
-                <option value="Zelle">Zelle</option>
-                <option value="Efectivo / Caja">Efectivo / Caja</option>
-                <option value="Binance USDT">Binance USDT / Cripto</option>
-                <option value="Punto de Venta / Tarjeta">Punto de Venta / Tarjeta</option>
+                {getPaymentMethodsForAccount(accounts.find((a) => a.id === accountId)).map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
               </select>
             </div>
 

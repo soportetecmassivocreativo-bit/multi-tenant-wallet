@@ -318,3 +318,4 @@ export async function deleteCompanyAccount(id: string): Promise<MutationResult> 
     return { ok: false, error: err instanceof Error ? err.message : "Error al eliminar cuenta." };
   }
 }
+
