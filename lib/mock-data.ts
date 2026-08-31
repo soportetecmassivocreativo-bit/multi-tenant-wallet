@@ -131,7 +131,7 @@ export interface Transaction {
 export const transactions: Transaction[] = [
   { id: "t1", kind: "cobro", title: "Cobro · Factura #1042", subtitle: "Ferretería Peña", amount: 18500, group: "Hoy" },
   { id: "t2", kind: "gasto", title: "Gasto · Combustible", subtitle: "Transporte", amount: -2400, group: "Hoy" },
-  { id: "t3", kind: "pendiente", title: "Factura #1048 · vence en 3d", subtitle: "Distribuidora Sol", amount: 9750, group: "Ayer" },
+  { id: "t3", kind: "pendiente", title: "Factura #1048 · Por Cobrar", subtitle: "Distribuidora Sol", amount: 9750, group: "Ayer" },
   { id: "t4", kind: "cobro", title: "Cobro · Factura #1039", subtitle: "Colmado La Bendición", amount: 6200, group: "Ayer" },
 ];
 

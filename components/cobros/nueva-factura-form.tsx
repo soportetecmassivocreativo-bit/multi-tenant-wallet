@@ -213,7 +213,7 @@ export function NuevaFacturaForm({
         </div>
         <h1 className="mt-4 font-serif text-2xl">Factura creada</h1>
         <p className="mt-1 text-sm text-muted">
-          {client?.name ?? "Cliente"} · vence {formatDate(result.dueDateISO)}
+          {client?.name ?? "Cliente"}
         </p>
         <p className="tnum mt-3 text-3xl font-medium">
           {formatCurrency(result.total, currency)}
@@ -607,19 +607,13 @@ export function NuevaFacturaForm({
           </div>
         )}
 
-        <div className="mt-3 space-y-1 text-xs text-muted">
-          <p>
-            Vence el{" "}
-            <span className="font-medium text-ink">
-              {formatDate(result.dueDateISO)}
-            </span>
-          </p>
-          {predictedDays !== null && (
+        {predictedDays !== null && (
+          <div className="mt-3 text-xs text-muted">
             <p className="inline-flex items-center gap-1.5 rounded-full bg-soft px-2.5 py-1">
               🧠 Pago probable: ~{predictedDays} días (score {client!.score})
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </section>
 
       {error && (

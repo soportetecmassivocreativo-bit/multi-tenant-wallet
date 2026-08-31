@@ -57,7 +57,7 @@ export function SearchClient({
           type: "Factura",
           id: inv.id,
           title: `#${inv.number} · ${client}`,
-          sub: `${inv.status} · vence ${formatDate(inv.dueDate)}`,
+          sub: `${inv.status} · ${formatDate(inv.date)}`,
           amount: inv.total,
           href: `/cobros/${inv.id}`,
         });

@@ -33,7 +33,7 @@ export function CobrosPdfButton({
         { header: "Nº Factura", dataKey: "number" },
         { header: "Cliente", dataKey: "clientName" },
         { header: "Emisión", dataKey: "date" },
-        { header: "Vence", dataKey: "dueDate" },
+        { header: "Fecha Pago", dataKey: "dueDate" },
         { header: "Monto Total", dataKey: "total", align: "right" as const },
         { header: "Estado", dataKey: "status", align: "center" as const },
       ],

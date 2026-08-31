@@ -3,21 +3,21 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/cobros/status-badge";
-import { ScoreChip } from "@/components/clientes/score-chip";
 import { formatMoney, formatDate } from "@/lib/format";
-import { getClient, getInvoices } from "@/lib/data";
+import { getClients, getInvoices } from "@/lib/data";
 
-export default async function ClienteDetailPage({
+export default async function ClientDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const client = await getClient(id);
+  const [clients, invoices] = await Promise.all([getClients(), getInvoices()]);
+  const client = clients.find((c) => c.id === id);
   if (!client) notFound();
 
-  const invoices = await getInvoices();
   const clientInvoices = invoices.filter((i) => i.clientId === id);
+  const totalInvoiced = clientInvoices.reduce((s, i) => s + i.total, 0);
 
   return (
     <div className="space-y-6">
@@ -25,28 +25,21 @@ export default async function ClienteDetailPage({
         <Link href="/clientes" className="text-sm text-muted active:scale-95">
           ‹ Clientes
         </Link>
+        <span className="font-mono text-xs text-hint">{client.rif}</span>
       </header>
 
-      <section className="flex items-center gap-4">
-        <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-accent-bg font-serif text-2xl text-accent-text">
-          {client.name.charAt(0)}
-        </div>
-        <div className="min-w-0">
-          <h1 className="font-serif text-2xl leading-tight tracking-tight">
-            {client.name}
-          </h1>
-          <p className="text-xs text-hint">RIF {client.rif}</p>
-          <div className="mt-1.5">
-            <ScoreChip score={client.score} />
-          </div>
-        </div>
+      <section>
+        <h1 className="font-serif text-2xl tracking-tight">{client.name}</h1>
+        <p className="mt-1 text-sm text-muted">{client.email}</p>
+        <p className="text-xs text-hint">{client.phone}</p>
       </section>
 
+      {/* KPIs del cliente */}
       <section className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-soft p-4">
-          <p className="text-xs text-muted">Saldo pendiente</p>
-          <p className="tnum mt-1 text-lg font-medium text-pending">
-            {formatMoney(client.balance)}
+          <p className="text-xs text-muted">Total facturado</p>
+          <p className="tnum mt-1 text-lg font-medium">
+            {formatMoney(totalInvoiced)}
           </p>
         </div>
         <div className="rounded-2xl bg-soft p-4">
@@ -73,7 +66,7 @@ export default async function ClienteDetailPage({
                   <StatusBadge status={inv.status} />
                 </div>
                 <p className="text-[11px] text-hint">
-                  Vence {formatDate(inv.dueDate)}
+                  {formatDate(inv.date)}
                 </p>
               </div>
               <span className="tnum text-sm font-medium">

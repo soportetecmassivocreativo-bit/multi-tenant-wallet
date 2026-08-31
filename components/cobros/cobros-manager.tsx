@@ -168,7 +168,7 @@ export function CobrosManager({
                       </div>
                       <p className="truncate text-xs text-hint mt-0.5">
                         {clientMap.get(inv.clientId) || "Cliente General"} · Emisión:{" "}
-                        {formatDate(inv.date)} · Vence: {formatDate(inv.dueDate)}
+                        {formatDate(inv.date)}
                       </p>
                     </div>
 

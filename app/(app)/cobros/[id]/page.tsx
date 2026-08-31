@@ -60,7 +60,7 @@ export default async function InvoiceDetailPage({
           <StatusBadge status={inv.status as InvoiceStatus} />
         </div>
         <p className="mt-1 text-xs text-hint">
-          Emitida {formatDate(inv.date)} · vence {formatDate(inv.dueDate)}
+          Emitida {formatDate(inv.date)}
         </p>
       </section>
 

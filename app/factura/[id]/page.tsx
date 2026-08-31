@@ -61,9 +61,6 @@ export default async function FacturaPage({
           <p className="mt-2 text-xs text-neutral-500">
             Emitida {formatDate(inv.date)}
           </p>
-          <p className="text-xs text-neutral-500">
-            Vence {formatDate(inv.dueDate)}
-          </p>
         </div>
       </div>
 
