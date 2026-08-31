@@ -37,15 +37,15 @@ export function Logo({ className }: { className?: string }) {
   }
 
   return (
-    <span className={`inline-flex items-center gap-2 select-none ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-2.5 select-none ${className ?? ""}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logo-m-icon.png"
         alt="M-Wallet"
-        className="block h-9 sm:h-10 w-auto shrink-0 object-contain drop-shadow-sm"
+        className="block h-8 sm:h-9 w-auto shrink-0 object-contain drop-shadow-sm"
       />
-      <span className="font-sans text-[18px] sm:text-[20px] font-black text-[#2C21FF] dark:text-[#7293FF] tracking-wider uppercase">
-        WALLET
+      <span className="font-sans text-[19px] sm:text-[21px] font-black text-[#2C21FF] dark:text-[#7293FF] tracking-tight">
+        M-Wallet
       </span>
     </span>
   );
