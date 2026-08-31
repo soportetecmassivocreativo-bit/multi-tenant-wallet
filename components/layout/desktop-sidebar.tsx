@@ -21,6 +21,7 @@ import {
   SearchIcon,
   PlusIcon,
 } from "@/components/ui/icons";
+import { TenantConfigSelector } from "@/components/admin/tenant-config-selector";
 
 interface NavItem {
   href: string;
@@ -123,6 +124,9 @@ export function DesktopSidebar() {
           </Link>
         )}
       </div>
+
+      {/* Multi-Tenant Company Selector */}
+      {isMaster && <TenantConfigSelector variant="sidebar" />}
 
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-xs">

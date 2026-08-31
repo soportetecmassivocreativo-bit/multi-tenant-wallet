@@ -1,19 +1,36 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getCurrentProfile } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
+import { getAdminTenants } from "@/lib/tenant-admin-actions";
 import { ConfiguracionTabs } from "@/components/configuracion/configuracion-tabs";
+import { TenantConfigSelector } from "@/components/admin/tenant-config-selector";
 import { SettingsIcon } from "@/components/ui/icons";
 
-export default async function ConfiguracionPage() {
-  const [profile, config] = await Promise.all([
+interface Props {
+  searchParams: Promise<{ empresa?: string }>;
+}
+
+export default async function ConfiguracionPage({ searchParams }: Props) {
+  const { empresa } = await searchParams;
+  const cookieStore = await cookies();
+  const activeSlug = empresa || cookieStore.get("m_wallet_active_config_tenant")?.value || "massivo";
+
+  const [profile, config, allTenants] = await Promise.all([
     getCurrentProfile(),
-    getSystemConfig(),
+    getSystemConfig(activeSlug),
+    getAdminTenants(),
   ]);
 
   const canEdit =
     profile?.role === "admin" ||
     profile?.role === "ceo" ||
     profile?.role === "project_manager";
+
+  const currentTenantObj = allTenants.find((t) => t.slug === activeSlug) || allTenants[0] || {
+    name: "Massivo Creativo",
+    slug: "massivo",
+  };
 
   return (
     <div className="space-y-6">
@@ -29,15 +46,27 @@ export default async function ConfiguracionPage() {
         </div>
         <div className="min-w-0">
           <h1 className="truncate font-serif text-2xl leading-tight tracking-tight">
-            Configuración
+            Configuración & Nomenclaturas
           </h1>
           <p className="text-xs text-hint">
-            Personalización de reportes PDF y contabilizadores Mas-Corp-
+            Personalizando parámetros y correlativos para:{" "}
+            <strong className="text-foreground">{currentTenantObj.name}</strong>
           </p>
         </div>
       </section>
 
-      <ConfiguracionTabs initialConfig={config} canEdit={canEdit} />
+      {/* Selector interactivo de Empresa a Personalizar */}
+      <TenantConfigSelector
+        variant="page"
+        activeSlug={activeSlug}
+        initialTenants={allTenants}
+      />
+
+      <ConfiguracionTabs
+        key={activeSlug}
+        initialConfig={config}
+        canEdit={canEdit}
+      />
     </div>
   );
 }

@@ -73,22 +73,54 @@ async function getContext() {
 }
 
 /**
- * Obtiene la configuración persistente del sistema (desde cookies / DB).
+ * Obtiene la configuración persistente del sistema (desde cookies / DB) por empresa / tenant.
  */
-export async function getSystemConfig(): Promise<SystemConfig> {
+export async function getSystemConfig(tenantSlug?: string): Promise<SystemConfig> {
+  const cookieStore = await cookies();
+  const activeSlug =
+    tenantSlug ||
+    cookieStore.get("m_wallet_active_config_tenant")?.value ||
+    "massivo";
+
+  const targetCookieName =
+    activeSlug === "massivo"
+      ? CONFIG_COOKIE_NAME
+      : `${CONFIG_COOKIE_NAME}_${activeSlug}`;
+
   let cookieConfig: Partial<SystemConfig> = {};
   let hasCookie = false;
   try {
-    const cookieStore = await cookies();
-    const raw = cookieStore.get(CONFIG_COOKIE_NAME)?.value;
+    const raw = cookieStore.get(targetCookieName)?.value;
     if (raw) {
       cookieConfig = JSON.parse(decodeURIComponent(raw));
       hasCookie = true;
     }
   } catch {}
 
-  const merged: SystemConfig = {
+  // Prefijo por defecto inteligente según la empresa
+  let dynamicDefaultPrefix = "Mas-Corp-";
+  let dynamicCompanyName = "Massivo Creativo";
+  if (activeSlug === "demo") {
+    dynamicDefaultPrefix = "Demo-Corp-";
+    dynamicCompanyName = "Empresa Demo";
+  } else if (activeSlug !== "massivo") {
+    const prefixTag = activeSlug.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase();
+    dynamicDefaultPrefix = `${prefixTag || "Emp"}-Corp-`;
+    dynamicCompanyName = `Empresa ${activeSlug}`;
+  }
+
+  const baseConfig: SystemConfig = {
     ...DEFAULT_SYSTEM_CONFIG,
+    basePrefix: dynamicDefaultPrefix,
+    invoicePrefix: `${dynamicDefaultPrefix}FAC-`,
+    expensePrefix: `${dynamicDefaultPrefix}GAS-`,
+    employeePrefix: `${dynamicDefaultPrefix}EMP-`,
+    servicePrefix: `${dynamicDefaultPrefix}SRV-`,
+    pdfCompanyName: dynamicCompanyName,
+  };
+
+  const merged: SystemConfig = {
+    ...baseConfig,
     ...cookieConfig,
   };
 
@@ -144,18 +176,29 @@ export async function getSystemConfig(): Promise<SystemConfig> {
 }
 
 /**
- * Guarda los cambios de configuración del sistema (en cookie de larga duración + base de datos).
+ * Guarda los cambios de configuración del sistema para una empresa / tenant específico.
  * Permitido para CEO, Administrador y Project Manager.
  */
 export async function saveSystemConfig(
-  newConfig: Partial<SystemConfig>
+  newConfig: Partial<SystemConfig>,
+  tenantSlug?: string
 ): Promise<MutationResult> {
-  // 1. Guardar siempre en Cookie persistente (1 año de vigencia)
+  const cookieStore = await cookies();
+  const activeSlug =
+    tenantSlug ||
+    cookieStore.get("m_wallet_active_config_tenant")?.value ||
+    "massivo";
+
+  const targetCookieName =
+    activeSlug === "massivo"
+      ? CONFIG_COOKIE_NAME
+      : `${CONFIG_COOKIE_NAME}_${activeSlug}`;
+
+  // 1. Guardar siempre en Cookie persistente de la empresa específica (1 año de vigencia)
   try {
-    const current = await getSystemConfig();
+    const current = await getSystemConfig(activeSlug);
     const merged = { ...current, ...newConfig };
-    const cookieStore = await cookies();
-    cookieStore.set(CONFIG_COOKIE_NAME, encodeURIComponent(JSON.stringify(merged)), {
+    cookieStore.set(targetCookieName, encodeURIComponent(JSON.stringify(merged)), {
       maxAge: 60 * 60 * 24 * 365, // 1 año
       path: "/",
       sameSite: "lax",
@@ -168,7 +211,7 @@ export async function saveSystemConfig(
     await logAuditEvent({
       action: "configuracion_sistema",
       entityType: "empresa",
-      description: `Actualizó personalización PDF y contabilizadores ${newConfig.basePrefix || "Mas-Corp-"} (Demo)`,
+      description: `Actualizó personalización PDF y contabilizadores ${newConfig.basePrefix || "Corp-"} (Empresa: ${activeSlug})`,
     });
     revalidatePath("/", "layout");
     revalidatePath("/configuracion");
