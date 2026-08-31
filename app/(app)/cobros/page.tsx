@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { PlusIcon } from "@/components/ui/icons";
 import { formatMoney } from "@/lib/format";

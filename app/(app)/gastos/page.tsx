@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NuevoGastoForm } from "@/components/gastos/nuevo-gasto-form";
 import { GastosPdfButton } from "@/components/gastos/gastos-pdf-button";
 import { GastosManager } from "@/components/gastos/gastos-manager";

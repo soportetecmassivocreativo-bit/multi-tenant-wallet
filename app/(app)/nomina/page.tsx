@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { EmployeesManager } from "@/components/nomina/employees-manager";
 import { NominaPdfButton } from "@/components/nomina/nomina-pdf-button";

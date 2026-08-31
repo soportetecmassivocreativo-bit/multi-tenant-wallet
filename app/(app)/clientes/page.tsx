@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NuevoClienteForm } from "@/components/clientes/nuevo-cliente-form";
 import { ClientesPdfButton } from "@/components/clientes/clientes-pdf-button";
 import { ClientesManager } from "@/components/clientes/clientes-manager";

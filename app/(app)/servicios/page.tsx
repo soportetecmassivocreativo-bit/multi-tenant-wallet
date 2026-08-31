@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { ServicesManager } from "@/components/servicios/services-manager";
 import { ServiciosPdfButton } from "@/components/servicios/servicios-pdf-button";

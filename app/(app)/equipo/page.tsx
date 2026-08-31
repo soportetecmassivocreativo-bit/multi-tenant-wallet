@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { InviteForm } from "@/components/equipo/invite-form";
 import { DeleteButton } from "@/components/ui/delete-button";

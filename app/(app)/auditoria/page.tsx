@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { getAuditLogs } from "@/lib/audit";
 import { getCurrentProfile } from "@/lib/data";

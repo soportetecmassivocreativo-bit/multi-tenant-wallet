@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { ReportePdfButton } from "@/components/reportes/reporte-pdf-button";
 import { formatMoney } from "@/lib/format";
