@@ -42,11 +42,29 @@ const mainNav: NavItem[] = [
   { href: "/configuracion", label: "Configuración Mas-Corp-", Icon: SettingsIcon },
 ];
 
+const masterNav: NavItem[] = [
+  { href: "/admin/empresas", label: "Empresas & Supabase DB", badge: "Master", Icon: BuildingIcon },
+  { href: "/configuracion", label: "Configuración & Prefijos", Icon: SettingsIcon },
+  { href: "/equipo", label: "Super Admins & Roles", Icon: UsersIcon },
+  { href: "/auditoria", label: "Auditoría Multi-Tenant", Icon: ShieldCheckIcon },
+];
+
 export function DesktopSidebar() {
   const pathname = usePathname();
 
+  // Detectar si está en el portal master multi-tenant
+  const isMaster =
+    pathname.startsWith("/admin") ||
+    process.env.NEXT_PUBLIC_APP_MODE === "master" ||
+    (typeof window !== "undefined" &&
+      (window.location.host.includes("multi-tenant") ||
+        window.location.host.includes("muti-tenant")));
+
+  const currentNav = isMaster ? masterNav : mainNav;
+
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/admin/empresas") return pathname === "/admin/empresas";
     return pathname.startsWith(href);
   };
 
@@ -54,36 +72,64 @@ export function DesktopSidebar() {
     <aside className="hidden lg:flex lg:w-72 lg:flex-col lg:fixed lg:inset-y-0 z-30 border-r border-line bg-card/95 backdrop-blur">
       {/* Brand Header */}
       <div className="flex h-16 items-center gap-3 border-b border-line px-5">
-        <Link href="/dashboard" className="flex items-center gap-2 group">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo-massivo-creativo.png"
-            alt="Massivo Creativo"
-            className="h-8 w-auto shrink-0 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
-          />
-          <span className="text-[12px] font-extrabold text-accent tracking-widest uppercase ml-1">
-            Wallet
-          </span>
+        <Link href={isMaster ? "/admin/empresas" : "/dashboard"} className="flex items-center gap-2 group">
+          {isMaster ? (
+            <div className="flex items-center gap-2.5">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-sm">
+                <BuildingIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[13px] font-bold text-foreground tracking-tight block truncate">
+                  Multi-Tenant Wallet
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-accent block">
+                  Master Admin
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-massivo-creativo.png"
+                alt="Massivo Creativo"
+                className="h-8 w-auto shrink-0 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+              />
+              <span className="text-[12px] font-extrabold text-accent tracking-widest uppercase ml-1">
+                Wallet
+              </span>
+            </>
+          )}
         </Link>
       </div>
 
       {/* Quick Action Button */}
       <div className="p-4 pb-2">
-        <Link
-          href="/cobros/nueva"
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-accent/90 transition-all active:scale-[0.98]"
-        >
-          <PlusIcon className="h-4 w-4" />
-          <span>Nueva Factura</span>
-        </Link>
+        {isMaster ? (
+          <Link
+            href="/admin/empresas"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-accent/90 transition-all active:scale-[0.98]"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>+ Nueva Empresa</span>
+          </Link>
+        ) : (
+          <Link
+            href="/cobros/nueva"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-accent/90 transition-all active:scale-[0.98]"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>Nueva Factura</span>
+          </Link>
+        )}
       </div>
 
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-xs">
         <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-hint">
-          Módulos Principales
+          {isMaster ? "Administración Global" : "Módulos Principales"}
         </div>
-        {mainNav.map((item) => {
+        {currentNav.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
@@ -102,7 +148,9 @@ export function DesktopSidebar() {
               />
               <span className="flex-1 truncate">{item.label}</span>
               {item.badge && (
-                <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[9px] font-semibold">
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                  active ? "bg-white/20 text-white" : "bg-accent/15 text-accent"
+                }`}>
                   {item.badge}
                 </span>
               )}

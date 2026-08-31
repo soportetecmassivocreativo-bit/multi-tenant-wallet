@@ -14,6 +14,10 @@ import {
   CashIcon,
   ReceiptIcon,
   UserPlusIcon,
+  BuildingIcon,
+  SettingsIcon,
+  ShieldCheckIcon,
+  UsersIcon,
 } from "@/components/ui/icons";
 
 type NavItem = {
@@ -31,11 +35,26 @@ const right: NavItem[] = [
   { href: "/mas", label: "Más", Icon: GridIcon },
 ];
 
+const masterLeft: NavItem[] = [
+  { href: "/admin/empresas", label: "Empresas", Icon: BuildingIcon },
+  { href: "/configuracion", label: "Prefijos", Icon: SettingsIcon },
+];
+const masterRight: NavItem[] = [
+  { href: "/equipo", label: "Admins", Icon: UsersIcon },
+  { href: "/auditoria", label: "Auditoría", Icon: ShieldCheckIcon },
+];
+
 const quickActions = [
   { label: "Nueva factura", href: "/cobros/nueva", Icon: InvoiceIcon, color: "text-accent" },
   { label: "Registrar cobro", href: "/cobros", Icon: CashIcon, color: "text-income" },
   { label: "Nuevo gasto", href: "/gastos", Icon: ReceiptIcon, color: "text-overdue" },
   { label: "Nuevo cliente", href: "/clientes", Icon: UserPlusIcon, color: "text-accent" },
+];
+
+const masterQuickActions = [
+  { label: "Nueva Empresa Multi-Tenant", href: "/admin/empresas", Icon: BuildingIcon, color: "text-accent" },
+  { label: "Configuración & Nomenclatura", href: "/configuracion", Icon: SettingsIcon, color: "text-accent" },
+  { label: "Gestión de Super Admins", href: "/equipo", Icon: UsersIcon, color: "text-income" },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -69,7 +88,22 @@ export function BottomNav() {
   const plusRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  const isActive = (href: string) => pathname === href;
+  const isMaster =
+    pathname.startsWith("/admin") ||
+    process.env.NEXT_PUBLIC_APP_MODE === "master" ||
+    (typeof window !== "undefined" &&
+      (window.location.host.includes("multi-tenant") ||
+        window.location.host.includes("muti-tenant")));
+
+  const currentLeft = isMaster ? masterLeft : left;
+  const currentRight = isMaster ? masterRight : right;
+  const currentActions = isMaster ? masterQuickActions : quickActions;
+
+  const isActive = (href: string) => {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/admin/empresas") return pathname === "/admin/empresas";
+    return pathname.startsWith(href);
+  };
 
   // Entrada de la barra al montar.
   useGSAP(() => {
@@ -125,7 +159,7 @@ export function BottomNav() {
             ref={sheetRef}
             className="fixed inset-x-0 bottom-[92px] z-40 mx-auto w-[calc(100%-2.5rem)] max-w-[440px] space-y-2 lg:hidden"
           >
-            {quickActions.map((a) => (
+            {currentActions.map((a) => (
               <Link
                 key={a.label}
                 href={a.href}
@@ -147,7 +181,7 @@ export function BottomNav() {
         ref={barRef}
         className="fixed inset-x-0 bottom-4 z-40 mx-auto flex h-14 w-[calc(100%-2.5rem)] max-w-[440px] items-center justify-around rounded-full border border-line bg-card px-2 shadow-[0_6px_24px_rgba(0,0,0,0.08)] lg:hidden"
       >
-        {left.map((item) => (
+        {currentLeft.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} />
         ))}
 
@@ -163,7 +197,7 @@ export function BottomNav() {
           </button>
         </div>
 
-        {right.map((item) => (
+        {currentRight.map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} />
         ))}
       </nav>
