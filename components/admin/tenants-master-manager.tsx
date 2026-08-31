@@ -349,7 +349,7 @@ export function TenantsMasterManager({
               <div className="flex items-center gap-2">
                 <BuildingIcon className="h-5 w-5 text-accent" />
                 <h3 className="font-serif text-base font-bold">
-                  Registrar Nueva Empresa Multi-Tenant
+                  Registrar Nueva Empresa
                 </h3>
               </div>
               <button

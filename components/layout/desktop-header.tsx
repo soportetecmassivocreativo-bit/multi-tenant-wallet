@@ -15,10 +15,10 @@ export function DesktopHeader() {
         window.location.host.includes("muti-tenant")));
 
   const getPageTitle = () => {
-    if (pathname.startsWith("/admin/empresas")) return "Panel Master Multi-Tenant";
-    if (pathname.startsWith("/configuracion")) return "Configuración Global & Prefijos";
-    if (pathname.startsWith("/equipo")) return "Super Administradores";
-    if (pathname.startsWith("/auditoria")) return "Auditoría de Seguridad Multi-Tenant";
+    if (pathname.startsWith("/admin/empresas")) return "Panel de Empresas & Bases de Datos";
+    if (pathname.startsWith("/configuracion")) return "Configuración & Prefijos por Empresa";
+    if (pathname.startsWith("/equipo")) return "Super Administradores & Roles";
+    if (pathname.startsWith("/auditoria")) return "Auditoría de Seguridad";
     if (pathname === "/dashboard") return "Panel Financiero Principal";
     if (pathname.startsWith("/cobros/nueva")) return "Emitir Nueva Factura";
     if (pathname.startsWith("/cobros")) return "Cuentas por Cobrar & Facturas";
@@ -28,9 +28,9 @@ export function DesktopHeader() {
     if (pathname.startsWith("/clientes")) return "Directorio de Clientes";
     if (pathname.startsWith("/reportes")) return "Reportes Financieros & Balances";
     if (pathname.startsWith("/cuentas")) return "Cuentas Bancarias & Métodos de Pago";
-    if (pathname.startsWith("/perfil")) return "Mi Perfil & Seguridad de Equipo";
+    if (pathname.startsWith("/perfil")) return "Mi Perfil & Seguridad";
     if (pathname.startsWith("/buscar")) return "Buscador Global";
-    return isMaster ? "Multi-Tenant Master Wallet" : "Massivo Corp Wallet";
+    return isMaster ? "M-Wallet Admin" : "Massivo Corp Wallet";
   };
 
   return (

@@ -52,7 +52,7 @@ const quickActions = [
 ];
 
 const masterQuickActions = [
-  { label: "Nueva Empresa Multi-Tenant", href: "/admin/empresas", Icon: BuildingIcon, color: "text-accent" },
+  { label: "Nueva Empresa", href: "/admin/empresas", Icon: BuildingIcon, color: "text-accent" },
   { label: "Configuración & Nomenclatura", href: "/configuracion", Icon: SettingsIcon, color: "text-accent" },
   { label: "Gestión de Super Admins", href: "/equipo", Icon: UsersIcon, color: "text-income" },
 ];

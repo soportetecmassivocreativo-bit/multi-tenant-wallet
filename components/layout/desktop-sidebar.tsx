@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/icons";
 import { TenantConfigSelector } from "@/components/admin/tenant-config-selector";
 import { SidebarCompaniesAccordion } from "@/components/admin/sidebar-companies-accordion";
+import { Logo } from "@/components/ui/logo";
 
 interface NavItem {
   href: string;
@@ -37,7 +38,7 @@ const mainNav: NavItem[] = [
   { href: "/gastos", label: "Gastos & Egresos", Icon: ReceiptIcon },
   { href: "/nomina", label: "Nómina de Empleados", Icon: PayrollIcon },
   { href: "/servicios", label: "Servicios Recurrentes", Icon: RepeatIcon },
-  { href: "/clientes", label: "Clientes", Icon: UsersIcon },
+  { href: "/clientes", label: "Directorio de Clientes", Icon: UsersIcon },
   { href: "/reportes", label: "Reportes Financieros", Icon: ChartIcon },
   { href: "/auditoria", label: "Auditoría de Seguridad", Icon: ShieldCheckIcon },
   { href: "/cuentas", label: "Cuentas de Empresa", Icon: BuildingIcon },
@@ -45,10 +46,10 @@ const mainNav: NavItem[] = [
 ];
 
 const masterNav: NavItem[] = [
-  { href: "/admin/empresas", label: "Empresas & Supabase DB", badge: "Master", Icon: BuildingIcon },
+  { href: "/admin/empresas", label: "Empresas & Supabase DB", badge: "Admin", Icon: BuildingIcon },
   { href: "/configuracion", label: "Configuración & Prefijos", Icon: SettingsIcon },
   { href: "/equipo", label: "Super Admins & Roles", Icon: UsersIcon },
-  { href: "/auditoria", label: "Auditoría Multi-Tenant", Icon: ShieldCheckIcon },
+  { href: "/auditoria", label: "Auditoría del Sistema", Icon: ShieldCheckIcon },
 ];
 
 export function DesktopSidebar() {
@@ -75,33 +76,7 @@ export function DesktopSidebar() {
       {/* Brand Header */}
       <div className="flex h-16 items-center gap-3 border-b border-line px-5">
         <Link href={isMaster ? "/admin/empresas" : "/dashboard"} className="flex items-center gap-2 group">
-          {isMaster ? (
-            <div className="flex items-center gap-2.5">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent text-white shadow-sm">
-                <BuildingIcon className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[13px] font-bold text-foreground tracking-tight block truncate">
-                  Multi-Tenant Wallet
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-widest text-accent block">
-                  Master Admin
-                </span>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logo-massivo-creativo.png"
-                alt="Massivo Creativo"
-                className="h-8 w-auto shrink-0 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
-              />
-              <span className="text-[12px] font-extrabold text-accent tracking-widest uppercase ml-1">
-                Wallet
-              </span>
-            </>
-          )}
+          <Logo />
         </Link>
       </div>
 
@@ -129,7 +104,7 @@ export function DesktopSidebar() {
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-xs">
         <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-hint">
-          {isMaster ? "Administración Global" : "Módulos Principales"}
+          {isMaster ? "Administración" : "Módulos Principales"}
         </div>
         {currentNav.map((item) => {
           const active = isActive(item.href);
