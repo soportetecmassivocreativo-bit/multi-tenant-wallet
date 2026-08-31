@@ -14,6 +14,8 @@ import {
   ChartIcon,
   ShieldCheckIcon,
   SettingsIcon,
+  BuildingIcon,
+  BankIcon,
   UserIcon,
   LogoutIcon,
   SearchIcon,
@@ -36,6 +38,7 @@ const mainNav: NavItem[] = [
   { href: "/clientes", label: "Clientes", Icon: UsersIcon },
   { href: "/reportes", label: "Reportes Financieros", Icon: ChartIcon },
   { href: "/auditoria", label: "Auditoría de Seguridad", Icon: ShieldCheckIcon },
+  { href: "/cuentas", label: "Cuentas de Empresa", Icon: BuildingIcon },
   { href: "/configuracion", label: "Configuración Mas-Corp-", Icon: SettingsIcon },
 ];
 

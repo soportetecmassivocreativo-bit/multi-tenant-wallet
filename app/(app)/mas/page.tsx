@@ -34,8 +34,9 @@ const modules: Item[] = [
   { href: "/equipo",        label: "Equipo",               desc: "Gestión de roles y miembros",             Icon: UserPlusIcon },
   { href: "/reportes",      label: "Reportes",             desc: "Ingresos vs egresos del mes",             Icon: ChartIcon },
   { href: "/auditoria",     label: "Auditoría",            desc: "Registro de movimientos y acciones",      Icon: ShieldCheckIcon },
-  { href: "/perfil",        label: "Mi Perfil & Seguridad",desc: "Cambiar clave y datos de cuenta",         Icon: UserIcon },
+  { href: "/cuentas",       label: "Cuentas de Empresa",   desc: "Bancos, Pago Móvil, Zelle y cripto",      Icon: BuildingIcon },
   { href: "/configuracion", label: "Configuración",        desc: "Personalización PDF y contabilizadores",  Icon: SettingsIcon },
+  { href: "/perfil",        label: "Mi Perfil & Seguridad",desc: "Cambiar clave y datos de cuenta",         Icon: UserIcon },
   { href: "/empresas",      label: "Empresas",             desc: "Datos fiscales e impuestos",              Icon: BuildingIcon },
 ];
 

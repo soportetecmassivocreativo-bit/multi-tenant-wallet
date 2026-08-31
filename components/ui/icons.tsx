@@ -245,5 +245,34 @@ export const FileTextIcon = (p: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const CreditCardIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+    <line x1="6" y1="15" x2="10" y2="15" />
+  </Icon>
+);
+
+export const WalletIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z" />
+    <path d="M16 3H4a2 2 0 0 0-2 2v2h18V5a2 2 0 0 0-2-2Z" />
+    <circle cx="17" cy="14" r="1.5" />
+  </Icon>
+);
+
+export const BankIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M3 21h18M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M12 3 2 8h20L12 3Z" />
+  </Icon>
+);
+
+export const CopyIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </Icon>
+);
+
 
 
