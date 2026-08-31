@@ -22,6 +22,7 @@ import {
   PlusIcon,
 } from "@/components/ui/icons";
 import { TenantConfigSelector } from "@/components/admin/tenant-config-selector";
+import { SidebarCompaniesAccordion } from "@/components/admin/sidebar-companies-accordion";
 
 interface NavItem {
   href: string;
@@ -125,9 +126,6 @@ export function DesktopSidebar() {
         )}
       </div>
 
-      {/* Multi-Tenant Company Selector */}
-      {isMaster && <TenantConfigSelector variant="sidebar" />}
-
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-xs">
         <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-hint">
@@ -135,30 +133,36 @@ export function DesktopSidebar() {
         </div>
         {currentNav.map((item) => {
           const active = isActive(item.href);
+          const isEmpresasModule = item.href === "/admin/empresas";
+
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition-all ${
-                active
-                  ? "bg-accent text-white shadow-sm font-semibold"
-                  : "text-muted hover:bg-soft hover:text-foreground"
-              }`}
-            >
-              <item.Icon
-                className={`h-4 w-4 shrink-0 ${
-                  active ? "text-white" : "text-hint"
+            <div key={item.href} className="space-y-1">
+              <Link
+                href={item.href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition-all ${
+                  active
+                    ? "bg-accent text-white shadow-sm font-semibold"
+                    : "text-muted hover:bg-soft hover:text-foreground"
                 }`}
-              />
-              <span className="flex-1 truncate">{item.label}</span>
-              {item.badge && (
-                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                  active ? "bg-white/20 text-white" : "bg-accent/15 text-accent"
-                }`}>
-                  {item.badge}
-                </span>
-              )}
-            </Link>
+              >
+                <item.Icon
+                  className={`h-4 w-4 shrink-0 ${
+                    active ? "text-white" : "text-hint"
+                  }`}
+                />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.badge && (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                    active ? "bg-white/20 text-white" : "bg-accent/15 text-accent"
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+
+              {/* Sub-selector desplegable debajo de Empresas & Supabase DB en Master Mode */}
+              {isMaster && isEmpresasModule && <SidebarCompaniesAccordion />}
+            </div>
           );
         })}
 
