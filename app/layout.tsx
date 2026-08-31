@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Geist } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { AdaptiveFavicon } from "@/components/providers/adaptive-favicon";
 import "./globals.css";
 
 const geist = Geist({
@@ -52,7 +53,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-page text-ink font-sans antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AdaptiveFavicon />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
