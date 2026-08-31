@@ -20,10 +20,10 @@ const inputClass =
 
 interface NuevoGastoFormProps {
   accounts?: CompanyAccount[];
+  onClose?: () => void;
 }
 
-export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
-  const [open, setOpen] = useState(false);
+export function NuevoGastoForm({ accounts = [], onClose }: NuevoGastoFormProps) {
   const [note, setNote] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Operaciones");
@@ -70,7 +70,7 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
         setAmount(0);
         setReference("");
         setCreditDays(0);
-        setOpen(false);
+        onClose?.();
       } else {
         setError(r.error ?? "No se pudo registrar el gasto.");
       }
@@ -78,32 +78,24 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
   }
 
   return (
-    <div>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 transition-all"
-      >
-        <PlusIcon className="h-4 w-4" />
-        <span>+ Nuevo Gasto</span>
-      </button>
-
-      {open && (
-        <section className="mt-4 space-y-4 rounded-3xl border border-line bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between border-b border-line pb-3">
-            <div>
-              <h3 className="font-serif text-lg font-bold text-foreground">
-                Registrar Nuevo Gasto / Egreso
-              </h3>
-              <p className="text-xs text-hint">Asienta compras, pagos de servicios o gastos operativos</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-xs text-muted hover:text-foreground font-medium px-2 py-1 rounded-lg hover:bg-soft"
-            >
-              Cancelar
-            </button>
-          </div>
+    <section className="space-y-4 rounded-3xl border border-line bg-card p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="flex items-center justify-between border-b border-line pb-3">
+        <div>
+          <h3 className="font-serif text-lg font-bold text-foreground">
+            Registrar Nuevo Gasto / Egreso
+          </h3>
+          <p className="text-xs text-hint">Asienta compras, pagos de servicios o gastos operativos</p>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs text-muted hover:text-foreground font-medium px-2 py-1 rounded-lg hover:bg-soft"
+          >
+            ✕ Cerrar
+          </button>
+        )}
+      </div>
 
           {/* Fila 1: Categoría y Moneda */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -297,13 +289,15 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
           )}
 
           <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-xl border border-line px-4 py-2 text-xs font-semibold text-muted hover:bg-soft"
-            >
-              Cancelar
-            </button>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-line px-4 py-2 text-xs font-semibold text-muted hover:bg-soft"
+              >
+                Cancelar
+              </button>
+            )}
             <button
               onClick={submit}
               disabled={!note || amount <= 0 || pending}
@@ -313,8 +307,7 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
             </button>
           </div>
         </section>
-      )}
-    </div>
   );
 }
+
 
