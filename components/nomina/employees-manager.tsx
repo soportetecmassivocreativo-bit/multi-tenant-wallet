@@ -54,15 +54,17 @@ export function EmployeesManager({
     return acc;
   }, {});
 
-  const filteredEmployees = employees.filter((e) => {
-    const q = query.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      (e.name || "").toLowerCase().includes(q) ||
-      (e.role || "").toLowerCase().includes(q) ||
-      (e.code || "").toLowerCase().includes(q)
-    );
-  });
+  const filteredEmployees = employees
+    .filter((e) => {
+      const q = query.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        (e.name || "").toLowerCase().includes(q) ||
+        (e.role || "").toLowerCase().includes(q) ||
+        (e.code || "").toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => (a.code || "").localeCompare(b.code || "", undefined, { numeric: true }));
 
   function openAdd() {
     setEditId(null);

@@ -369,8 +369,9 @@ export async function getEmployees(): Promise<Employee[]> {
     code: formatEntityCode(prefix, startNum + idx, digits),
   }));
 
+  // Ordenados explícitamente por código correlativo ascendente (Mas-Corp-Nom-0001, 0002, ...)
   return withPermanentCodes.sort((a, b) =>
-    (a.name || "").localeCompare(b.name || "")
+    (a.code || "").localeCompare(b.code || "", undefined, { numeric: true })
   ) as unknown as Employee[];
 }
 
