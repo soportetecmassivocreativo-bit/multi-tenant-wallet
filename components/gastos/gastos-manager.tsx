@@ -8,13 +8,15 @@ import { exportExpenseVoucherPdf } from "@/lib/pdf-export";
 import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon } from "@/components/ui/icons";
 import { MoneyInput } from "@/components/ui/money-input";
 import type { Expense } from "@/lib/mock-data";
+import type { CompanyAccount } from "@/lib/cuentas-actions";
 
 interface GastosManagerProps {
   expenses: Expense[];
+  accounts?: CompanyAccount[];
   admin: boolean;
 }
 
-export function GastosManager({ expenses, admin }: GastosManagerProps) {
+export function GastosManager({ expenses, accounts = [], admin }: GastosManagerProps) {
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
   const [activeExpense, setActiveExpense] = useState<Expense | null>(null);
@@ -24,6 +26,8 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
   const [editNote, setEditNote] = useState("");
   const [editAmount, setEditAmount] = useState(0);
   const [editCategory, setEditCategory] = useState("");
+  const [editAccountId, setEditAccountId] = useState("");
+  const [editReference, setEditReference] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -46,9 +50,27 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
 
   function startEdit(e: Expense) {
     setEditingExpense(e);
-    setEditNote(e.note);
+    // Extraer base note y posibles metadatos existentes [Cuenta · Ref: 12345678]
+    const rawNote = e.note || "";
+    const metaMatch = rawNote.match(/\[(.*?)\]$/);
+    let baseNote = rawNote;
+    let refVal = "";
+    let foundAccId = accounts[0]?.id || "";
+
+    if (metaMatch) {
+      baseNote = rawNote.replace(/\s*\[.*?\]$/, "").trim();
+      const metaContent = metaMatch[1];
+      const refMatch = metaContent.match(/Ref:\s*(\d+)/i);
+      if (refMatch) refVal = refMatch[1];
+      const accFound = accounts.find((a) => metaContent.toLowerCase().includes(a.name.toLowerCase()));
+      if (accFound) foundAccId = accFound.id;
+    }
+
+    setEditNote(baseNote);
     setEditAmount(e.amount);
     setEditCategory(e.category || "General");
+    setEditAccountId(foundAccId);
+    setEditReference(refVal);
     setEditError(null);
   }
 
@@ -57,12 +79,17 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
     if (!editingExpense || editAmount <= 0) return;
     setEditError(null);
 
+    const selectedAcc = accounts.find((a) => a.id === editAccountId);
+
     startTransition(async () => {
       const res = await updateExpense(editingExpense.id, {
         note: editNote,
         amount: editAmount,
         category: editCategory || "General",
         currency: (editingExpense as unknown as { currency?: "USD" | "VES" | "EUR" }).currency ?? "USD",
+        accountId: editAccountId || undefined,
+        accountName: selectedAcc ? selectedAcc.name : undefined,
+        reference: editReference.trim() ? editReference.trim() : undefined,
       });
 
       if (res.ok) {
@@ -219,14 +246,47 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-muted block mb-1">Concepto / Detalle:</label>
+                <label className="text-muted block mb-1">Concepto / Detalle *</label>
                 <input
                   type="text"
                   required
                   value={editNote}
                   onChange={(e) => setEditNote(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-muted block mb-1">Cuenta de Origen (Débito)</label>
+                  <select
+                    value={editAccountId}
+                    onChange={(e) => setEditAccountId(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                  >
+                    {accounts.length === 0 ? (
+                      <option value="">Cuenta Principal</option>
+                    ) : (
+                      accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({a.currency}) {a.bankName ? `· ${a.bankName}` : ""}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-muted block mb-1">Referencia (Últimos 8 dígitos)</label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    placeholder="Ej: 83920194"
+                    value={editReference}
+                    onChange={(e) => setEditReference(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent font-mono"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -235,7 +295,7 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
                   <MoneyInput
                     value={editAmount}
                     onValueChange={setEditAmount}
-                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
                   />
                 </div>
                 <div>
@@ -244,7 +304,7 @@ export function GastosManager({ expenses, admin }: GastosManagerProps) {
                     type="text"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent"
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
                     placeholder="General, Servicios, etc."
                   />
                 </div>

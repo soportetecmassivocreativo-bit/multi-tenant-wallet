@@ -7,6 +7,7 @@ import { deleteInvoice } from "@/lib/mutations";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
 import { getInvoiceDetail, isAdmin } from "@/lib/data";
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import type { InvoiceStatus } from "@/lib/mock-data";
 
 export default async function InvoiceDetailPage({
@@ -15,7 +16,11 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [inv, admin] = await Promise.all([getInvoiceDetail(id), isAdmin()]);
+  const [inv, admin, accounts] = await Promise.all([
+    getInvoiceDetail(id),
+    isAdmin(),
+    getCompanyAccounts(),
+  ]);
   if (!inv) notFound();
 
   const isForeign = inv.currency !== "VES";
@@ -137,6 +142,7 @@ export default async function InvoiceDetailPage({
         invoiceId={inv.id}
         currency={inv.currency}
         balance={inv.balance}
+        accounts={accounts}
       />
     </div>
   );

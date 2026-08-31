@@ -3,9 +3,14 @@ import { GastosPdfButton } from "@/components/gastos/gastos-pdf-button";
 import { GastosManager } from "@/components/gastos/gastos-manager";
 import { formatMoney } from "@/lib/format";
 import { getExpenses, isAdmin } from "@/lib/data";
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
 
 export default async function GastosPage() {
-  const [expenses, admin] = await Promise.all([getExpenses(), isAdmin()]);
+  const [expenses, admin, accounts] = await Promise.all([
+    getExpenses(),
+    isAdmin(),
+    getCompanyAccounts(),
+  ]);
   const total = expenses.reduce((s, e) => s + e.amount, 0);
 
   return (
@@ -19,7 +24,7 @@ export default async function GastosPage() {
         </div>
         <div className="flex items-center gap-2">
           <GastosPdfButton expenses={expenses} total={total} />
-          <NuevoGastoForm />
+          <NuevoGastoForm accounts={accounts} />
         </div>
       </header>
 
@@ -30,7 +35,7 @@ export default async function GastosPage() {
         </p>
       </div>
 
-      <GastosManager expenses={expenses} admin={admin} />
+      <GastosManager expenses={expenses} accounts={accounts} admin={admin} />
     </div>
   );
 }

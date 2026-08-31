@@ -140,6 +140,9 @@ export interface CreateExpenseInput {
   note: string;
   amount: number;
   currency?: CurrencyCode;
+  accountId?: string;
+  accountName?: string;
+  reference?: string; // Últimos 8 dígitos
 }
 
 export async function createExpense(
@@ -150,12 +153,22 @@ export async function createExpense(
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const currency = input.currency ?? "USD";
+  
+  // Guardamos cuenta de débito y referencia de 8 dígitos formateados en la nota si aplica
+  let finalNote = input.note.trim();
+  const metaParts: string[] = [];
+  if (input.accountName) metaParts.push(input.accountName.trim());
+  if (input.reference) metaParts.push(`Ref: ${input.reference.trim()}`);
+  if (metaParts.length > 0) {
+    finalNote = `${finalNote} [${metaParts.join(" · ")}]`;
+  }
+
   const { data: exp, error } = await ctx.supabase
     .from("expenses")
     .insert({
       company_id: ctx.companyId,
       category: input.category || "General",
-      note: input.note,
+      note: finalNote,
       amount: input.amount,
       currency,
       spent_on: today(),
@@ -169,8 +182,14 @@ export async function createExpense(
     action: "crear_gasto",
     entityType: "gasto",
     entityId: exp?.id,
-    description: `Registró gasto en ${input.category || "General"}: ${input.amount.toFixed(2)} ${currency} ("${input.note || "Sin nota"}")`,
-    details: { category: input.category, amount: input.amount, currency },
+    description: `Registró gasto en ${input.category || "General"}: ${input.amount.toFixed(2)} ${currency} ("${finalNote}")`,
+    details: {
+      category: input.category,
+      amount: input.amount,
+      currency,
+      accountName: input.accountName,
+      reference: input.reference,
+    },
     customUser: {
       id: ctx.userId,
       name: ctx.userName,
@@ -192,11 +211,23 @@ export async function updateExpense(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
+  let finalNote = input.note.trim();
+  // Evitar duplicar corchetes existentes si ya tenía metadata
+  const cleanBaseNote = finalNote.replace(/\s*\[.*?\]\s*$/, "").trim();
+  const metaParts: string[] = [];
+  if (input.accountName) metaParts.push(input.accountName.trim());
+  if (input.reference) metaParts.push(`Ref: ${input.reference.trim()}`);
+  if (metaParts.length > 0) {
+    finalNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
+  } else {
+    finalNote = cleanBaseNote;
+  }
+
   const { error } = await ctx.supabase
     .from("expenses")
     .update({
       category: input.category || "General",
-      note: input.note,
+      note: finalNote,
       amount: input.amount,
       currency: input.currency ?? "USD",
     })
@@ -207,8 +238,14 @@ export async function updateExpense(
     action: "editar_gasto",
     entityType: "gasto",
     entityId: id,
-    description: `Modificó gasto: ${input.amount.toFixed(2)} ${input.currency ?? "USD"} ("${input.note}")`,
-    details: { category: input.category, amount: input.amount, currency: input.currency },
+    description: `Modificó gasto: ${input.amount.toFixed(2)} ${input.currency ?? "USD"} ("${finalNote}")`,
+    details: {
+      category: input.category,
+      amount: input.amount,
+      currency: input.currency,
+      accountName: input.accountName,
+      reference: input.reference,
+    },
     customUser: {
       id: ctx.userId,
       name: ctx.userName,
@@ -340,15 +377,30 @@ export async function updateInvoiceStatus(
   return { ok: true };
 }
 
+export interface RegisterPaymentInput {
+  amount: number;
+  method?: string;
+  accountId?: string;
+  accountName?: string;
+  reference?: string; // Últimos 8 dígitos
+}
+
 /** Registra un pago (o abono) contra una factura y actualiza su estado. */
 export async function registerPayment(
   invoiceId: string,
-  amount: number,
-  method = "transferencia",
+  inputOrAmount: number | RegisterPaymentInput,
+  fallbackMethod = "transferencia",
 ): Promise<MutationResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
+
+  const isObj = typeof inputOrAmount === "object";
+  const amount = isObj ? inputOrAmount.amount : inputOrAmount;
+  const baseMethod = isObj ? inputOrAmount.method || fallbackMethod : fallbackMethod;
+  const accountName = isObj ? inputOrAmount.accountName : undefined;
+  const reference = isObj ? inputOrAmount.reference : undefined;
+
   if (amount <= 0) return { ok: false, error: "Monto inválido." };
 
   const { data: inv } = await ctx.supabase
@@ -358,13 +410,22 @@ export async function registerPayment(
     .single();
   if (!inv) return { ok: false, error: "Factura no encontrada." };
 
+  // Construir descripción formateada del método de pago con cuenta y referencia
+  let formattedMethod = baseMethod.trim();
+  const metaParts: string[] = [];
+  if (accountName) metaParts.push(accountName.trim());
+  if (reference) metaParts.push(`Ref: ${reference.trim()}`);
+  if (metaParts.length > 0) {
+    formattedMethod = `${formattedMethod} · ${metaParts.join(" · ")}`;
+  }
+
   const { error } = await ctx.supabase.from("payments").insert({
     company_id: ctx.companyId,
     invoice_id: invoiceId,
     amount,
     currency: inv.currency,
     paid_on: today(),
-    method,
+    method: formattedMethod,
   });
   if (error) return { ok: false, error: error.message };
 
@@ -381,8 +442,16 @@ export async function registerPayment(
     action: "registrar_pago",
     entityType: "pago",
     entityId: invoiceId,
-    description: `Registró pago de ${amount.toFixed(2)} ${inv.currency} para la factura #${inv.number} vía ${method}`,
-    details: { invoiceId, number: inv.number, amount, method, status },
+    description: `Registró pago de ${amount.toFixed(2)} ${inv.currency} para la factura #${inv.number} vía ${formattedMethod}`,
+    details: {
+      invoiceId,
+      number: inv.number,
+      amount,
+      method: formattedMethod,
+      accountName,
+      reference,
+      status,
+    },
     customUser: {
       id: ctx.userId,
       name: ctx.userName,
