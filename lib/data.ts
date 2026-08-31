@@ -297,6 +297,9 @@ export async function getRecentMovements(limit = 8): Promise<Movement[]> {
     .slice(0, limit);
 }
 
+import { getExpenseBreakdown } from "./cuentas-helpers";
+export { getExpenseBreakdown };
+
 export async function getExpenses(): Promise<Expense[]> {
   const config = await getSystemConfig();
   const prefix = config.expensePrefix || config.basePrefix || "Mas-Corp-Egre-";
@@ -648,9 +651,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     0,
   );
 
-  // Contabilidad real: ingresos (pagos cobrados) − egresos (gastos).
+  // Contabilidad real: ingresos (pagos cobrados) − egresos pagados (gastos pagados).
   const cobrado = payments.reduce((s, p) => s + Number(p.amount), 0);
-  const gastos = expenses.reduce((s, e) => s + e.amount, 0);
+  const gastos = expenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
   const balance = isSupabaseConfigured ? cobrado - gastos : mock.balance;
   const cobradoMes = isSupabaseConfigured ? cobrado : mock.stats.cobradoMes;
 

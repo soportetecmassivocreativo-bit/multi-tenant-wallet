@@ -13,11 +13,19 @@ interface GastosViewProps {
   expenses: Expense[];
   admin: boolean;
   accounts: CompanyAccount[];
-  total: number;
+  totalPagado: number;
+  totalPorPagar: number;
 }
 
-export function GastosView({ expenses, admin, accounts, total }: GastosViewProps) {
+export function GastosView({
+  expenses,
+  admin,
+  accounts,
+  totalPagado,
+  totalPorPagar,
+}: GastosViewProps) {
   const [openNew, setOpenNew] = useState(false);
+  const totalGeneral = totalPagado + totalPorPagar;
 
   return (
     <div className="space-y-6">
@@ -30,7 +38,7 @@ export function GastosView({ expenses, admin, accounts, total }: GastosViewProps
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <GastosPdfButton expenses={expenses} total={total} />
+          <GastosPdfButton expenses={expenses} total={totalGeneral} />
           <button
             type="button"
             onClick={() => setOpenNew((v) => !v)}
@@ -50,12 +58,20 @@ export function GastosView({ expenses, admin, accounts, total }: GastosViewProps
         />
       )}
 
-      {/* Tarjeta de Resumen de Totales */}
-      <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-        <p className="text-xs text-muted">Total egresos registrados</p>
-        <p className="tnum mt-1 text-2xl font-semibold text-overdue">
-          {formatMoney(total)}
-        </p>
+      {/* Tarjetas de Resumen de Totales (Por Pagar vs Pagados) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted font-medium">Gastos por pagar (Pendientes / Crédito)</p>
+          <p className="tnum mt-1 text-2xl font-bold text-pending">
+            {formatMoney(totalPorPagar)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted font-medium">Egresos pagados (Debitado)</p>
+          <p className="tnum mt-1 text-2xl font-bold text-overdue">
+            {formatMoney(totalPagado)}
+          </p>
+        </div>
       </div>
 
       {/* Historial y Gestor de Gastos */}

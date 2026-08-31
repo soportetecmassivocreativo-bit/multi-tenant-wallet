@@ -9,7 +9,7 @@ import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon, PlusIcon } from "@/com
 import { MoneyInput } from "@/components/ui/money-input";
 import type { Expense } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
-import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
+import { getPaymentMethodsForAccount, getExpenseBreakdown } from "@/lib/cuentas-helpers";
 
 interface GastosManagerProps {
   expenses: Expense[];
@@ -119,8 +119,9 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
   }
 
   function startPayExpense(e: Expense) {
+    const breakdown = getExpenseBreakdown(e);
     setPayingExpense(e);
-    setPayAmount(e.amount);
+    setPayAmount(breakdown.pendingAmount > 0 ? breakdown.pendingAmount : e.amount);
     const initialAcc = accounts[0];
     setPayAccountId(initialAcc?.id || "");
     const methods = getPaymentMethodsForAccount(initialAcc);
@@ -137,10 +138,14 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
 
     const selectedAcc = accounts.find((a) => a.id === payAccountId);
     const cleanBaseNote = payingExpense.note.replace(/\s*\[.*?\]\s*$/, "").trim();
+    const breakdown = getExpenseBreakdown(payingExpense);
 
     let newNote = cleanBaseNote;
-    if (payAmount >= payingExpense.amount) {
-      // Pago completo
+    const currentPending = breakdown.pendingAmount > 0 ? breakdown.pendingAmount : payingExpense.amount;
+    const currentPaid = breakdown.paidAmount;
+
+    if (payAmount >= currentPending) {
+      // Pago completo de la totalidad / saldo pendiente
       const metaParts: string[] = [];
       if (selectedAcc?.name) metaParts.push(`Pagado desde ${selectedAcc.name}`);
       if (payReference.trim()) metaParts.push(`Ref: ${payReference.trim()}`);
@@ -148,11 +153,12 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
       newNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
     } else {
       // Abono parcial
-      const remaining = payingExpense.amount - payAmount;
+      const totalPaidSoFar = currentPaid + payAmount;
+      const newRemaining = Math.max(0, payingExpense.amount - totalPaidSoFar);
       const metaParts: string[] = [];
-      if (selectedAcc?.name) metaParts.push(`Abonado ${formatMoney(payAmount)} desde ${selectedAcc.name}`);
+      if (selectedAcc?.name) metaParts.push(`Abonado ${formatMoney(totalPaidSoFar)} desde ${selectedAcc.name}`);
       if (payReference.trim()) metaParts.push(`Ref: ${payReference.trim()}`);
-      metaParts.push(`Pendiente ${formatMoney(remaining)}`);
+      metaParts.push(`Pendiente ${formatMoney(newRemaining)}`);
       if (payNote.trim()) metaParts.push(`"${payNote.trim()}"`);
       newNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
     }
@@ -236,7 +242,8 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
         ) : (
           <div className="divide-y divide-line">
             {filtered.map((e) => {
-              const isPending = (e.note || "").includes("Por Aprobar") || (e.note || "").includes("A Crédito") || (e.note || "").includes("Pendiente");
+              const breakdown = getExpenseBreakdown(e);
+              const isPending = breakdown.isPending;
               return (
                 <div
                   key={e.id}
@@ -254,7 +261,14 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
                       </span>
                       {isPending && (
                         <span className="rounded-full bg-pending/15 text-pending font-semibold px-2 py-0.5 text-[10px]">
-                          Por Aprobar / Pendiente
+                          {breakdown.isPartial
+                            ? `Parcial · Pendiente ${formatMoney(breakdown.pendingAmount)}`
+                            : "Por Pagar / Pendiente"}
+                        </span>
+                      )}
+                      {!isPending && (
+                        <span className="rounded-full bg-income/10 text-income font-semibold px-2 py-0.5 text-[10px]">
+                          Pagado
                         </span>
                       )}
                     </div>
@@ -264,9 +278,22 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
-                    <span className="tnum text-sm font-semibold text-overdue mr-1">
-                      − {formatMoney(e.amount)}
-                    </span>
+                    {isPending ? (
+                      <div className="text-right mr-1">
+                        <span className="tnum text-sm font-bold text-pending">
+                          Pendiente {formatMoney(breakdown.pendingAmount)}
+                        </span>
+                        {breakdown.isPartial && (
+                          <span className="tnum block text-[10px] text-muted">
+                            Pagado: {formatMoney(breakdown.paidAmount)} / {formatMoney(e.amount)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="tnum text-sm font-bold text-overdue mr-1">
+                        − {formatMoney(e.amount)}
+                      </span>
+                    )}
 
                     {/* Botón Abonar / Pagar */}
                     {isPending ? (
