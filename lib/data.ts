@@ -87,6 +87,10 @@ export async function getBcvRates(): Promise<BcvRates> {
 
 
 export async function getInvoices(): Promise<Invoice[]> {
+  const config = await getSystemConfig();
+  const prefix = config.invoicePrefix || config.basePrefix || "Mas-Corp-Fact-";
+  const digits = config.codeDigits || 4;
+
   if (!isSupabaseConfigured) return mock.invoices;
   const supabase = await createClient();
   const { data } = await supabase
@@ -95,17 +99,29 @@ export async function getInvoices(): Promise<Invoice[]> {
       "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status",
     )
     .order("issue_date", { ascending: false });
-  return (data ?? []) as unknown as Invoice[];
+
+  return (data ?? []).map((inv) => ({
+    ...inv,
+    code: formatEntityCode(prefix, Number(inv.number), digits),
+  })) as unknown as Invoice[];
 }
 
 export async function getClients(): Promise<Client[]> {
+  const config = await getSystemConfig();
+  const digits = config.codeDigits || 4;
+
   if (!isSupabaseConfigured) return mock.clients;
   const supabase = await createClient();
   const { data } = await supabase
     .from("clients")
     .select("id, name, rif, score, termDays:term_days")
-    .order("name");
-  const clients = (data ?? []) as unknown as Client[];
+    .order("created_at", { ascending: true });
+
+  const clients = (data ?? []).map((c, idx) => ({
+    ...c,
+    code: formatEntityCode("Mas-Corp-Clie-", idx + 1, digits),
+  })) as unknown as Client[];
+
   const invoices = await getInvoices();
   return clients.map((c) => ({
     ...c,
@@ -311,14 +327,21 @@ export async function getExpenses(): Promise<Expense[]> {
     }));
   }
   const supabase = await createClient();
+  // Ordenamos por created_at ASC para fijar el número único permanente de cada gasto
   const { data } = await supabase
     .from("expenses")
-    .select("id, category, note, amount, currency, date:spent_on")
-    .order("spent_on", { ascending: false });
-  return (data ?? []).map((e, idx) => ({
+    .select("id, category, note, amount, currency, date:spent_on, created_at")
+    .order("created_at", { ascending: true });
+
+  const withPermanentCodes = (data ?? []).map((e, idx) => ({
     ...e,
     code: formatEntityCode(prefix, startNum + idx, digits),
-  })) as unknown as Expense[];
+  }));
+
+  // Retornamos ordenado por fecha de gasto descendente para la vista
+  return withPermanentCodes.sort((a, b) =>
+    (b.date || "").localeCompare(a.date || "")
+  ) as unknown as Expense[];
 }
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -334,15 +357,21 @@ export async function getEmployees(): Promise<Employee[]> {
     }));
   }
   const supabase = await createClient();
+  // Ordenamos por created_at ASC para fijar el código inmutable del empleado
   const { data } = await supabase
     .from("employees")
-    .select("id, name:full_name, role, salary, currency")
+    .select("id, name:full_name, role, salary, currency, created_at")
     .eq("active", true)
-    .order("full_name");
-  return (data ?? []).map((e, idx) => ({
+    .order("created_at", { ascending: true });
+
+  const withPermanentCodes = (data ?? []).map((e, idx) => ({
     ...e,
     code: formatEntityCode(prefix, startNum + idx, digits),
-  })) as unknown as Employee[];
+  }));
+
+  return withPermanentCodes.sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "")
+  ) as unknown as Employee[];
 }
 
 export async function getPayrollPeriods(): Promise<PayrollPeriod[]> {
@@ -370,17 +399,24 @@ export async function getServices(): Promise<Service[]> {
     }));
   }
   const supabase = await createClient();
+  // Ordenamos por created_at ASC para que el código asignado sea FIJO e INMUTABLE aunque se pague o modifique
   const { data } = await supabase
     .from("services")
     .select(
-      "id, name, amount, currency, cycle, category, nextChargeDate:next_charge_date",
+      "id, name, amount, currency, cycle, category, nextChargeDate:next_charge_date, created_at",
     )
     .eq("active", true)
-    .order("next_charge_date");
-  return (data ?? []).map((s, idx) => ({
+    .order("created_at", { ascending: true });
+
+  const withPermanentCodes = (data ?? []).map((s, idx) => ({
     ...s,
     code: formatEntityCode(prefix, startNum + idx, digits),
-  })) as unknown as Service[];
+  }));
+
+  // Ordenamos para la vista por fecha de próximo cobro sin modificar el código permanente
+  return withPermanentCodes.sort((a, b) =>
+    (a.nextChargeDate || "").localeCompare(b.nextChargeDate || "")
+  ) as unknown as Service[];
 }
 
 export async function getProducts(): Promise<Product[]> {
