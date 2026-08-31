@@ -2,6 +2,7 @@ import { HeroBalance } from "@/components/dashboard/hero-balance";
 import { MiniLineChart } from "@/components/dashboard/mini-line-chart";
 import { StatPills } from "@/components/dashboard/stat-pills";
 import { Transactions } from "@/components/dashboard/transactions";
+import { DashboardBcvPill } from "@/components/dashboard/dashboard-bcv-pill";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { PayrollIcon, GridIcon } from "@/components/ui/icons";
@@ -39,19 +40,8 @@ export default async function DashboardPage() {
               ≈ {formatCurrency(vesEquivalent, "VES")} · ≈ {formatCurrency(eurEquivalent, "EUR")}
             </p>
 
-            {/* Tasas oficiales del día (siempre visibles) */}
-            <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-2xl bg-soft px-3.5 py-2.5 text-xs text-muted">
-              <span className="font-medium text-foreground">
-                Tasas Oficiales BCV ({formatDate(s.bcv.date)}):
-              </span>
-              <span>
-                $ 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.usd, "VES")}</strong>
-              </span>
-              <span className="text-hint">·</span>
-              <span>
-                € 1 = <strong className="font-medium text-foreground">{formatCurrency(s.bcv.eur, "VES")}</strong>
-              </span>
-            </div>
+            {/* Tasas oficiales del día con botón de actualización en vivo */}
+            <DashboardBcvPill initialBcv={s.bcv} />
           </section>
 
           <MiniLineChart series={s.chartSeries} hasData={s.hasMovements} />
