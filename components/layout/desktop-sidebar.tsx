@@ -40,6 +40,7 @@ const mainNav: NavItem[] = [
   { href: "/auditoria", label: "Auditoría de Seguridad", Icon: ShieldCheckIcon },
   { href: "/cuentas", label: "Cuentas de Empresa", Icon: BuildingIcon },
   { href: "/configuracion", label: "Configuración Mas-Corp-", Icon: SettingsIcon },
+  { href: "/admin/empresas", label: "Panel Master Empresas", badge: "Multi-Tenant", Icon: BuildingIcon },
 ];
 
 export function DesktopSidebar() {

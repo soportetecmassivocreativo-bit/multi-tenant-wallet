@@ -19,6 +19,7 @@ export function DesktopHeader() {
     if (pathname.startsWith("/auditoria")) return "Registro de Auditoría & Seguridad";
     if (pathname.startsWith("/cuentas")) return "Cuentas Bancarias & Métodos de Pago";
     if (pathname.startsWith("/configuracion")) return "Configuración del Sistema";
+    if (pathname.startsWith("/admin/empresas")) return "Panel Master Multi-Tenant";
     if (pathname.startsWith("/perfil")) return "Mi Perfil & Seguridad de Equipo";
     if (pathname.startsWith("/buscar")) return "Buscador Global";
     return "Massivo Corp Wallet";
