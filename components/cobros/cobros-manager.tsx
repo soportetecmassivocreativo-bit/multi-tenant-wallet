@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteInvoice, deletePayment, updateInvoiceStatus, registerPayment } from "@/lib/mutations";
 import { formatMoney, formatDate } from "@/lib/format";
+import { formatEntityCode } from "@/lib/config";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
   InvoiceIcon,
@@ -58,17 +59,20 @@ export function CobrosManager({
   const clientMap = new Map(clients.map((c) => [c.id, c.name]));
   const invoiceMap = new Map(invoices.map((i) => [i.id, i]));
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const clientName = clientMap.get(inv.clientId) || "";
-    const matchesStatus =
-      statusFilter === "todas" || inv.status === statusFilter;
-    const q = query.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      String(inv.number).toLowerCase().includes(q) ||
-      clientName.toLowerCase().includes(q);
-    return matchesStatus && matchesQuery;
-  });
+  const filteredInvoices = invoices
+    .filter((inv) => {
+      const clientName = clientMap.get(inv.clientId) || "";
+      const matchesStatus =
+        statusFilter === "todas" || inv.status === statusFilter;
+      const q = query.toLowerCase().trim();
+      const matchesQuery =
+        !q ||
+        String(inv.number).toLowerCase().includes(q) ||
+        (inv.code && inv.code.toLowerCase().includes(q)) ||
+        clientName.toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    })
+    .sort((a, b) => Number(b.number) - Number(a.number));
 
   function getInvoiceBalance(inv: Invoice) {
     const paid = payments
@@ -218,13 +222,16 @@ export function CobrosManager({
                     className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Link
                           href={`/cobros/${inv.id}`}
                           className="font-mono text-sm font-bold text-foreground hover:text-accent transition-colors"
                         >
                           #{inv.number}
                         </Link>
+                        <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
+                          {inv.code || formatEntityCode("Mas-Corp-Fact-", Number(inv.number), 4)}
+                        </span>
                         <StatusBadge status={inv.status as InvoiceStatus} />
                       </div>
                       <p className="truncate text-xs text-hint mt-0.5">

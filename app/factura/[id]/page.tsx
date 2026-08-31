@@ -58,7 +58,12 @@ export default async function FacturaPage({
           <p className="font-serif text-xl leading-none">
             Factura #{inv.number}
           </p>
-          <p className="mt-2 text-xs text-neutral-500">
+          {inv.code && (
+            <p className="font-mono text-xs font-semibold text-neutral-600 mt-1">
+              {inv.code}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-neutral-500">
             Emitida {formatDate(inv.date)}
           </p>
         </div>

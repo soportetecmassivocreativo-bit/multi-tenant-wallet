@@ -57,19 +57,29 @@ export async function getInvoices(): Promise<Invoice[]> {
   const prefix = config.invoicePrefix || config.basePrefix || "Mas-Corp-Fact-";
   const digits = config.codeDigits || 4;
 
-  if (!isSupabaseConfigured) return mock.invoices;
+  if (!isSupabaseConfigured) {
+    return [...mock.invoices]
+      .map((inv) => ({
+        ...inv,
+        code: formatEntityCode(prefix, Number(inv.number), digits),
+      }))
+      .sort((a, b) => Number(b.number) - Number(a.number));
+  }
   const supabase = await createClient();
   const { data } = await supabase
     .from("invoices")
     .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status",
+      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, created_at",
     )
-    .order("issue_date", { ascending: false });
+    .order("number", { ascending: false });
 
-  return (data ?? []).map((inv) => ({
+  const invoices = (data ?? []).map((inv) => ({
     ...inv,
     code: formatEntityCode(prefix, Number(inv.number), digits),
   })) as unknown as Invoice[];
+
+  // Garantizar siempre el orden numérico correlativo descendente (#10, #9, #8... #1)
+  return invoices.sort((a, b) => Number(b.number) - Number(a.number));
 }
 
 export async function getClients(): Promise<Client[]> {
@@ -120,6 +130,7 @@ export interface Payment {
 export interface InvoiceDetail {
   id: string;
   number: number | string;
+  code?: string;
   clientId: string;
   clientName: string;
   date: string;
@@ -142,6 +153,10 @@ export interface InvoiceDetail {
 export async function getInvoiceDetail(
   id: string,
 ): Promise<InvoiceDetail | null> {
+  const config = await getSystemConfig();
+  const prefix = config.invoicePrefix || config.basePrefix || "Mas-Corp-Fact-";
+  const digits = config.codeDigits || 4;
+
   if (!isSupabaseConfigured) {
     const inv = mock.invoices.find((i) => i.id === id);
     if (!inv) return null;
@@ -151,6 +166,7 @@ export async function getInvoiceDetail(
     return {
       id: inv.id,
       number: inv.number,
+      code: formatEntityCode(prefix, Number(inv.number), digits),
       clientId: inv.clientId,
       clientName,
       date: inv.date,
@@ -205,6 +221,7 @@ export async function getInvoiceDetail(
 
   return {
     ...(row as unknown as InvoiceDetail),
+    code: formatEntityCode(prefix, Number(row.number), digits),
     clientName: (clientRes.data?.name as string) ?? "—",
     items,
     payments,

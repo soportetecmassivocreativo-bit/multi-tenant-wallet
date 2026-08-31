@@ -52,10 +52,17 @@ export default async function InvoiceDetailPage({
       <section>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="font-serif text-2xl tracking-tight">
-              Factura #{inv.number}
-            </h1>
-            <p className="text-sm text-muted">{inv.clientName}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-serif text-2xl tracking-tight">
+                Factura #{inv.number}
+              </h1>
+              {inv.code && (
+                <span className="rounded-full bg-soft font-mono px-2.5 py-1 text-xs font-bold text-accent">
+                  {inv.code}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted mt-0.5">{inv.clientName}</p>
           </div>
           <StatusBadge status={inv.status as InvoiceStatus} />
         </div>
