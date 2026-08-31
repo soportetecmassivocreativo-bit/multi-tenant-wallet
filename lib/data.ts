@@ -40,48 +40,14 @@ export interface BcvRates {
 import { fetchLiveBcvRates, syncAndSaveBcvRates } from "@/lib/bcv";
 
 export async function getBcvRates(): Promise<BcvRates> {
-  // Modo rápido cuando no hay Supabase
-  if (!isSupabaseConfigured) {
-    const live = await fetchLiveBcvRates();
-    return { usd: live.usd, eur: live.eur, date: live.date };
-  }
-
   try {
-    // Timeout ultra rápido de 1s para DB: si Supabase tarda, caemos inmediatamente a live
-    const dbPromise = (async (): Promise<BcvRates | null> => {
-      const supabase = await createClient();
-      const { data } = await supabase
-        .from("bcv_rates")
-        .select("date:rate_date, usd, eur")
-        .order("rate_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const today = new Date().toISOString().slice(0, 10);
-      if (data && String(data.date) >= today) {
-        return {
-          usd: Number(data.usd),
-          eur: Number(data.eur),
-          date: String(data.date),
-        };
-      }
-      return null;
-    })();
-
-    const timeoutPromise = new Promise<null>((resolve) =>
-      setTimeout(() => resolve(null), 1000),
-    );
-
-    const fromDb = await Promise.race([dbPromise, timeoutPromise]);
-    if (fromDb) return fromDb;
-
-    // Sincronizar en background (no bloquea al usuario)
-    syncAndSaveBcvRates().catch(() => {});
     const live = await fetchLiveBcvRates();
+    if (isSupabaseConfigured) {
+      syncAndSaveBcvRates().catch(() => {});
+    }
     return { usd: live.usd, eur: live.eur, date: live.date };
   } catch {
-    const live = await fetchLiveBcvRates();
-    return { usd: live.usd, eur: live.eur, date: live.date };
+    return { usd: 798.326, eur: 926.5531, date: new Date().toISOString().slice(0, 10) };
   }
 }
 

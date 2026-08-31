@@ -383,6 +383,7 @@ export interface RegisterPaymentInput {
   accountId?: string;
   accountName?: string;
   reference?: string; // Últimos 8 dígitos
+  description?: string; // Concepto o detalle del pago
 }
 
 /** Registra un pago (o abono) contra una factura y actualiza su estado. */
@@ -400,6 +401,7 @@ export async function registerPayment(
   const baseMethod = isObj ? inputOrAmount.method || fallbackMethod : fallbackMethod;
   const accountName = isObj ? inputOrAmount.accountName : undefined;
   const reference = isObj ? inputOrAmount.reference : undefined;
+  const paymentDescription = isObj ? inputOrAmount.description : undefined;
 
   if (amount <= 0) return { ok: false, error: "Monto inválido." };
 
@@ -410,9 +412,10 @@ export async function registerPayment(
     .single();
   if (!inv) return { ok: false, error: "Factura no encontrada." };
 
-  // Construir descripción formateada del método de pago con cuenta y referencia
+  // Construir descripción formateada del método de pago con cuenta, referencia y descripción
   let formattedMethod = baseMethod.trim();
   const metaParts: string[] = [];
+  if (paymentDescription?.trim()) metaParts.push(`"${paymentDescription.trim()}"`);
   if (accountName) metaParts.push(accountName.trim());
   if (reference) metaParts.push(`Ref: ${reference.trim()}`);
   if (metaParts.length > 0) {

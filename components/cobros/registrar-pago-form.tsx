@@ -26,6 +26,7 @@ export function RegistrarPagoForm({
   );
   const [method, setMethod] = useState("Transferencia Bancaria");
   const [reference, setReference] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -50,12 +51,14 @@ export function RegistrarPagoForm({
         accountId: selectedAccountId,
         accountName: selectedAcc ? selectedAcc.name : undefined,
         reference: reference.trim() ? reference.trim() : undefined,
+        description: description.trim() ? description.trim() : undefined,
       });
 
       if (!r.ok) {
         setError(r.error ?? "No se pudo registrar el pago.");
       } else {
         setReference("");
+        setDescription("");
       }
     });
   }
@@ -67,6 +70,19 @@ export function RegistrarPagoForm({
         <span className="text-[11px] font-medium text-hint">
           Pendiente: <strong className="text-pending">{formatCurrency(balance, currency)}</strong>
         </span>
+      </div>
+
+      <div>
+        <label className="block text-[11px] text-hint font-medium mb-1">
+          Descripción / Concepto del Pago (Opcional)
+        </label>
+        <input
+          type="text"
+          placeholder="Ej: Pago total factura, abono parcial, anticipo..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className={inputClass}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

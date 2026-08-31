@@ -187,22 +187,21 @@ export function EmployeesManager({
           {/* Formulario Agregar / Editar */}
           {formOpen && (
             <section className="space-y-3 rounded-2xl border border-line bg-card p-4 shadow-sm animate-in fade-in duration-200">
-              <p className="font-serif text-sm font-semibold">
-                {editId ? "Editar empleado" : "Nuevo empleado"}
-              </p>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nombre completo"
-                className={inputClass}
-                autoFocus
-              />
-              <input
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="Cargo / Rol (ej. Diseñador, Desarrollador)"
-                className={inputClass}
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nombre completo del empleado"
+                  className={inputClass}
+                  autoFocus
+                />
+                <input
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="Cargo / Descripción del Puesto (ej. Diseñador UI, Desarrollador)"
+                  className={inputClass}
+                />
+              </div>
               <div className="flex gap-2">
                 <MoneyInput
                   value={salary}

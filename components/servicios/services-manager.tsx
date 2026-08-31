@@ -208,13 +208,22 @@ export function ServicesManager({ services }: ServicesManagerProps) {
               <p className="font-serif text-sm font-semibold">
                 {editId ? "Editar servicio" : "Nuevo servicio recurrente"}
               </p>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nombre del servicio (ej. Claude, Supabase)"
-                className={inputClass}
-                autoFocus
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nombre del servicio (ej. Claude, Supabase, Hosting)"
+                  className={inputClass}
+                  autoFocus
+                />
+                <input
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="Categoría o Descripción (ej. Plan Pro IA, Servidor Web)"
+                  className={inputClass}
+                />
+              </div>
+
               <div className="flex gap-2">
                 <MoneyInput
                   value={amount}
@@ -240,22 +249,15 @@ export function ServicesManager({ services }: ServicesManagerProps) {
                   <option value="anual">Anual</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+
+              <div>
+                <label className="text-[10px] text-muted block mb-0.5">Fecha del próximo cobro / vencimiento</label>
                 <input
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="Categoría (ej. IA, Hosting, Backend)"
+                  type="date"
+                  value={nextChargeDate}
+                  onChange={(e) => setNextChargeDate(e.target.value)}
                   className={inputClass}
                 />
-                <div>
-                  <label className="text-[10px] text-muted block mb-0.5">Próximo cobro</label>
-                  <input
-                    type="date"
-                    value={nextChargeDate}
-                    onChange={(e) => setNextChargeDate(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
               </div>
 
               {error && (

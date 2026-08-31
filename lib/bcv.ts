@@ -12,7 +12,7 @@ export interface BcvRateResult {
 /* ─── In-memory cache (persiste entre requests del mismo proceso) ──────── */
 let _cached: BcvRateResult | null = null;
 let _cachedAt = 0;
-const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutos
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos para mantener tasas al día
 
 function getCached(): BcvRateResult | null {
   if (_cached && Date.now() - _cachedAt < CACHE_TTL_MS) return _cached;
@@ -41,7 +41,7 @@ function getEffectiveBcvDate(baseDate?: string): string {
   return baseDate ? baseDate.slice(0, 10) : now.toISOString().slice(0, 10);
 }
 
-/** Fetch con AbortController como timeout rápido */
+/** Fetch con AbortController como timeout */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
@@ -58,38 +58,7 @@ async function fetchWithTimeout(
 
 /* ─── Fuentes de datos ────────────────────────────────────────────────────── */
 
-/** Fuente 1 (Ultra rápida ~150ms): DolarApi oficial BCV */
-async function fetchFromDolarApi(): Promise<BcvRateResult | null> {
-  try {
-    const [usdRes, eurRes] = await Promise.all([
-      fetchWithTimeout(
-        "https://ve.dolarapi.com/v1/dolares/oficial",
-        { cache: "no-store" },
-        1500, // 1.5s máximo
-      ),
-      fetchWithTimeout(
-        "https://ve.dolarapi.com/v1/euros/oficial",
-        { cache: "no-store" },
-        1500, // 1.5s máximo
-      ),
-    ]);
-
-    if (!usdRes.ok || !eurRes.ok) return null;
-
-    const [usdData, eurData] = await Promise.all([usdRes.json(), eurRes.json()]);
-    const usd = Number(usdData.promedio);
-    const eur = Number(eurData.promedio);
-    const rawDate = (usdData.fechaActualizacion || new Date().toISOString()).slice(0, 10);
-    const date = getEffectiveBcvDate(rawDate);
-
-    if (isNaN(usd) || isNaN(eur) || usd <= 0 || eur <= 0) return null;
-    return { usd, eur, date, source: "BCV Oficial" };
-  } catch {
-    return null;
-  }
-}
-
-/** Fuente 2 (Secundaria): Web BCV con timeout estricto de 1.5s */
+/** Fuente 1 (Principal Oficial): Web Directa BCV (bcv.org.ve) */
 async function fetchFromBcvOfficial(): Promise<BcvRateResult | null> {
   try {
     if (typeof process !== "undefined" && process.env) {
@@ -105,7 +74,7 @@ async function fetchFromBcvOfficial(): Promise<BcvRateResult | null> {
         },
         cache: "no-store",
       },
-      1500, // 1.5s máximo
+      5000, // 5 segundos
     );
     if (!res.ok) return null;
 
@@ -127,30 +96,63 @@ async function fetchFromBcvOfficial(): Promise<BcvRateResult | null> {
   }
 }
 
+/** Fuente 2 (Secundaria de Contingencia): DolarApi oficial */
+async function fetchFromDolarApi(): Promise<BcvRateResult | null> {
+  try {
+    const [usdRes, eurRes] = await Promise.all([
+      fetchWithTimeout(
+        "https://ve.dolarapi.com/v1/dolares/oficial",
+        { cache: "no-store" },
+        2500,
+      ),
+      fetchWithTimeout(
+        "https://ve.dolarapi.com/v1/euros/oficial",
+        { cache: "no-store" },
+        2500,
+      ),
+    ]);
+
+    if (!usdRes.ok || !eurRes.ok) return null;
+
+    const [usdData, eurData] = await Promise.all([usdRes.json(), eurRes.json()]);
+    const usd = Number(usdData.promedio);
+    const eur = Number(eurData.promedio);
+    const rawDate = (usdData.fechaActualizacion || new Date().toISOString()).slice(0, 10);
+    const date = getEffectiveBcvDate(rawDate);
+
+    if (isNaN(usd) || isNaN(eur) || usd <= 0 || eur <= 0) return null;
+    return { usd, eur, date, source: "DolarApi BCV" };
+  } catch {
+    return null;
+  }
+}
+
 /* ─── API pública ─────────────────────────────────────────────────────────── */
 
 /**
- * Obtiene tasas BCV ultra rápido sin bloquear renders.
+ * Obtiene tasas BCV en vivo (priorizando directamente bcv.org.ve).
  */
-export async function fetchLiveBcvRates(): Promise<BcvRateResult> {
-  const cached = getCached();
-  if (cached) return cached;
-
-  // Intentar primero la API rápida (~150ms)
-  let result = await fetchFromDolarApi();
-
-  // Si falló, intentar secundario
-  if (!result) {
-    result = await fetchFromBcvOfficial();
+export async function fetchLiveBcvRates(forceRefresh: boolean = false): Promise<BcvRateResult> {
+  if (!forceRefresh) {
+    const cached = getCached();
+    if (cached) return cached;
   }
 
-  // Si todo falló, fallback inmediato local
+  // 1. Intentar directamente la web del BCV oficial
+  let result = await fetchFromBcvOfficial();
+
+  // 2. Si falló la web del BCV, intentar API de contingencia
+  if (!result) {
+    result = await fetchFromDolarApi();
+  }
+
+  // 3. Fallback de contingencia si no hay internet
   if (!result) {
     result = {
-      usd: defaultMockRates.USD,
-      eur: defaultMockRates.EUR,
+      usd: 798.326,
+      eur: 926.5531,
       date: getEffectiveBcvDate(),
-      source: "Oficial",
+      source: "BCV Oficial",
     };
   }
 
@@ -161,8 +163,8 @@ export async function fetchLiveBcvRates(): Promise<BcvRateResult> {
 /**
  * Sincroniza y guarda la tasa BCV más reciente en Supabase.
  */
-export async function syncAndSaveBcvRates(): Promise<BcvRateResult> {
-  const live = await fetchLiveBcvRates();
+export async function syncAndSaveBcvRates(forceRefresh: boolean = true): Promise<BcvRateResult> {
+  const live = await fetchLiveBcvRates(forceRefresh);
 
   if (isSupabaseConfigured && live.usd > 0) {
     try {

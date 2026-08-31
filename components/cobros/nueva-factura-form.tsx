@@ -270,16 +270,21 @@ export function NuevaFacturaForm({
         </div>
       </section>
 
-      {/* Líneas */}
+      {/* Conceptos y Líneas de Facturación */}
       <section className="space-y-3">
-        <label className="text-xs text-muted">Conceptos</label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-foreground">
+            Descripción / Conceptos del Cobro o Factura
+          </label>
+          <span className="text-[10px] text-hint">Detalle de ítems y servicios</span>
+        </div>
         {lines.map((l) => (
-          <div key={l.id} className="rounded-2xl border border-line bg-card p-3">
+          <div key={l.id} className="rounded-2xl border border-line bg-card p-3 shadow-sm space-y-2">
             <input
               value={l.description}
               onChange={(e) => updateLine(l.id, { description: e.target.value })}
-              placeholder="Descripción"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-hint"
+              placeholder="Descripción del concepto o servicio (Ej: Consultoría mensual, diseño, materiales...)"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-hint font-medium"
             />
             <div className="mt-2 flex items-center gap-2">
               <div className="flex items-center gap-1">

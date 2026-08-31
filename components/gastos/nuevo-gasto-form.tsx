@@ -17,6 +17,7 @@ interface NuevoGastoFormProps {
 export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
+  const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [amount, setAmount] = useState(0);
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
@@ -35,10 +36,11 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
     setError(null);
 
     const selectedAcc = accounts.find((a) => a.id === selectedAccountId);
+    const fullNote = description.trim() ? `${note.trim()} (${description.trim()})` : note.trim();
 
     start(async () => {
       const r = await createExpense({
-        note: note.trim(),
+        note: fullNote,
         category: category.trim() || "General",
         amount,
         currency,
@@ -49,6 +51,7 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
 
       if (r.ok) {
         setNote("");
+        setDescription("");
         setCategory("");
         setAmount(0);
         setReference("");
@@ -73,7 +76,7 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
         <section className="mt-3 space-y-3 rounded-2xl border border-line bg-card p-4 shadow-xl">
           <div className="flex items-center justify-between border-b border-line pb-2">
             <h3 className="font-serif text-sm font-bold text-foreground">
-              Registrar Nuevo Egreso
+              Registrar Nuevo Egreso / Pago
             </h3>
             <button
               type="button"
@@ -84,17 +87,31 @@ export function NuevoGastoForm({ accounts = [] }: NuevoGastoFormProps) {
             </button>
           </div>
 
-          <div>
-            <label className="block text-[11px] text-hint font-medium mb-1">
-              Concepto / Detalle del Gasto *
-            </label>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Ej: Combustible, Materiales de oficina, Servidor..."
-              className={inputClass}
-              autoFocus
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[11px] text-hint font-medium mb-1">
+                Concepto / Título del Gasto *
+              </label>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ej: Combustible, Materiales de oficina, Servidor..."
+                className={inputClass}
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-hint font-medium mb-1">
+                Descripción / Detalle del Pago (Opcional)
+              </label>
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ej: Factura Nº 4920 de proveedor XYZ, servicio de internet..."
+                className={inputClass}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
