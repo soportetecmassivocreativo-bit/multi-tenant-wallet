@@ -33,8 +33,6 @@ export interface CompanyAccount {
   createdAt: string;
 }
 
-const ACCOUNTS_COOKIE_NAME = "m_wallet_company_accounts";
-
 const DEFAULT_COMPANY_ACCOUNTS: CompanyAccount[] = [
   {
     id: "cta-1",
@@ -106,17 +104,51 @@ const DEFAULT_COMPANY_ACCOUNTS: CompanyAccount[] = [
   },
 ];
 
+const ACCOUNTS_COOKIE_NAME = "m_wallet_company_accounts";
+const ACCOUNTS_COUNTER_COOKIE = "m_wallet_company_accounts_counter";
+
 export async function getCompanyAccounts(): Promise<CompanyAccount[]> {
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(ACCOUNTS_COOKIE_NAME)?.value;
     if (raw) {
-      const parsed: CompanyAccount[] = JSON.parse(decodeURIComponent(raw));
+      let parsed: CompanyAccount[] = JSON.parse(decodeURIComponent(raw));
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((a, idx) => ({
-          ...a,
-          code: a.code || formatEntityCode("Mas-Corp-Cta-", idx + 1, 4),
-        }));
+        let needsResave = false;
+
+        // Re-secuenciar las cuentas existentes a 0002 y 0003 si venían de 0004 y 0005
+        parsed = parsed.map((a, idx) => {
+          if (a.code === "Mas-Corp-Cta-0004" && (idx === 0 || a.name.includes("Binance"))) {
+            needsResave = true;
+            return { ...a, code: "Mas-Corp-Cta-0002" };
+          }
+          if (a.code === "Mas-Corp-Cta-0005" && (idx === 1 || a.name.includes("Caja Chica"))) {
+            needsResave = true;
+            return { ...a, code: "Mas-Corp-Cta-0003" };
+          }
+          if (!a.code) {
+            needsResave = true;
+            return { ...a, code: formatEntityCode("Mas-Corp-Cta-", idx + 2, 4) };
+          }
+          return a;
+        });
+
+        if (needsResave) {
+          cookieStore.set(ACCOUNTS_COOKIE_NAME, encodeURIComponent(JSON.stringify(parsed)), {
+            maxAge: 60 * 60 * 24 * 365,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+          cookieStore.set(ACCOUNTS_COUNTER_COOKIE, "3", {
+            maxAge: 60 * 60 * 24 * 365,
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production",
+          });
+        }
+
+        return parsed;
       }
     }
   } catch {}
@@ -127,6 +159,32 @@ export async function getCompanyAccounts(): Promise<CompanyAccount[]> {
 async function saveAccountsToCookie(accounts: CompanyAccount[]) {
   const cookieStore = await cookies();
   cookieStore.set(ACCOUNTS_COOKIE_NAME, encodeURIComponent(JSON.stringify(accounts)), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
+async function getNextAccountSequence(currentAccounts: CompanyAccount[]): Promise<number> {
+  const cookieStore = await cookies();
+  const rawCounter = cookieStore.get(ACCOUNTS_COUNTER_COOKIE)?.value;
+  let storedCounter = rawCounter ? parseInt(rawCounter, 10) : 0;
+  if (isNaN(storedCounter)) storedCounter = 0;
+
+  // Encontrar el número más alto existente entre los códigos actuales
+  const maxFromCodes = currentAccounts.reduce((max, a) => {
+    const num = parseInt(a.code?.replace(/\D/g, "") || "0", 10);
+    return Math.max(max, isNaN(num) ? 0 : num);
+  }, 0);
+
+  const nextNum = Math.max(storedCounter + 1, maxFromCodes + 1, 4);
+  return nextNum;
+}
+
+async function updateAccountCounterCookie(num: number) {
+  const cookieStore = await cookies();
+  cookieStore.set(ACCOUNTS_COUNTER_COOKIE, String(num), {
     maxAge: 60 * 60 * 24 * 365,
     path: "/",
     sameSite: "lax",
@@ -153,7 +211,8 @@ export async function addCompanyAccount(
 ): Promise<MutationResult> {
   try {
     const current = await getCompanyAccounts();
-    const nextNum = current.length + 1;
+    const nextNum = await getNextAccountSequence(current);
+
     const newAccount: CompanyAccount = {
       id: `cta-${Date.now()}`,
       code: formatEntityCode("Mas-Corp-Cta-", nextNum, 4),
@@ -174,6 +233,7 @@ export async function addCompanyAccount(
 
     const updated = [...current, newAccount];
     await saveAccountsToCookie(updated);
+    await updateAccountCounterCookie(nextNum);
 
     await logAuditEvent({
       action: "account_create",
@@ -185,6 +245,7 @@ export async function addCompanyAccount(
     revalidatePath("/cuentas");
     revalidatePath("/configuracion");
     revalidatePath("/cobros");
+    revalidatePath("/gastos");
     return { ok: true };
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : "Error al guardar cuenta." };
