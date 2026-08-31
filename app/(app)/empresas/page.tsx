@@ -1,17 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers, cookies } from "next/headers";
 import { BuildingIcon } from "@/components/ui/icons";
 import { CompanyForm } from "@/components/empresas/company-form";
 import { BcvRatesCard } from "@/components/empresas/bcv-rates-card";
+import { TenantSwitcher } from "@/components/empresas/tenant-switcher";
 import { getCompany, getBcvRates, isAdmin } from "@/lib/data";
+import { getAllTenants, TENANT_COOKIE_NAME } from "@/lib/supabase/tenants-config";
 
 export default async function EmpresasPage() {
-  const [company, bcv, admin] = await Promise.all([
+  const [company, bcv, admin, headerList, cookieStore] = await Promise.all([
     getCompany(),
     getBcvRates(),
     isAdmin(),
+    headers(),
+    cookies(),
   ]);
   if (!company) notFound();
+
+  const allTenants = getAllTenants();
+  const activeTenantSlug =
+    headerList.get("x-tenant-slug") ||
+    cookieStore.get(TENANT_COOKIE_NAME)?.value ||
+    "massivo";
 
   return (
     <div className="space-y-6">
@@ -29,9 +40,12 @@ export default async function EmpresasPage() {
           <h1 className="truncate font-serif text-2xl leading-tight tracking-tight">
             {company.name}
           </h1>
-          <p className="text-xs text-hint">Empresa emisora</p>
+          <p className="text-xs text-hint">Empresa emisora · Tenant: <span className="font-mono font-semibold text-foreground">{activeTenantSlug}</span></p>
         </div>
       </section>
+
+      {/* Selector y Gestor de Bases de Datos Multi-Tenant */}
+      <TenantSwitcher tenants={allTenants} activeTenantSlug={activeTenantSlug} />
 
       <CompanyForm company={company} canEdit={admin} />
 
@@ -39,3 +53,4 @@ export default async function EmpresasPage() {
     </div>
   );
 }
+

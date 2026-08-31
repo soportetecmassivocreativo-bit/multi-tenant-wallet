@@ -1,57 +1,129 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY,
-  isSupabaseConfigured,
-} from "@/lib/supabase/config";
+  getTenantBySlug,
+  getTenantFromHost,
+  TENANT_COOKIE_NAME,
+  type TenantConfig,
+} from "@/lib/supabase/tenants-config";
 
 const PUBLIC_PATHS = ["/login", "/registro", "/auth"];
 
-/** Refresca la sesión y protege las rutas de la app (solo si Supabase está configurado). */
+/**
+ * Middleware Multi-Tenant:
+ * 1. Detecta el tenant por subdominio, parámetro ?tenant= o cookie.
+ * 2. Inyecta headers de tenant (x-tenant-slug, x-tenant-name, x-tenant-url).
+ * 3. Valida y refresca la sesión en la base de datos de Supabase de ESE tenant específico.
+ */
 export async function updateSession(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
-  // Ignorar rutas de API y si Supabase no está configurado
-  if (pathname.startsWith("/api") || !isSupabaseConfigured) {
-    return NextResponse.next({ request });
+  // 1. Detección de Tenant
+  const host = request.headers.get("host") || request.nextUrl.host;
+  const tenantFromHost = getTenantFromHost(host);
+  
+  const queryTenantSlug = searchParams.get("tenant");
+  const cookieTenantSlug = request.cookies.get(TENANT_COOKIE_NAME)?.value;
+  
+  let activeTenant: TenantConfig = tenantFromHost;
+  if (queryTenantSlug) {
+    activeTenant = getTenantBySlug(queryTenantSlug);
+  } else if (cookieTenantSlug && tenantFromHost.slug === "massivo") {
+    activeTenant = getTenantBySlug(cookieTenantSlug);
+  }
+
+  // Clonar headers e inyectar datos del tenant para Server Components y Actions
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-tenant-slug", activeTenant.slug);
+  requestHeaders.set("x-tenant-name", activeTenant.name);
+  requestHeaders.set("x-tenant-url", activeTenant.supabaseUrl);
+
+  // Ignorar rutas de API internas o estáticos
+  if (pathname.startsWith("/api")) {
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("x-tenant-slug", activeTenant.slug);
+    return res;
+  }
+
+  const isConfigured =
+    activeTenant.supabaseUrl.startsWith("http") &&
+    activeTenant.supabaseAnonKey.length > 20;
+
+  if (!isConfigured) {
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+    return res;
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-  const cookies = request.cookies.getAll();
-  const hasAuthCookie = cookies.some(
+  const cookiesList = request.cookies.getAll();
+  const hasAuthCookie = cookiesList.some(
     (c) => c.name.includes("-auth-token") || c.name.startsWith("sb-")
   );
 
-  // Si no hay cookies de autenticación, resolvemos al instante sin latencia de red
+  // Respuesta base con headers inyectados y cookie de tenant sincronizada
+  let response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+  response.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  response.headers.set("x-tenant-slug", activeTenant.slug);
+
+  // Si no hay cookies de autenticación, resolvemos al instante
   if (!hasAuthCookie) {
     if (isPublic) {
-      return NextResponse.next({ request });
+      return response;
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    const redirectRes = NextResponse.redirect(url);
+    redirectRes.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+    return redirectRes;
   }
 
-  let response = NextResponse.next({ request });
-
   try {
-    const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
+    const supabase = createServerClient(
+      activeTenant.supabaseUrl,
+      activeTenant.supabaseAnonKey,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            response = NextResponse.next({
+              request: {
+                headers: requestHeaders,
+              },
+            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+            response.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+              path: "/",
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+            });
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
-      },
-    });
+      }
+    );
 
     // Timeout de 2.5s para evitar que el middleware se cuelgue en Edge
     const userPromise = supabase.auth.getUser();
@@ -67,14 +139,26 @@ export async function updateSession(request: NextRequest) {
     if (!user && !isPublic) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
-      return NextResponse.redirect(url);
+      const redirectRes = NextResponse.redirect(url);
+      redirectRes.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+      return redirectRes;
     }
 
     // Con sesión en una ruta de auth → dashboard.
     if (user && isPublic) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      const redirectRes = NextResponse.redirect(url);
+      redirectRes.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+      return redirectRes;
     }
   } catch (err) {
     console.error("Middleware auth error:", err);
@@ -82,4 +166,3 @@ export async function updateSession(request: NextRequest) {
 
   return response;
 }
-

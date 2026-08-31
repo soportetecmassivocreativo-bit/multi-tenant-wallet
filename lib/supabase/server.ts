@@ -1,25 +1,13 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/supabase/config";
+import { getTenantClient } from "@/lib/supabase/getTenantClient";
 
-/** Cliente de Supabase para componentes de servidor, server actions y route handlers. */
-export async function createClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
-        } catch {
-          // Llamado desde un Server Component: se ignora (la sesión se refresca en el middleware).
-        }
-      },
-    },
-  });
+/**
+ * Cliente de Supabase para componentes de servidor, server actions y route handlers.
+ * Conecta automáticamente a la base de datos de Supabase del Tenant activo
+ * (o a la del tenant especificado por parámetro).
+ */
+export async function createClient(tenantSlugOrId?: string | null) {
+  return getTenantClient(tenantSlugOrId);
 }
+
+export { getTenantClient };
+
