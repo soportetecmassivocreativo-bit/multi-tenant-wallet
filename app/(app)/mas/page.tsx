@@ -36,7 +36,6 @@ const modules: Item[] = [
   { href: "/auditoria",     label: "Auditoría",            desc: "Registro de movimientos y acciones",      Icon: ShieldCheckIcon },
   { href: "/cuentas",       label: "Cuentas de Empresa",   desc: "Bancos, Pago Móvil, Zelle y cripto",      Icon: BuildingIcon },
   { href: "/configuracion", label: "Configuración",        desc: "Personalización PDF y contabilizadores",  Icon: SettingsIcon },
-  { href: "/admin/empresas", label: "Panel Master Empresas",desc: "Creación y bases de datos multi-tenant", Icon: BuildingIcon },
   { href: "/perfil",        label: "Mi Perfil & Seguridad",desc: "Cambiar clave y datos de cuenta",         Icon: UserIcon },
   { href: "/empresas",      label: "Empresas",             desc: "Datos fiscales e impuestos",              Icon: BuildingIcon },
 ];

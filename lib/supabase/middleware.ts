@@ -135,6 +135,24 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await Promise.race([userPromise, timeoutPromise]);
 
+    // Si el host corresponde al portal master multi-tenant (multi-tenant-wallet o muti-tenant-wallet)
+    const isMasterPortal =
+      host.includes("multi-tenant") ||
+      host.includes("muti-tenant") ||
+      process.env.NEXT_PUBLIC_APP_MODE === "master";
+
+    if (isMasterPortal && (pathname === "/" || pathname === "/dashboard")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/empresas";
+      const redirectRes = NextResponse.redirect(url);
+      redirectRes.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+      return redirectRes;
+    }
+
     // Sin sesión y ruta protegida → login.
     if (!user && !isPublic) {
       const url = request.nextUrl.clone();
@@ -148,10 +166,10 @@ export async function updateSession(request: NextRequest) {
       return redirectRes;
     }
 
-    // Con sesión en una ruta de auth → dashboard.
+    // Con sesión en una ruta de auth → dashboard o panel master según el dominio.
     if (user && isPublic) {
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      url.pathname = isMasterPortal ? "/admin/empresas" : "/dashboard";
       const redirectRes = NextResponse.redirect(url);
       redirectRes.cookies.set(TENANT_COOKIE_NAME, activeTenant.slug, {
         path: "/",

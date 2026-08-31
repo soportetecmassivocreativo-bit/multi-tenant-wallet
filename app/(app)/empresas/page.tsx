@@ -44,9 +44,6 @@ export default async function EmpresasPage() {
         </div>
       </section>
 
-      {/* Selector y Gestor de Bases de Datos Multi-Tenant */}
-      <TenantSwitcher tenants={allTenants} activeTenantSlug={activeTenantSlug} />
-
       <CompanyForm company={company} canEdit={admin} />
 
       <BcvRatesCard initialBcv={bcv} />
