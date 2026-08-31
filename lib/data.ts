@@ -304,10 +304,12 @@ export async function getExpenses(): Promise<Expense[]> {
   const startNum = Number(config.expenseCounter || 1);
 
   if (!isSupabaseConfigured) {
-    return mock.expenses.map((e, idx) => ({
-      ...e,
-      code: formatEntityCode(prefix, startNum + idx, digits),
-    }));
+    return [...mock.expenses]
+      .map((e, idx) => ({
+        ...e,
+        code: formatEntityCode(prefix, startNum + idx, digits),
+      }))
+      .reverse();
   }
   const supabase = await createClient();
   // Ordenamos por created_at ASC para fijar el número único permanente de cada gasto
@@ -321,10 +323,8 @@ export async function getExpenses(): Promise<Expense[]> {
     code: formatEntityCode(prefix, startNum + idx, digits),
   }));
 
-  // Retornamos ordenado por fecha de gasto descendente para la vista
-  return withPermanentCodes.sort((a, b) =>
-    (b.date || "").localeCompare(a.date || "")
-  ) as unknown as Expense[];
+  // Retornamos de forma fija y correlativa descendente (el más reciente arriba)
+  return withPermanentCodes.reverse() as unknown as Expense[];
 }
 
 export async function getEmployees(): Promise<Employee[]> {

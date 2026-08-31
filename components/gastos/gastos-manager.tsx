@@ -46,18 +46,25 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
     new Set(expenses.map((e) => e.category || "General"))
   );
 
-  const filtered = expenses.filter((e) => {
-    const matchesCat =
-      selectedCategory === "todas" ||
-      (e.category || "General").toLowerCase() === selectedCategory.toLowerCase();
-    const q = query.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      (e.note || "").toLowerCase().includes(q) ||
-      (e.code || "").toLowerCase().includes(q) ||
-      (e.category || "").toLowerCase().includes(q);
-    return matchesCat && matchesQuery;
-  });
+  const filtered = expenses
+    .filter((e) => {
+      const matchesCat =
+        selectedCategory === "todas" ||
+        (e.category || "General").toLowerCase() === selectedCategory.toLowerCase();
+      const q = query.toLowerCase().trim();
+      const matchesQuery =
+        !q ||
+        (e.note || "").toLowerCase().includes(q) ||
+        (e.code || "").toLowerCase().includes(q) ||
+        (e.category || "").toLowerCase().includes(q);
+      return matchesCat && matchesQuery;
+    })
+    .sort((a, b) => {
+      if (b.code && a.code && b.code !== a.code) {
+        return b.code.localeCompare(a.code, undefined, { numeric: true });
+      }
+      return b.id.localeCompare(a.id);
+    });
 
   function startEdit(e: Expense) {
     setEditingExpense(e);
