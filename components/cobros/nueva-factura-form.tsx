@@ -376,19 +376,28 @@ export function NuevaFacturaForm({
           <div className="flex items-center justify-between">
             <div>
               <p className="font-serif text-[15px]">Conversión a Bolívares</p>
-              <p className="text-[11px] text-hint">
-                {rateMode === "manual" ? "Tasa manual de contingencia" : `BCV Oficial · ${formatDate(currentBcv.date)}`}
+              <p className="text-[11px] text-hint flex items-center gap-1.5 flex-wrap">
+                <span>
+                  {rateMode === "manual"
+                    ? "Tasa manual de contingencia"
+                    : `BCV Oficial · Fecha Valor: ${formatDate(currentBcv.date)}`}
+                </span>
+                {syncMsg && (
+                  <span className="rounded-md bg-income/15 px-1.5 py-0.5 text-[10px] font-semibold text-income">
+                    ✓ {syncMsg}
+                  </span>
+                )}
               </p>
             </div>
             <button
               type="button"
               onClick={handleSync}
               disabled={syncPending}
-              className="inline-flex items-center gap-1 rounded-lg bg-soft px-2 py-1 text-xs text-muted hover:text-foreground active:scale-95 disabled:opacity-50"
-              title="Sincronizar tasa BCV en vivo"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-soft px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-line active:scale-95 disabled:opacity-50 transition-all border border-line"
+              title="Sincronizar tasa y fecha oficial del BCV en vivo"
             >
-              <ArrowPathIcon className={`h-3 w-3 ${syncPending ? "animate-spin" : ""}`} />
-              <span className="text-[11px]">{syncPending ? "…" : "BCV"}</span>
+              <ArrowPathIcon className={`h-3.5 w-3.5 ${syncPending ? "animate-spin text-accent" : ""}`} />
+              <span className="text-[11px]">{syncPending ? "Sincronizando…" : "Actualizar BCV"}</span>
             </button>
           </div>
 
