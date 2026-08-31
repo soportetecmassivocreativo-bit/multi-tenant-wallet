@@ -18,9 +18,9 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "M-Wallet",
+  title: "MASSIVO CREATIVO WALLET",
   description: "Finanzas, cobros y facturación en la palma de la mano.",
-  applicationName: "M-Wallet",
+  applicationName: "Massivo Creativo Wallet",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "M-Wallet" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Massivo Creativo Wallet" },
 };
 
 export const viewport: Viewport = {

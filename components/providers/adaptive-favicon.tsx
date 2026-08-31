@@ -28,16 +28,12 @@ export function AdaptiveFavicon() {
       // Portal Multi-Tenant
       faviconEl.href = "/logo-m-icon.png";
       faviconEl.type = "image/png";
-      if (!document.title.includes("M-Wallet")) {
-        document.title = "M-Wallet";
-      }
+      document.title = "M-Wallet";
     } else {
       // Portal Massivo Creativo Wallet
       faviconEl.href = "/logo-massivo-creativo.png";
       faviconEl.type = "image/png";
-      if (document.title === "M-Wallet" || !document.title) {
-        document.title = "Massivo Creativo Wallet";
-      }
+      document.title = "MASSIVO CREATIVO WALLET";
     }
   }, [pathname]);
 
