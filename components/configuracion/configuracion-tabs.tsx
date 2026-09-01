@@ -763,7 +763,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                       {config.pdfInvoiceShowConditions && (
                         <div className="space-y-2.5 pt-1">
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Forma de Pago:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Forma de Pago:</label>
                             <textarea
                               rows={2}
                               value={config.pdfInvoiceConditionsPayment || ""}
@@ -772,7 +772,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Tiempo de entrega:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Tiempo de entrega:</label>
                             <textarea
                               rows={2}
                               value={config.pdfInvoiceConditionsDelivery || ""}
@@ -781,7 +781,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Propiedad Intelectual:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Propiedad Intelectual:</label>
                             <textarea
                               rows={2}
                               value={config.pdfInvoiceConditionsIP || ""}
@@ -790,7 +790,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Confidencialidad:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Confidencialidad:</label>
                             <textarea
                               rows={2}
                               value={config.pdfInvoiceConditionsConfidentiality || ""}
@@ -986,7 +986,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                       {config.pdfProformaShowConditions && (
                         <div className="space-y-2.5 pt-1">
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Forma de Pago:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Forma de Pago:</label>
                             <textarea
                               rows={2}
                               value={config.pdfProformaConditionsPayment || ""}
@@ -995,7 +995,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Tiempo de entrega:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Tiempo de entrega:</label>
                             <textarea
                               rows={2}
                               value={config.pdfProformaConditionsDelivery || ""}
@@ -1004,7 +1004,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Propiedad Intelectual:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Propiedad Intelectual:</label>
                             <textarea
                               rows={2}
                               value={config.pdfProformaConditionsIP || ""}
@@ -1013,7 +1013,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-accent">Confidencialidad:</label>
+                            <label className="block text-[11px] font-semibold text-foreground">Confidencialidad:</label>
                             <textarea
                               rows={2}
                               value={config.pdfProformaConditionsConfidentiality || ""}

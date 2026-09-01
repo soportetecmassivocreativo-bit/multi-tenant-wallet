@@ -186,30 +186,30 @@ export default async function FacturaPage({
 
       {/* BLOQUE DE CONDICIONES ESTRUCTURADAS DEL PROYECTO */}
       {showConditions && (
-        <div className="mt-6 rounded-xl bg-[#0F172A] p-4 text-white space-y-2 text-xs border border-slate-700">
-          <p className="font-bold text-cyan-400 uppercase tracking-wider text-[11px]">Condiciones del Proyecto</p>
+        <div className="mt-6 rounded-xl bg-neutral-50/80 p-4 text-neutral-800 space-y-2.5 text-xs border border-neutral-200">
+          <p className="font-bold text-neutral-900 uppercase tracking-wider text-[11px]">Condiciones del Proyecto</p>
           {conditions.payment && (
             <div>
-              <p className="text-cyan-300 font-semibold">1. Forma de Pago:</p>
-              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.payment}</p>
+              <p className="text-neutral-900 font-semibold">1. Forma de Pago:</p>
+              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.payment}</p>
             </div>
           )}
           {conditions.delivery && (
             <div>
-              <p className="text-cyan-300 font-semibold">2. Tiempo de entrega:</p>
-              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.delivery}</p>
+              <p className="text-neutral-900 font-semibold">2. Tiempo de entrega:</p>
+              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.delivery}</p>
             </div>
           )}
           {conditions.ip && (
             <div>
-              <p className="text-cyan-300 font-semibold">3. Propiedad Intelectual:</p>
-              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.ip}</p>
+              <p className="text-neutral-900 font-semibold">3. Propiedad Intelectual:</p>
+              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.ip}</p>
             </div>
           )}
           {conditions.confidentiality && (
             <div>
-              <p className="text-cyan-300 font-semibold">4. Confidencialidad:</p>
-              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.confidentiality}</p>
+              <p className="text-neutral-900 font-semibold">4. Confidencialidad:</p>
+              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.confidentiality}</p>
             </div>
           )}
         </div>

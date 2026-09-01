@@ -516,7 +516,7 @@ export function NuevaProformaForm({
           {hasConditions && (
             <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
               <div>
-                <label className="block text-[11px] font-semibold text-accent mb-0.5">Forma de Pago:</label>
+                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Forma de Pago:</label>
                 <textarea
                   rows={2}
                   value={condPayment}
@@ -525,7 +525,7 @@ export function NuevaProformaForm({
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-accent mb-0.5">Tiempo de entrega:</label>
+                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Tiempo de entrega:</label>
                 <textarea
                   rows={2}
                   value={condDelivery}
@@ -534,7 +534,7 @@ export function NuevaProformaForm({
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-accent mb-0.5">Propiedad Intelectual:</label>
+                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Propiedad Intelectual:</label>
                 <textarea
                   rows={2}
                   value={condIP}
@@ -543,7 +543,7 @@ export function NuevaProformaForm({
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-accent mb-0.5">Confidencialidad:</label>
+                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Confidencialidad:</label>
                 <textarea
                   rows={2}
                   value={condConfidentiality}
