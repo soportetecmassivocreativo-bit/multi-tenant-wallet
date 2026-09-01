@@ -115,6 +115,16 @@ export interface ProformaDetail {
   notes?: string;
   items: ProformaItem[];
   invoiceId?: string;
+  targetAccountId?: string;
+  targetAccountName?: string;
+  paidAmount?: number;
+  hasConditions?: boolean;
+  conditions?: {
+    payment?: string;
+    delivery?: string;
+    ip?: string;
+    confidentiality?: string;
+  };
 }
 
 export async function getProformas(): Promise<Proforma[]> {

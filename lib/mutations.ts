@@ -559,6 +559,15 @@ export interface CreateProformaInput {
   rateRef: RateRef;
   rate: number;
   notes?: string;
+  targetAccountId?: string;
+  targetAccountName?: string;
+  hasConditions?: boolean;
+  conditions?: {
+    payment?: string;
+    delivery?: string;
+    ip?: string;
+    confidentiality?: string;
+  };
 }
 
 export async function createProforma(
@@ -604,6 +613,10 @@ export async function createProforma(
         issue_date: issueDateISO,
         valid_until: validUntilISO,
         notes: input.notes || null,
+        target_account_id: input.targetAccountId || null,
+        target_account_name: input.targetAccountName || null,
+        has_conditions: input.hasConditions ?? true,
+        conditions: input.conditions || null,
       })
       .select("id")
       .single();
@@ -625,8 +638,8 @@ export async function createProforma(
         action: "crear_proforma",
         entityType: "proforma",
         entityId: prof.id as string,
-        description: `Creó la Proforma #${nextNum} por ${result.total.toFixed(2)} ${input.currency} (Validez: ${input.validDays} días)`,
-        details: { number: nextNum, total: result.total, currency: input.currency },
+        description: `Creó la Proforma #${nextNum} por ${result.total.toFixed(2)} ${input.currency} (Validez: ${input.validDays} días, Cuenta Prevista: ${input.targetAccountName || "General"})`,
+        details: { number: nextNum, total: result.total, currency: input.currency, targetAccountName: input.targetAccountName },
         customUser: {
           id: ctx.userId,
           name: ctx.userName,
@@ -651,6 +664,11 @@ export async function createProforma(
     .single();
   const number = company?.next_invoice_number ?? 1;
 
+  let notePayload = input.notes || "";
+  if (input.targetAccountName) {
+    notePayload = `${notePayload} [Cuenta Prevista: ${input.targetAccountName}]`.trim();
+  }
+
   const { data: inv, error: invErr } = await supabase
     .from("invoices")
     .insert({
@@ -669,6 +687,7 @@ export async function createProforma(
       status: "pendiente",
       issue_date: issueDateISO,
       due_date: validUntilISO,
+      note: notePayload || null,
     })
     .select("id")
     .single();
@@ -698,6 +717,89 @@ export async function createProforma(
   return { ok: true, id: inv.id as string };
 }
 
+export interface UpdateProformaInput {
+  id: string;
+  clientId?: string;
+  currency?: CurrencyCode;
+  lines?: { description: string; qty: number; unitPrice: number }[];
+  taxRate?: number;
+  discountPct?: number;
+  validDays?: number;
+  rateRef?: RateRef;
+  rate?: number;
+  notes?: string;
+  targetAccountId?: string;
+  targetAccountName?: string;
+  hasConditions?: boolean;
+}
+
+export async function updateProforma(
+  input: UpdateProformaInput,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+  const { supabase, companyId } = ctx;
+
+  try {
+    const updateData: Record<string, unknown> = {};
+    if (input.clientId) updateData.client_id = input.clientId;
+    if (input.notes !== undefined) updateData.notes = input.notes;
+    if (input.targetAccountId !== undefined) updateData.target_account_id = input.targetAccountId;
+    if (input.targetAccountName !== undefined) updateData.target_account_name = input.targetAccountName;
+    if (input.hasConditions !== undefined) updateData.has_conditions = input.hasConditions;
+
+    if (input.lines && input.lines.length > 0) {
+      const result = computeInvoice({
+        lines: input.lines,
+        taxRate: input.taxRate ?? 0.16,
+        discountPct: (input.discountPct ?? 0) / 100,
+        creditDays: input.validDays || 15,
+        issueDateISO: today(),
+      });
+      updateData.subtotal = result.subtotal;
+      updateData.discount = result.discount;
+      updateData.tax = result.tax;
+      updateData.total = result.total;
+
+      // Actualizar items
+      await supabase.from("proforma_items").delete().eq("proforma_id", input.id);
+      await supabase.from("proforma_items").insert(
+        input.lines.map((l) => ({
+          company_id: companyId,
+          proforma_id: input.id,
+          description: l.description,
+          qty: l.qty,
+          unit_price: l.unitPrice,
+        })),
+      );
+    }
+
+    await supabase.from("proformas").update(updateData).eq("id", input.id);
+
+    await logAuditEvent({
+      action: "editar_proforma",
+      entityType: "proforma",
+      entityId: input.id,
+      description: `Editó la Proforma ID: ${input.id}`,
+      customUser: {
+        id: ctx.userId,
+        name: ctx.userName,
+        role: ctx.role,
+        companyId: ctx.companyId,
+      },
+    });
+
+    revalidatePath("/proformas");
+    revalidatePath(`/proformas/${input.id}`);
+    revalidatePath("/dashboard");
+    return { ok: true, id: input.id };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "Error al actualizar proforma";
+    return { ok: false, error: errorMsg };
+  }
+}
+
 export interface ConvertProformaInput {
   proformaId: string;
   accountId: string;
@@ -706,6 +808,7 @@ export interface ConvertProformaInput {
   paymentReference?: string;
   notes?: string;
   amount?: number;
+  isPartial?: boolean;
 }
 
 export async function convertProformaToInvoiceAndPay(
@@ -743,7 +846,12 @@ export async function convertProformaToInvoiceAndPay(
         .single();
       const invoiceNumber = company?.next_invoice_number ?? 1;
 
-      // Crear factura pagada definitiva
+      const totalVal = Number(prof.total);
+      const payAmount = input.amount && input.amount > 0 ? input.amount : totalVal;
+      const isFullPayment = payAmount >= totalVal;
+      const finalStatus: InvoiceStatus = isFullPayment ? "pagada" : "parcial";
+
+      // Crear factura pagada/parcial definitiva
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
         .insert({
@@ -759,7 +867,7 @@ export async function convertProformaToInvoiceAndPay(
           ves_rate: prof.ves_rate,
           ves_rate_ref: prof.ves_rate_ref,
           ves_total: prof.ves_total,
-          status: "pagada",
+          status: finalStatus,
           issue_date: issueDateISO,
           due_date: issueDateISO,
         })
@@ -789,7 +897,6 @@ export async function convertProformaToInvoiceAndPay(
       }
 
       // Registrar pago acreditado
-      const payAmount = input.amount && input.amount > 0 ? input.amount : Number(prof.total);
       await supabase.from("payments").insert({
         company_id: companyId,
         invoice_id: inv.id,
@@ -802,7 +909,7 @@ export async function convertProformaToInvoiceAndPay(
       // Actualizar proforma
       await supabase
         .from("proformas")
-        .update({ status: "pagada", invoice_id: inv.id })
+        .update({ status: isFullPayment ? "pagada" : "aprobada", invoice_id: inv.id })
         .eq("id", prof.id);
 
       // Incrementar contador de facturas
@@ -815,8 +922,8 @@ export async function convertProformaToInvoiceAndPay(
         action: "convertir_proforma_a_factura",
         entityType: "factura",
         entityId: inv.id as string,
-        description: `Proforma #${prof.number} convertida a Factura #${invoiceNumber} (Pagada y acreditada en ${input.accountName})`,
-        details: { proformaId: prof.id, invoiceId: inv.id, invoiceNumber, amount: payAmount, accountName: input.accountName },
+        description: `Proforma #${prof.number} convertida a Factura #${invoiceNumber} (${isFullPayment ? "Pagada 100%" : `Abono Parcial $${payAmount}`} y acreditada en ${input.accountName})`,
+        details: { proformaId: prof.id, invoiceId: inv.id, invoiceNumber, amount: payAmount, accountName: input.accountName, isFullPayment },
         customUser: {
           id: ctx.userId,
           name: ctx.userName,
@@ -841,7 +948,10 @@ export async function convertProformaToInvoiceAndPay(
     .single();
 
   if (inv) {
-    const payAmount = input.amount && input.amount > 0 ? input.amount : Number(inv.total);
+    const totalVal = Number(inv.total);
+    const payAmount = input.amount && input.amount > 0 ? input.amount : totalVal;
+    const isFullPayment = payAmount >= totalVal;
+    const finalStatus: InvoiceStatus = isFullPayment ? "pagada" : "parcial";
 
     // Registrar pago
     await supabase.from("payments").insert({
@@ -853,17 +963,17 @@ export async function convertProformaToInvoiceAndPay(
       method: formattedMethod,
     });
 
-    // Marcar factura como pagada
+    // Marcar factura con su nuevo status
     await supabase
       .from("invoices")
-      .update({ status: "pagada" })
+      .update({ status: finalStatus })
       .eq("id", inv.id);
 
     await logAuditEvent({
       action: "cobrar_factura_proforma",
       entityType: "factura",
       entityId: inv.id as string,
-      description: `Factura #${inv.number} marcada como pagada y acreditada en ${input.accountName}`,
+      description: `Factura #${inv.number} marcada como ${finalStatus} (${isFullPayment ? "Completa" : `Abono $${payAmount}`}) y acreditada en ${input.accountName}`,
       details: { invoiceId: inv.id, invoiceNumber: inv.number, amount: payAmount, accountName: input.accountName },
       customUser: {
         id: ctx.userId,
@@ -881,6 +991,84 @@ export async function convertProformaToInvoiceAndPay(
   }
 
   return { ok: false, error: "Proforma no encontrada." };
+}
+
+export interface UpdateInvoiceInput {
+  id: string;
+  clientId?: string;
+  currency?: CurrencyCode;
+  lines?: { description: string; qty: number; unitPrice: number }[];
+  taxRate?: number;
+  discountPct?: number;
+  creditDays?: number;
+  rateRef?: RateRef;
+  rate?: number;
+  note?: string;
+  status?: InvoiceStatus;
+}
+
+export async function updateInvoice(
+  input: UpdateInvoiceInput,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+  const { supabase, companyId } = ctx;
+
+  try {
+    const updateData: Record<string, unknown> = {};
+    if (input.clientId) updateData.client_id = input.clientId;
+    if (input.note !== undefined) updateData.note = input.note;
+    if (input.status) updateData.status = input.status;
+
+    if (input.lines && input.lines.length > 0) {
+      const result = computeInvoice({
+        lines: input.lines,
+        taxRate: input.taxRate ?? 0.16,
+        discountPct: (input.discountPct ?? 0) / 100,
+        creditDays: input.creditDays || 0,
+        issueDateISO: today(),
+      });
+      updateData.subtotal = result.subtotal;
+      updateData.discount = result.discount;
+      updateData.tax = result.tax;
+      updateData.total = result.total;
+
+      await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
+      await supabase.from("invoice_items").insert(
+        input.lines.map((l) => ({
+          company_id: companyId,
+          invoice_id: input.id,
+          description: l.description,
+          qty: l.qty,
+          unit_price: l.unitPrice,
+        })),
+      );
+    }
+
+    await supabase.from("invoices").update(updateData).eq("id", input.id);
+
+    await logAuditEvent({
+      action: "editar_factura",
+      entityType: "factura",
+      entityId: input.id,
+      description: `Editó la Factura ID: ${input.id}`,
+      customUser: {
+        id: ctx.userId,
+        name: ctx.userName,
+        role: ctx.role,
+        companyId: ctx.companyId,
+      },
+    });
+
+    revalidatePath("/cobros");
+    revalidatePath(`/cobros/${input.id}`);
+    revalidatePath("/dashboard");
+    return { ok: true, id: input.id };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "Error al actualizar factura";
+    return { ok: false, error: errorMsg };
+  }
 }
 
 export async function deleteProforma(id: string): Promise<MutationResult> {

@@ -7,6 +7,8 @@ import { ConfiguracionTabs } from "@/components/configuracion/configuracion-tabs
 import { TenantConfigSelector } from "@/components/admin/tenant-config-selector";
 import { SettingsIcon } from "@/components/ui/icons";
 
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
+
 interface Props {
   searchParams: Promise<{ empresa?: string }>;
 }
@@ -18,10 +20,11 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
   const cookieStore = await cookies();
   const activeSlug = empresa || cookieStore.get("m_wallet_active_config_tenant")?.value || "massivo";
 
-  const [profile, config, allTenants] = await Promise.all([
+  const [profile, config, allTenants, accounts] = await Promise.all([
     getCurrentProfile(),
     getSystemConfig(activeSlug),
     getAdminTenants(),
+    getCompanyAccounts(),
   ]);
 
   const canEdit =
@@ -68,6 +71,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
         key={activeSlug}
         initialConfig={config}
         canEdit={canEdit}
+        accounts={accounts}
       />
     </div>
   );

@@ -16,6 +16,7 @@ import { computeInvoice } from "@/lib/calc";
 import { createProforma } from "@/lib/mutations";
 import { syncBcvRates, saveManualBcvRates } from "@/lib/bcv-actions";
 import type { Client, Product } from "@/lib/mock-data";
+import type { CompanyAccount } from "@/lib/cuentas-actions";
 
 const termOptions = [
   { label: "15 días", days: 15 },
@@ -40,10 +41,12 @@ export function NuevaProformaForm({
   clients,
   products,
   bcv,
+  accounts = [],
 }: {
   clients: Client[];
   products: Product[];
   bcv: { usd: number; eur: number; date: string };
+  accounts?: CompanyAccount[];
 }) {
   const [currentBcv, setCurrentBcv] = useState(bcv);
   const [clientId, setClientId] = useState("");
@@ -51,6 +54,7 @@ export function NuevaProformaForm({
   const [rateRef, setRateRef] = useState<RateRef>("USD");
   const [rateMode, setRateMode] = useState<"usd" | "eur" | "manual">("usd");
   const [rate, setRate] = useState<number>(bcv.usd);
+  const [targetAccountId, setTargetAccountId] = useState(accounts[0]?.id || "");
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncPending, startSyncTransition] = useTransition();
   const [lines, setLines] = useState<Line[]>([
@@ -60,6 +64,22 @@ export function NuevaProformaForm({
   const [discountPct, setDiscountPct] = useState(0);
   const [validDays, setValidDays] = useState(15);
   const [notes, setNotes] = useState("");
+
+  // Condiciones Estructuradas (según requerimiento)
+  const [hasConditions, setHasConditions] = useState(true);
+  const [condPayment, setCondPayment] = useState(
+    "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente."
+  );
+  const [condDelivery, setCondDelivery] = useState(
+    "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente."
+  );
+  const [condIP, setCondIP] = useState(
+    "La propiedad intelectual de todos los elementos del proyecto, incluyendo el código fuente, el diseño gráfico, los contenidos y la marca, corresponderá al cliente."
+  );
+  const [condConfidentiality, setCondConfidentiality] = useState(
+    "Todas las partes se comprometen a mantener la confidencialidad de toda la información relacionada con el proyecto."
+  );
+
   const [saved, setSaved] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +87,7 @@ export function NuevaProformaForm({
 
   const client = clients.find((c) => c.id === clientId);
   const isForeign = currency !== "VES";
+  const selectedAccount = accounts.find((a) => a.id === targetAccountId) || accounts[0];
 
   async function handleSyncBcv() {
     setSyncMsg(null);
@@ -170,6 +191,17 @@ export function NuevaProformaForm({
         rateRef,
         rate,
         notes: notes.trim() || undefined,
+        targetAccountId: selectedAccount?.id,
+        targetAccountName: selectedAccount ? `${selectedAccount.name} (${selectedAccount.bankName || selectedAccount.accountType})` : undefined,
+        hasConditions,
+        conditions: hasConditions
+          ? {
+              payment: condPayment.trim(),
+              delivery: condDelivery.trim(),
+              ip: condIP.trim(),
+              confidentiality: condConfidentiality.trim(),
+            }
+          : undefined,
       });
       if (res.ok) {
         setSaved(true);
@@ -235,7 +267,7 @@ export function NuevaProformaForm({
           Cliente & Moneda
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-muted mb-1">
               Cliente Destinatario
@@ -268,6 +300,27 @@ export function NuevaProformaForm({
                   {c.name} ({c.symbol})
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Cuenta donde se piensa recibir el dinero */}
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">
+              Cuenta donde se recibirá el dinero
+            </label>
+            <select
+              value={targetAccountId}
+              onChange={(e) => setTargetAccountId(e.target.value)}
+              className={inputClass}
+            >
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
+                </option>
+              ))}
+              {accounts.length === 0 && (
+                <option value="">Cuenta General</option>
+              )}
             </select>
           </div>
         </div>
@@ -445,9 +498,66 @@ export function NuevaProformaForm({
           </div>
         </div>
 
+        {/* Bloque de Condiciones Estructuradas del Proyecto */}
+        <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-foreground block">Condiciones del Proyecto</span>
+              <span className="text-[11px] text-muted">Incluye forma de pago, tiempos de entrega y confidencialidad en el documento</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={hasConditions}
+              onChange={(e) => setHasConditions(e.target.checked)}
+              className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+            />
+          </div>
+
+          {hasConditions && (
+            <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+              <div>
+                <label className="block text-[11px] font-semibold text-accent mb-0.5">Forma de Pago:</label>
+                <textarea
+                  rows={2}
+                  value={condPayment}
+                  onChange={(e) => setCondPayment(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-accent mb-0.5">Tiempo de entrega:</label>
+                <textarea
+                  rows={2}
+                  value={condDelivery}
+                  onChange={(e) => setCondDelivery(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-accent mb-0.5">Propiedad Intelectual:</label>
+                <textarea
+                  rows={2}
+                  value={condIP}
+                  onChange={(e) => setCondIP(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-accent mb-0.5">Confidencialidad:</label>
+                <textarea
+                  rows={2}
+                  value={condConfidentiality}
+                  onChange={(e) => setCondConfidentiality(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="block text-xs font-medium text-muted mb-1">
-            Notas / Términos de la Proforma (Opcional)
+            Notas Adicionales (Opcional)
           </label>
           <textarea
             rows={2}

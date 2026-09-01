@@ -3,13 +3,15 @@
 import { exportSamplePdf } from "@/lib/pdf-export";
 import { DownloadIcon, FileTextIcon } from "@/components/ui/icons";
 import type { SystemConfig } from "@/lib/config";
+import type { CompanyAccount } from "@/lib/cuentas-actions";
 
 interface PdfLivePreviewProps {
   config: SystemConfig;
   target?: "general" | "facturas" | "proformas";
+  accounts?: CompanyAccount[];
 }
 
-export function PdfLivePreview({ config, target = "general" }: PdfLivePreviewProps) {
+export function PdfLivePreview({ config, target = "general", accounts = [] }: PdfLivePreviewProps) {
   const isFacturas = target === "facturas";
   const isProformas = target === "proformas";
 
@@ -73,6 +75,27 @@ export function PdfLivePreview({ config, target = "general" }: PdfLivePreviewPro
       ? config.pdfProformaTermsAndConditions
       : config.pdfTermsAndConditions;
 
+  const showConditions = isFacturas
+    ? config.pdfInvoiceShowConditions
+    : isProformas
+      ? config.pdfProformaShowConditions
+      : config.pdfShowConditions;
+
+  const conditions = {
+    payment: isFacturas ? config.pdfInvoiceConditionsPayment : config.pdfProformaConditionsPayment,
+    delivery: isFacturas ? config.pdfInvoiceConditionsDelivery : config.pdfProformaConditionsDelivery,
+    ip: isFacturas ? config.pdfInvoiceConditionsIP : config.pdfProformaConditionsIP,
+    confidentiality: isFacturas ? config.pdfInvoiceConditionsConfidentiality : config.pdfProformaConditionsConfidentiality,
+  };
+
+  const targetAccountId = isFacturas
+    ? config.pdfInvoiceTargetAccountId
+    : isProformas
+      ? config.pdfProformaTargetAccountId
+      : undefined;
+
+  const selectedAccount = accounts.find((a) => a.id === targetAccountId) || accounts[0];
+
   const paperDetails = {
     a4: { label: "Formato A4 Estándar", dims: "210 × 297 mm", ratio: "aspect-[1/1.41]" },
     letter: { label: "Formato Carta (Letter)", dims: "216 × 279 mm", ratio: "aspect-[1/1.29]" },
@@ -112,7 +135,7 @@ export function PdfLivePreview({ config, target = "general" }: PdfLivePreviewPro
       </div>
 
       {/* Hoja de papel simulada */}
-      <div className={`rounded-xl border border-line/80 bg-white p-4 sm:p-5 text-[#14151A] shadow-md space-y-3.5 text-[11px] select-none ${paperDetails.ratio} transition-all`}>
+      <div className={`rounded-xl border border-line/80 bg-white p-4 sm:p-5 text-[#14151A] shadow-md space-y-3 text-[11px] select-none ${paperDetails.ratio} transition-all`}>
         {/* Encabezado */}
         <div className="rounded-lg bg-[#F5F6FF] p-3 flex items-center justify-between border border-line/40">
           <div className="space-y-1">
@@ -169,7 +192,7 @@ export function PdfLivePreview({ config, target = "general" }: PdfLivePreviewPro
           </span>
         </div>
 
-        {/* Tabla simulada con el color configurado */}
+        {/* Tabla simulada */}
         <div className="overflow-hidden rounded border border-gray-200">
           <table className="w-full text-left text-[10px]">
             <thead>
@@ -199,8 +222,55 @@ export function PdfLivePreview({ config, target = "general" }: PdfLivePreviewPro
           </table>
         </div>
 
-        {/* Términos */}
-        {terms && (
+        {/* Cuenta de Pago Destino en el documento */}
+        {selectedAccount && (isFacturas || isProformas) && (
+          <div className="rounded bg-blue-50/70 p-2 text-[9px] border border-blue-100 text-gray-700 flex items-center justify-between">
+            <div>
+              <span className="font-bold text-blue-900 block">Cuenta de Pago / Acreditación:</span>
+              <p className="font-medium text-gray-800">{selectedAccount.name} ({selectedAccount.bankName || selectedAccount.accountType})</p>
+              <p className="text-gray-500 font-mono text-[8.5px]">
+                {selectedAccount.accountNumber || selectedAccount.email || selectedAccount.walletAddress || "Coordenadas bancarias asignadas"}
+              </p>
+            </div>
+            <span className="text-[9px] font-mono font-bold text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
+              {selectedAccount.currency}
+            </span>
+          </div>
+        )}
+
+        {/* Bloque de Condiciones Estructuradas (según imagen) */}
+        {showConditions && (isFacturas || isProformas) && (
+          <div className="rounded-lg bg-[#0F172A] p-2.5 text-white space-y-1.5 text-[8.5px] border border-slate-700">
+            <p className="font-bold text-cyan-400 uppercase tracking-wider text-[9px]">Condiciones del Proyecto</p>
+            {conditions.payment && (
+              <div>
+                <p className="text-cyan-300 font-semibold">Forma de Pago:</p>
+                <p className="text-slate-200 leading-tight line-clamp-2">{conditions.payment}</p>
+              </div>
+            )}
+            {conditions.delivery && (
+              <div>
+                <p className="text-cyan-300 font-semibold">Tiempo de entrega:</p>
+                <p className="text-slate-200 leading-tight line-clamp-1">{conditions.delivery}</p>
+              </div>
+            )}
+            {conditions.ip && (
+              <div>
+                <p className="text-cyan-300 font-semibold">Propiedad Intelectual:</p>
+                <p className="text-slate-200 leading-tight line-clamp-1">{conditions.ip}</p>
+              </div>
+            )}
+            {conditions.confidentiality && (
+              <div>
+                <p className="text-cyan-300 font-semibold">Confidencialidad:</p>
+                <p className="text-slate-200 leading-tight line-clamp-1">{conditions.confidentiality}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Términos generales */}
+        {terms && !showConditions && (
           <div className="rounded bg-gray-50 p-2 text-[9px] text-gray-600 border border-gray-200/60 space-y-0.5">
             <span className="font-bold text-gray-700 block">Términos & Condiciones:</span>
             <p className="line-clamp-2">{terms}</p>

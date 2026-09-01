@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
 import { getProformaDetail } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
 
 export default async function ProformaPrintPage({
   params,
@@ -14,9 +15,10 @@ export default async function ProformaPrintPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [prof, config] = await Promise.all([
+  const [prof, config, accounts] = await Promise.all([
     getProformaDetail(id),
     getSystemConfig(),
+    getCompanyAccounts(),
   ]);
   if (!prof) notFound();
   const isForeign = prof.currency !== "VES";
@@ -29,8 +31,18 @@ export default async function ProformaPrintPage({
   const terms = config.pdfProformaTermsAndConditions || "Esta proforma / cotización tiene una validez de 15 días continuos.";
   const footer = config.pdfProformaFooterText || "Massivo Corp · Proforma Preliminar · No válida como factura fiscal";
 
+  const targetAccount = accounts.find((a) => a.id === prof.targetAccountId) || (prof.targetAccountName ? { name: prof.targetAccountName } : null);
+
+  const showConditions = prof.hasConditions ?? config.pdfProformaShowConditions ?? true;
+  const conditions = prof.conditions || {
+    payment: config.pdfProformaConditionsPayment,
+    delivery: config.pdfProformaConditionsDelivery,
+    ip: config.pdfProformaConditionsIP,
+    confidentiality: config.pdfProformaConditionsConfidentiality,
+  };
+
   return (
-    <div className="mx-auto min-h-[100dvh] max-w-[640px] bg-white p-6 text-[#14151A]">
+    <div className="mx-auto min-h-[100dvh] max-w-[680px] bg-white p-6 text-[#14151A]">
       <div className="no-print mb-5 flex items-center justify-between">
         <Link href={`/proformas/${prof.id}`} className="text-sm text-neutral-500 hover:text-black">
           ‹ Volver al Sistema
@@ -42,12 +54,21 @@ export default async function ProformaPrintPage({
       <div className="flex items-start justify-between gap-4 border-b border-neutral-200 pb-4">
         <div className="min-w-0">
           <div className="mb-2 flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-massivo-creativo.png"
-              alt={companyName}
-              className="h-8 w-auto object-contain"
-            />
+            {config.pdfLogoUrl || config.systemLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={config.pdfLogoUrl || config.systemLogoUrl}
+                alt={companyName}
+                className="h-9 w-auto max-w-[160px] object-contain"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src="/logo-massivo-creativo.png"
+                alt={companyName}
+                className="h-8 w-auto object-contain"
+              />
+            )}
           </div>
           <p className="text-xs font-bold text-neutral-800">
             {companyName} · RIF {companyRif}
@@ -60,7 +81,7 @@ export default async function ProformaPrintPage({
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <span className="inline-block rounded-md bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1">
+          <span className="inline-block rounded-md bg-amber-100 text-amber-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1">
             Proforma / Cotización
           </span>
           <p className="font-serif text-xl leading-none font-bold">
@@ -82,10 +103,23 @@ export default async function ProformaPrintPage({
         </div>
       </div>
 
-      {/* Cliente */}
-      <div className="py-4 border-b border-neutral-100">
-        <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Destinatario / Cliente</p>
-        <p className="text-base font-bold text-neutral-900 mt-0.5">{prof.clientName}</p>
+      {/* Cliente y Cuenta Prevista */}
+      <div className="py-4 border-b border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Destinatario / Cliente</p>
+          <p className="text-base font-bold text-neutral-900 mt-0.5">{prof.clientName}</p>
+        </div>
+        {targetAccount && (
+          <div className="sm:text-right rounded-lg bg-blue-50/70 p-2.5 border border-blue-100">
+            <p className="text-[10px] text-blue-900 uppercase tracking-wider font-bold">Cuenta de Pago / Anticipo</p>
+            <p className="text-xs font-bold text-blue-950 mt-0.5">{targetAccount.name}</p>
+            {"bankName" in targetAccount && targetAccount.bankName && (
+              <p className="text-[11px] text-blue-800 font-mono">
+                {targetAccount.bankName} {targetAccount.accountNumber ? `· ${targetAccount.accountNumber}` : ""}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Conceptos */}
@@ -152,12 +186,45 @@ export default async function ProformaPrintPage({
         )}
       </div>
 
+      {/* BLOQUE DE CONDICIONES ESTRUCTURADAS DEL PROYECTO (según diseño requerido) */}
+      {showConditions && (
+        <div className="mt-6 rounded-xl bg-[#0F172A] p-4 text-white space-y-2 text-xs border border-slate-700">
+          <p className="font-bold text-cyan-400 uppercase tracking-wider text-[11px]">Condiciones del Proyecto</p>
+          {conditions.payment && (
+            <div>
+              <p className="text-cyan-300 font-semibold">1. Forma de Pago:</p>
+              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.payment}</p>
+            </div>
+          )}
+          {conditions.delivery && (
+            <div>
+              <p className="text-cyan-300 font-semibold">2. Tiempo de entrega:</p>
+              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.delivery}</p>
+            </div>
+          )}
+          {conditions.ip && (
+            <div>
+              <p className="text-cyan-300 font-semibold">3. Propiedad Intelectual:</p>
+              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.ip}</p>
+            </div>
+          )}
+          {conditions.confidentiality && (
+            <div>
+              <p className="text-cyan-300 font-semibold">4. Confidencialidad:</p>
+              <p className="text-slate-200 leading-relaxed text-[11px]">{conditions.confidentiality}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Términos y Notas de la Proforma */}
-      <div className="mt-8 rounded-xl bg-neutral-50 p-3.5 border border-neutral-200/80 text-xs text-neutral-600 space-y-2">
-        <p className="font-bold text-neutral-700 uppercase tracking-wide text-[10px]">Términos & Condiciones</p>
-        <p>{terms}</p>
-        {prof.notes && <p className="pt-1 border-t border-neutral-200"><strong>Notas específicas:</strong> {prof.notes}</p>}
-      </div>
+      {(!showConditions || prof.notes) && (
+        <div className="mt-4 rounded-xl bg-neutral-50 p-3.5 border border-neutral-200/80 text-xs text-neutral-600 space-y-2">
+          <p className="font-bold text-neutral-700 uppercase tracking-wide text-[10px]">Términos Generales</p>
+          <p>{terms}</p>
+          {prof.notes && <p className="pt-1 border-t border-neutral-200"><strong>Notas específicas:</strong> {prof.notes}</p>}
+        </div>
+      )}
 
       <p className="mt-6 text-center text-[10px] text-neutral-400">
         {footer}

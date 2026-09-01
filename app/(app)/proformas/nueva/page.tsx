@@ -2,13 +2,15 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getClients, getProducts, getBcvRates } from "@/lib/data";
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { NuevaProformaForm } from "@/components/proformas/nueva-proforma-form";
 
 export default async function NuevaProformaPage() {
-  const [clients, products, bcv] = await Promise.all([
+  const [clients, products, bcv, accounts] = await Promise.all([
     getClients(),
     getProducts(),
     getBcvRates(),
+    getCompanyAccounts(),
   ]);
 
   return (
@@ -32,6 +34,7 @@ export default async function NuevaProformaPage() {
         clients={clients}
         products={products}
         bcv={bcv}
+        accounts={accounts}
       />
     </div>
   );

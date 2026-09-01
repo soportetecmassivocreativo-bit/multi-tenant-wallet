@@ -23,12 +23,15 @@ const BRAND_PALETTES = [
   { label: "Negro Ejecutivo", primary: "#09090B", accent: "#27272A" },
 ];
 
+import type { CompanyAccount } from "@/lib/cuentas-actions";
+
 interface ConfiguracionTabsProps {
   initialConfig: SystemConfig;
   canEdit: boolean;
+  accounts?: CompanyAccount[];
 }
 
-export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsProps) {
+export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: ConfiguracionTabsProps) {
   const [activeTab, setActiveTab] = useState<"contabilizadores" | "branding" | "pdf">("contabilizadores");
   const [pdfSubTab, setPdfSubTab] = useState<"facturas" | "proformas" | "general">("facturas");
   const [config, setConfig] = useState<SystemConfig>(initialConfig);
@@ -600,15 +603,74 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
               <div className="space-y-4">
                 {/* 1. SECCIÓN FACTURAS */}
                 {pdfSubTab === "facturas" && (
-                  <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5 animate-in fade-in duration-150">
+                  <section className="rounded-2xl border border-line bg-card p-4 space-y-4 animate-in fade-in duration-150">
                     <div>
                       <h2 className="font-serif text-[15px] font-medium text-foreground">
                         Membrete y Datos de Facturas PDF
                       </h2>
                       <p className="text-xs text-muted">
-                        Personaliza los textos, datos fiscales y condiciones exclusivas para los comprobantes de facturación.
+                        Personaliza los textos, datos fiscales, plantilla y condiciones exclusivas para los comprobantes de facturación.
                       </p>
                     </div>
+
+                    {/* Botón para Cargar Plantilla / Formato PDF de Facturas */}
+                    <div className="rounded-xl border border-line bg-soft/40 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-foreground">Formato / Plantilla de Diseño (Factura PDF)</label>
+                        <span className="text-[10px] text-accent font-semibold">Fondo / Template Personalizado</span>
+                      </div>
+                      <p className="text-[11px] text-muted">
+                        Carga el archivo o diseño base que servirá como plantilla para generar las facturas de la empresa.
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => updateField("pdfInvoiceTemplateUrl", reader.result as string);
+                            reader.readAsDataURL(file);
+                          }}
+                          className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-accent/90 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          placeholder="O pega URL de la plantilla..."
+                          value={config.pdfInvoiceTemplateUrl || ""}
+                          onChange={(e) => updateField("pdfInvoiceTemplateUrl", e.target.value)}
+                          className="w-full sm:w-1/2 rounded-lg border border-line bg-card px-2.5 py-1 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      {config.pdfInvoiceTemplateUrl && (
+                        <p className="text-[10px] text-income font-medium">✓ Plantilla de Factura asignada correctamente</p>
+                      )}
+                    </div>
+
+                    {/* Cuenta de Recepción de Fondos para Facturas */}
+                    {accounts.length > 0 && (
+                      <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2">
+                        <label className="text-xs font-bold text-foreground">
+                          Cuenta donde se piensa recibir el dinero (Datos en Factura)
+                        </label>
+                        <p className="text-[11px] text-muted">
+                          Esta cuenta aparecerá en la factura para que el cliente tenga las coordenadas bancarias / cripto de pago.
+                        </p>
+                        <select
+                          value={config.pdfInvoiceTargetAccountId || ""}
+                          onChange={(e) => updateField("pdfInvoiceTargetAccountId", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-accent"
+                        >
+                          <option value="">Selecciona la cuenta por defecto para facturación...</option>
+                          {accounts.map((acc) => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div>
                       <label className="mb-1 block text-xs text-muted">Nombre de la Empresa en Facturas</label>
@@ -687,15 +749,57 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-xs text-muted">Términos y Condiciones / Nota Legal de Factura</label>
-                      <textarea
-                        rows={2}
-                        value={config.pdfInvoiceTermsAndConditions || ""}
-                        onChange={(e) => updateField("pdfInvoiceTermsAndConditions", e.target.value)}
-                        placeholder="Nota legal para la factura..."
-                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                      />
+                    {/* BLOQUE DE CONDICIONES ESTRUCTURADAS */}
+                    <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground">Condiciones del Proyecto en Facturas</span>
+                        <input
+                          type="checkbox"
+                          checked={config.pdfInvoiceShowConditions ?? true}
+                          onChange={(e) => updateField("pdfInvoiceShowConditions", e.target.checked)}
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                        />
+                      </div>
+                      {config.pdfInvoiceShowConditions && (
+                        <div className="space-y-2.5 pt-1">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Forma de Pago:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfInvoiceConditionsPayment || ""}
+                              onChange={(e) => updateField("pdfInvoiceConditionsPayment", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Tiempo de entrega:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfInvoiceConditionsDelivery || ""}
+                              onChange={(e) => updateField("pdfInvoiceConditionsDelivery", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Propiedad Intelectual:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfInvoiceConditionsIP || ""}
+                              onChange={(e) => updateField("pdfInvoiceConditionsIP", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Confidencialidad:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfInvoiceConditionsConfidentiality || ""}
+                              onChange={(e) => updateField("pdfInvoiceConditionsConfidentiality", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -722,15 +826,74 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
 
                 {/* 2. SECCIÓN PROFORMAS */}
                 {pdfSubTab === "proformas" && (
-                  <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5 animate-in fade-in duration-150">
+                  <section className="rounded-2xl border border-line bg-card p-4 space-y-4 animate-in fade-in duration-150">
                     <div>
                       <h2 className="font-serif text-[15px] font-medium text-foreground">
                         Membrete y Datos de Proformas PDF
                       </h2>
                       <p className="text-xs text-muted">
-                        Personaliza los textos, validez de la oferta y condiciones para las cotizaciones y proformas.
+                        Personaliza los textos, plantilla, validez de la oferta y condiciones para las cotizaciones y proformas.
                       </p>
                     </div>
+
+                    {/* Botón para Cargar Plantilla / Formato PDF de Proformas */}
+                    <div className="rounded-xl border border-line bg-soft/40 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-foreground">Formato / Plantilla de Diseño (Proforma PDF)</label>
+                        <span className="text-[10px] text-accent font-semibold">Fondo / Template Personalizado</span>
+                      </div>
+                      <p className="text-[11px] text-muted">
+                        Carga el archivo o diseño base que servirá como formato único para las cotizaciones y presupuestos.
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => updateField("pdfProformaTemplateUrl", reader.result as string);
+                            reader.readAsDataURL(file);
+                          }}
+                          className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-accent/90 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          placeholder="O pega URL de la plantilla..."
+                          value={config.pdfProformaTemplateUrl || ""}
+                          onChange={(e) => updateField("pdfProformaTemplateUrl", e.target.value)}
+                          className="w-full sm:w-1/2 rounded-lg border border-line bg-card px-2.5 py-1 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      {config.pdfProformaTemplateUrl && (
+                        <p className="text-[10px] text-income font-medium">✓ Plantilla de Proforma asignada correctamente</p>
+                      )}
+                    </div>
+
+                    {/* Cuenta de Recepción de Fondos para Proformas */}
+                    {accounts.length > 0 && (
+                      <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2">
+                        <label className="text-xs font-bold text-foreground">
+                          Cuenta donde se piensa recibir el dinero (Datos en Proforma)
+                        </label>
+                        <p className="text-[11px] text-muted">
+                          Indica a los clientes dónde realizar el pago de anticipo de esta cotización.
+                        </p>
+                        <select
+                          value={config.pdfProformaTargetAccountId || ""}
+                          onChange={(e) => updateField("pdfProformaTargetAccountId", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-accent"
+                        >
+                          <option value="">Selecciona la cuenta por defecto para proformas...</option>
+                          {accounts.map((acc) => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div>
                       <label className="mb-1 block text-xs text-muted">Nombre de la Empresa en Proformas</label>
@@ -809,15 +972,57 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-xs text-muted">Términos, Validez & Condiciones de Proforma</label>
-                      <textarea
-                        rows={2}
-                        value={config.pdfProformaTermsAndConditions || ""}
-                        onChange={(e) => updateField("pdfProformaTermsAndConditions", e.target.value)}
-                        placeholder="Ej: Validez de la oferta: 15 días continuos..."
-                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                      />
+                    {/* BLOQUE DE CONDICIONES ESTRUCTURADAS PROFORMA */}
+                    <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground">Condiciones del Proyecto en Proformas</span>
+                        <input
+                          type="checkbox"
+                          checked={config.pdfProformaShowConditions ?? true}
+                          onChange={(e) => updateField("pdfProformaShowConditions", e.target.checked)}
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                        />
+                      </div>
+                      {config.pdfProformaShowConditions && (
+                        <div className="space-y-2.5 pt-1">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Forma de Pago:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfProformaConditionsPayment || ""}
+                              onChange={(e) => updateField("pdfProformaConditionsPayment", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Tiempo de entrega:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfProformaConditionsDelivery || ""}
+                              onChange={(e) => updateField("pdfProformaConditionsDelivery", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Propiedad Intelectual:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfProformaConditionsIP || ""}
+                              onChange={(e) => updateField("pdfProformaConditionsIP", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-accent">Confidencialidad:</label>
+                            <textarea
+                              rows={2}
+                              value={config.pdfProformaConditionsConfidentiality || ""}
+                              onChange={(e) => updateField("pdfProformaConditionsConfidentiality", e.target.value)}
+                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -844,7 +1049,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
 
                 {/* 3. SECCIÓN GENERAL (Otros Módulos) */}
                 {pdfSubTab === "general" && (
-                  <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5 animate-in fade-in duration-150">
+                  <section className="rounded-2xl border border-line bg-card p-4 space-y-4 animate-in fade-in duration-150">
                     <div>
                       <h2 className="font-serif text-[15px] font-medium text-foreground">
                         Membrete y Datos para Reportes Generales
@@ -852,6 +1057,41 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
                       <p className="text-xs text-muted">
                         Aplica a los reportes de Gastos, Nómina, Servicios, Cuentas, Auditoría y Reportes Financieros.
                       </p>
+                    </div>
+
+                    {/* Botón para Cargar Plantilla / Formato PDF General */}
+                    <div className="rounded-xl border border-line bg-soft/40 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-foreground">Formato / Plantilla de Diseño (Reportes PDF)</label>
+                        <span className="text-[10px] text-accent font-semibold">Fondo / Template General</span>
+                      </div>
+                      <p className="text-[11px] text-muted">
+                        Carga el archivo o diseño base para los reportes financieros y listados del sistema.
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => updateField("pdfGeneralTemplateUrl", reader.result as string);
+                            reader.readAsDataURL(file);
+                          }}
+                          className="w-full text-xs text-muted file:mr-2 file:rounded-lg file:border-0 file:bg-accent file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white hover:file:bg-accent/90 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          placeholder="O pega URL de la plantilla..."
+                          value={config.pdfGeneralTemplateUrl || ""}
+                          onChange={(e) => updateField("pdfGeneralTemplateUrl", e.target.value)}
+                          className="w-full sm:w-1/2 rounded-lg border border-line bg-card px-2.5 py-1 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      {config.pdfGeneralTemplateUrl && (
+                        <p className="text-[10px] text-income font-medium">✓ Plantilla General asignada correctamente</p>
+                      )}
                     </div>
 
                     <div>
@@ -967,7 +1207,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
 
               {/* Vista previa en vivo interactiva */}
               <div className="lg:sticky lg:top-6 self-start">
-                <PdfLivePreview config={config} target={pdfSubTab} />
+                <PdfLivePreview config={config} target={pdfSubTab} accounts={accounts} />
               </div>
             </div>
           </div>
