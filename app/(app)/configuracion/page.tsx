@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { getCurrentProfile } from "@/lib/data";
+import { getCurrentProfile, getBcvRates } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
 import { getAdminTenants } from "@/lib/tenant-admin-actions";
 import { ConfiguracionTabs } from "@/components/configuracion/configuracion-tabs";
@@ -20,11 +20,12 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
   const cookieStore = await cookies();
   const activeSlug = empresa || cookieStore.get("m_wallet_active_config_tenant")?.value || "massivo";
 
-  const [profile, config, allTenants, accounts] = await Promise.all([
+  const [profile, config, allTenants, accounts, bcv] = await Promise.all([
     getCurrentProfile(),
     getSystemConfig(activeSlug),
     getAdminTenants(),
     getCompanyAccounts(),
+    getBcvRates(),
   ]);
 
   const canEdit =
@@ -72,6 +73,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
         initialConfig={config}
         canEdit={canEdit}
         accounts={accounts}
+        bcv={bcv}
       />
     </div>
   );

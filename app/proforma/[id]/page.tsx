@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/factura/print-button";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
-import { getProformaDetail } from "@/lib/data";
+import { getProformaDetail, getBcvRates } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 
@@ -15,10 +15,11 @@ export default async function ProformaPrintPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [prof, config, accounts] = await Promise.all([
+  const [prof, config, accounts, bcv] = await Promise.all([
     getProformaDetail(id),
     getSystemConfig(),
     getCompanyAccounts(),
+    getBcvRates(),
   ]);
   if (!prof) notFound();
   const isForeign = prof.currency !== "VES";
@@ -40,6 +41,15 @@ export default async function ProformaPrintPage({
     ip: config.pdfProformaConditionsIP,
     confidentiality: config.pdfProformaConditionsConfidentiality,
   };
+
+  const usdRateFormatted = (prof.vesRate || bcv.usd).toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+  const eurRateFormatted = (bcv.eur || (prof.vesRate ? prof.vesRate * 1.16 : 926.5531)).toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
 
   return (
     <div className="mx-auto min-h-[100dvh] max-w-[680px] bg-white p-6 text-[#14151A]">
@@ -82,10 +92,10 @@ export default async function ProformaPrintPage({
           {(config.pdfProformaShowBcvRates ?? true) && config.pdfProformaBcvCurrency !== "none" && (
             <p className="text-[10px] text-neutral-600 font-medium mt-1">
               {config.pdfProformaBcvCurrency === "eur"
-                ? `Tasa Ref. BCV: EUR ${prof.vesRate || "926,55"} Bs.`
+                ? `Tasa Ref. BCV: EUR ${eurRateFormatted} Bs.`
                 : config.pdfProformaBcvCurrency === "both"
-                  ? `Tasa Ref. BCV: USD ${prof.vesRate || "798,32"} Bs. | EUR ${(prof.vesRate ? (prof.vesRate * 1.16).toFixed(2) : "926,55")} Bs.`
-                  : `Tasa Ref. BCV: USD ${prof.vesRate || "798,32"} Bs.`}
+                  ? `Tasa Ref. BCV: USD ${usdRateFormatted} Bs. | EUR ${eurRateFormatted} Bs.`
+                  : `Tasa Ref. BCV: USD ${usdRateFormatted} Bs.`}
             </p>
           )}
         </div>

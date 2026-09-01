@@ -9,9 +9,10 @@ interface PdfLivePreviewProps {
   config: SystemConfig;
   target?: "general" | "facturas" | "proformas";
   accounts?: CompanyAccount[];
+  bcv?: { usd: number; eur: number; date?: string };
 }
 
-export function PdfLivePreview({ config, target = "general", accounts = [] }: PdfLivePreviewProps) {
+export function PdfLivePreview({ config, target = "general", accounts = [], bcv }: PdfLivePreviewProps) {
   const isFacturas = target === "facturas";
   const isProformas = target === "proformas";
 
@@ -69,14 +70,31 @@ export function PdfLivePreview({ config, target = "general", accounts = [] }: Pd
       ? config.pdfProformaBcvCurrency || "usd"
       : config.pdfBcvCurrency || "usd";
 
+  const usdRateFormatted = (bcv?.usd ?? 798.326).toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+  const eurRateFormatted = (bcv?.eur ?? 926.5531).toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+
   const bcvText =
     bcvCurrency === "usd"
-      ? "Tasa Ref. BCV: USD 798,32 Bs."
+      ? `Tasa Ref. BCV: USD ${usdRateFormatted} Bs.`
       : bcvCurrency === "eur"
-        ? "Tasa Ref. BCV: EUR 926,55 Bs."
+        ? `Tasa Ref. BCV: EUR ${eurRateFormatted} Bs.`
         : bcvCurrency === "both"
-          ? "Tasa Ref. BCV: USD 798,32 Bs. | EUR 926,55 Bs."
+          ? `Tasa Ref. BCV: USD ${usdRateFormatted} Bs. | EUR ${eurRateFormatted} Bs.`
           : "";
+
+  const emissionDateFormatted = bcv?.date
+    ? new Date(bcv.date + "T00:00:00").toLocaleDateString("es-VE", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "01 sep. 2026";
 
   const footer = isFacturas
     ? config.pdfInvoiceFooterText || "Massivo Corp · Factura Oficial"
@@ -171,7 +189,7 @@ export function PdfLivePreview({ config, target = "general", accounts = [] }: Pd
             </p>
           </div>
           <div className="text-right text-[9px] text-gray-500 space-y-0.5">
-            <p>Emisión: 01 sep. 2026</p>
+            <p>Emisión: {emissionDateFormatted}</p>
             {showBcv && bcvText && (
               <p className="font-medium text-gray-700">
                 {bcvText}

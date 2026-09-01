@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/factura/print-button";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
-import { getInvoiceDetail, getCompany } from "@/lib/data";
+import { getInvoiceDetail, getCompany, getBcvRates } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 
@@ -15,11 +15,12 @@ export default async function FacturaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [inv, company, config, accounts] = await Promise.all([
+  const [inv, company, config, accounts, bcv] = await Promise.all([
     getInvoiceDetail(id),
     getCompany(),
     getSystemConfig(),
     getCompanyAccounts(),
+    getBcvRates(),
   ]);
   if (!inv) notFound();
   const isForeign = inv.currency !== "VES";
@@ -40,6 +41,15 @@ export default async function FacturaPage({
     ip: config.pdfInvoiceConditionsIP,
     confidentiality: config.pdfInvoiceConditionsConfidentiality,
   };
+
+  const usdRateFormatted = (inv.vesRate || bcv.usd).toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+  const eurRateFormatted = (bcv.eur || (inv.vesRate ? inv.vesRate * 1.16 : 926.5531)).toLocaleString("es-VE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
 
   return (
     <div className="mx-auto min-h-[100dvh] max-w-[680px] bg-white p-6 text-[#14151A]">
@@ -85,10 +95,10 @@ export default async function FacturaPage({
           {(config.pdfInvoiceShowBcvRates ?? true) && config.pdfInvoiceBcvCurrency !== "none" && (
             <p className="text-[10px] text-neutral-600 font-medium mt-1">
               {config.pdfInvoiceBcvCurrency === "eur"
-                ? `Tasa Ref. BCV: EUR ${inv.vesRate || "926,55"} Bs.`
+                ? `Tasa Ref. BCV: EUR ${eurRateFormatted} Bs.`
                 : config.pdfInvoiceBcvCurrency === "both"
-                  ? `Tasa Ref. BCV: USD ${inv.vesRate || "798,32"} Bs. | EUR ${(inv.vesRate ? (inv.vesRate * 1.16).toFixed(2) : "926,55")} Bs.`
-                  : `Tasa Ref. BCV: USD ${inv.vesRate || "798,32"} Bs.`}
+                  ? `Tasa Ref. BCV: USD ${usdRateFormatted} Bs. | EUR ${eurRateFormatted} Bs.`
+                  : `Tasa Ref. BCV: USD ${usdRateFormatted} Bs.`}
             </p>
           )}
         </div>

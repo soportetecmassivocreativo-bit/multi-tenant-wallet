@@ -29,9 +29,10 @@ interface ConfiguracionTabsProps {
   initialConfig: SystemConfig;
   canEdit: boolean;
   accounts?: CompanyAccount[];
+  bcv?: { usd: number; eur: number; date?: string };
 }
 
-export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: ConfiguracionTabsProps) {
+export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [], bcv }: ConfiguracionTabsProps) {
   const [activeTab, setActiveTab] = useState<"contabilizadores" | "branding" | "pdf">("contabilizadores");
   const [pdfSubTab, setPdfSubTab] = useState<"facturas" | "proformas" | "general">("facturas");
   const [config, setConfig] = useState<SystemConfig>(initialConfig);
@@ -1333,7 +1334,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
 
               {/* Vista previa en vivo interactiva */}
               <div className="lg:sticky lg:top-6 self-start">
-                <PdfLivePreview config={config} target={pdfSubTab} accounts={accounts} />
+                <PdfLivePreview config={config} target={pdfSubTab} accounts={accounts} bcv={bcv} />
               </div>
             </div>
           </div>
