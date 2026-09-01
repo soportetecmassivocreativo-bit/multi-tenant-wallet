@@ -1,0 +1,167 @@
+export const dynamic = "force-dynamic";
+
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { PrintButton } from "@/components/factura/print-button";
+import { formatCurrency } from "@/lib/currency";
+import { formatDate } from "@/lib/format";
+import { getProformaDetail } from "@/lib/data";
+import { getSystemConfig } from "@/lib/config-actions";
+
+export default async function ProformaPrintPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const [prof, config] = await Promise.all([
+    getProformaDetail(id),
+    getSystemConfig(),
+  ]);
+  if (!prof) notFound();
+  const isForeign = prof.currency !== "VES";
+
+  const companyName = config.pdfProformaCompanyName || config.pdfCompanyName || "Massivo Corp";
+  const companyRif = config.pdfProformaCompanyRif || config.pdfCompanyRif || "J-50000000-0";
+  const subtitle = config.pdfProformaHeaderSubtitle || "Proforma / Presupuesto Comercial";
+  const phone = config.pdfProformaContactPhone || config.pdfContactPhone || "+58 412-0000000";
+  const email = config.pdfProformaContactEmail || config.pdfContactEmail || "contacto@massivocorp.com";
+  const terms = config.pdfProformaTermsAndConditions || "Esta proforma / cotización tiene una validez de 15 días continuos.";
+  const footer = config.pdfProformaFooterText || "Massivo Corp · Proforma Preliminar · No válida como factura fiscal";
+
+  return (
+    <div className="mx-auto min-h-[100dvh] max-w-[640px] bg-white p-6 text-[#14151A]">
+      <div className="no-print mb-5 flex items-center justify-between">
+        <Link href={`/proformas/${prof.id}`} className="text-sm text-neutral-500 hover:text-black">
+          ‹ Volver al Sistema
+        </Link>
+        <PrintButton />
+      </div>
+
+      {/* Membrete Proforma */}
+      <div className="flex items-start justify-between gap-4 border-b border-neutral-200 pb-4">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-massivo-creativo.png"
+              alt={companyName}
+              className="h-8 w-auto object-contain"
+            />
+          </div>
+          <p className="text-xs font-bold text-neutral-800">
+            {companyName} · RIF {companyRif}
+          </p>
+          <p className="text-[11px] text-neutral-500">
+            {subtitle}
+          </p>
+          <p className="text-[11px] text-neutral-500 mt-0.5">
+            {[phone, email].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <span className="inline-block rounded-md bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1">
+            Proforma / Cotización
+          </span>
+          <p className="font-serif text-xl leading-none font-bold">
+            #{prof.number}
+          </p>
+          {prof.code && (
+            <p className="font-mono text-xs font-semibold text-neutral-600 mt-1">
+              {prof.code}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-neutral-500">
+            Emisión: {formatDate(prof.date)}
+          </p>
+          {prof.validUntil && (
+            <p className="text-xs text-neutral-500">
+              Válida hasta: {formatDate(prof.validUntil)}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Cliente */}
+      <div className="py-4 border-b border-neutral-100">
+        <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Destinatario / Cliente</p>
+        <p className="text-base font-bold text-neutral-900 mt-0.5">{prof.clientName}</p>
+      </div>
+
+      {/* Conceptos */}
+      <table className="w-full text-sm mt-3">
+        <thead>
+          <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
+            <th className="py-2 font-semibold">Descripción</th>
+            <th className="py-2 text-right font-semibold">Cant.</th>
+            <th className="py-2 text-right font-semibold">Precio</th>
+            <th className="py-2 text-right font-semibold">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {prof.items.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="py-3 text-neutral-400">
+                Sin conceptos cotizados.
+              </td>
+            </tr>
+          ) : (
+            prof.items.map((it) => (
+              <tr key={it.id} className="border-b border-neutral-100">
+                <td className="py-2 text-neutral-800">{it.description}</td>
+                <td className="tnum py-2 text-right font-mono">{it.qty}</td>
+                <td className="tnum py-2 text-right font-mono">
+                  {formatCurrency(it.unitPrice, prof.currency)}
+                </td>
+                <td className="tnum py-2 text-right font-mono font-medium">
+                  {formatCurrency(it.qty * it.unitPrice, prof.currency)}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      {/* Totales */}
+      <div className="mt-4 space-y-1.5 border-t border-neutral-200 pt-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-neutral-500">Subtotal</span>
+          <span className="font-mono">{formatCurrency(prof.subtotal, prof.currency)}</span>
+        </div>
+        {prof.discount > 0 && (
+          <div className="flex justify-between text-emerald-700">
+            <span>Descuento</span>
+            <span className="font-mono">− {formatCurrency(prof.discount, prof.currency)}</span>
+          </div>
+        )}
+        {prof.tax > 0 && (
+          <div className="flex justify-between text-neutral-500">
+            <span>IVA</span>
+            <span className="font-mono">+{formatCurrency(prof.tax, prof.currency)}</span>
+          </div>
+        )}
+        <div className="flex justify-between border-t border-neutral-200 pt-2 text-base font-bold text-neutral-900">
+          <span>Total Cotizado</span>
+          <span className="font-mono">{formatCurrency(prof.total, prof.currency)}</span>
+        </div>
+        {isForeign && prof.vesTotal && (
+          <div className="flex justify-between text-xs text-neutral-500 pt-1">
+            <span>Equivalente en Bs. (Tasa {prof.vesRateRef || "BCV"})</span>
+            <span className="font-mono">{formatCurrency(prof.vesTotal, "VES")}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Términos y Notas de la Proforma */}
+      <div className="mt-8 rounded-xl bg-neutral-50 p-3.5 border border-neutral-200/80 text-xs text-neutral-600 space-y-2">
+        <p className="font-bold text-neutral-700 uppercase tracking-wide text-[10px]">Términos & Condiciones</p>
+        <p>{terms}</p>
+        {prof.notes && <p className="pt-1 border-t border-neutral-200"><strong>Notas específicas:</strong> {prof.notes}</p>}
+      </div>
+
+      <p className="mt-6 text-center text-[10px] text-neutral-400">
+        {footer}
+      </p>
+    </div>
+  );
+}

@@ -20,6 +20,7 @@ import {
   LogoutIcon,
   SearchIcon,
   PlusIcon,
+  FileTextIcon,
 } from "@/components/ui/icons";
 import { TenantConfigSelector } from "@/components/admin/tenant-config-selector";
 import { SidebarCompaniesAccordion } from "@/components/admin/sidebar-companies-accordion";
@@ -34,6 +35,7 @@ interface NavItem {
 
 const mainNav: NavItem[] = [
   { href: "/dashboard", label: "Inicio / Resumen", Icon: HomeIcon },
+  { href: "/proformas", label: "Proformas & Cotizaciones", Icon: FileTextIcon },
   { href: "/cobros", label: "Cobros & Facturas", Icon: InvoiceIcon },
   { href: "/gastos", label: "Gastos & Egresos", Icon: ReceiptIcon },
   { href: "/nomina", label: "Nómina de Empleados", Icon: PayrollIcon },

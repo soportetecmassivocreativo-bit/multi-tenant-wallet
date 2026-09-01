@@ -2,13 +2,15 @@ export interface SystemConfig {
   // Contabilizadores y Nomenclatura
   basePrefix: string; // ej: "Mas-Corp-"
   codeDigits: number; // 1, 2, 3, 4 (default: 4 -> "0001")
-  invoicePrefix: string; // "Mas-Corp-" o "Mas-Corp-FAC-"
+  proformaPrefix: string; // "Mas-Corp-Prof-"
+  proformaCounter: number; // ej: 1
+  invoicePrefix: string; // "Mas-Corp-Fact-"
   invoiceCounter: number; // ej: 1
-  expensePrefix: string; // "Mas-Corp-" o "Mas-Corp-GAS-"
+  expensePrefix: string; // "Mas-Corp-Egre-"
   expenseCounter: number; // ej: 1
-  employeePrefix: string; // "Mas-Corp-" o "Mas-Corp-NOM-"
+  employeePrefix: string; // "Mas-Corp-Nom-"
   employeeCounter: number; // ej: 1
-  servicePrefix: string; // "Mas-Corp-" o "Mas-Corp-SRV-"
+  servicePrefix: string; // "Mas-Corp-Serv-"
   serviceCounter: number; // ej: 1
 
   // Identidad, Branding y Logos
@@ -19,22 +21,48 @@ export interface SystemConfig {
   defaultCurrency: string; // "USD" | "VES" | "EUR"
   defaultTaxRate: number; // 16%
 
-  // Personalización de Reportes PDF
+  // 1. Personalización de Reportes PDF General (Egresos, Nómina, Servicios, Cuentas, etc.)
   pdfCompanyName: string; // "Massivo Corp"
   pdfCompanyRif: string; // "J-50000000-0"
   pdfHeaderSubtitle: string; // "Sistema Financiero & Facturación"
   pdfPrimaryColor: string; // "#2C21FF"
-  pdfPaperSize: "a4" | "letter" | "legal"; // "a4" | "letter" | "legal"
+  pdfPaperSize: "a4" | "letter" | "legal";
   pdfContactEmail: string; // "contacto@massivocorp.com"
   pdfContactPhone: string; // "+58 412-0000000"
   pdfShowBcvRates: boolean; // true
-  pdfFooterText: string; // "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet"
-  pdfTermsAndConditions: string; // Términos y condiciones
+  pdfFooterText: string;
+  pdfTermsAndConditions: string;
+
+  // 2. Personalización de PDF Exclusivo para Facturas
+  pdfInvoiceCompanyName: string;
+  pdfInvoiceCompanyRif: string;
+  pdfInvoiceHeaderSubtitle: string;
+  pdfInvoicePrimaryColor: string;
+  pdfInvoicePaperSize: "a4" | "letter" | "legal";
+  pdfInvoiceContactEmail: string;
+  pdfInvoiceContactPhone: string;
+  pdfInvoiceShowBcvRates: boolean;
+  pdfInvoiceFooterText: string;
+  pdfInvoiceTermsAndConditions: string;
+
+  // 3. Personalización de PDF Exclusivo para Proformas / Presupuestos
+  pdfProformaCompanyName: string;
+  pdfProformaCompanyRif: string;
+  pdfProformaHeaderSubtitle: string;
+  pdfProformaPrimaryColor: string;
+  pdfProformaPaperSize: "a4" | "letter" | "legal";
+  pdfProformaContactEmail: string;
+  pdfProformaContactPhone: string;
+  pdfProformaShowBcvRates: boolean;
+  pdfProformaFooterText: string;
+  pdfProformaTermsAndConditions: string;
 }
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   basePrefix: "Mas-Corp-",
   codeDigits: 4,
+  proformaPrefix: "Mas-Corp-Prof-",
+  proformaCounter: 1,
   invoicePrefix: "Mas-Corp-Fact-",
   invoiceCounter: 1,
   expensePrefix: "Mas-Corp-Egre-",
@@ -51,16 +79,41 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   defaultCurrency: "USD",
   defaultTaxRate: 16,
 
+  // General
   pdfCompanyName: "Massivo Corp",
   pdfCompanyRif: "J-50000000-0",
-  pdfHeaderSubtitle: "Sistema Financiero & Facturación",
+  pdfHeaderSubtitle: "Sistema Financiero & Reportes",
   pdfPrimaryColor: "#2C21FF",
-  pdfPaperSize: "a4",
+  pdfPaperSize: "letter",
   pdfContactEmail: "contacto@massivocorp.com",
   pdfContactPhone: "+58 412-0000000",
   pdfShowBcvRates: true,
   pdfFooterText: "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet",
-  pdfTermsAndConditions: "Factura emitida conforme a las regulaciones vigentes. Pagadera a la fecha de vencimiento.",
+  pdfTermsAndConditions: "Documento oficial generado para fines contables y de auditoría interna.",
+
+  // Facturas
+  pdfInvoiceCompanyName: "Massivo Corp",
+  pdfInvoiceCompanyRif: "J-50000000-0",
+  pdfInvoiceHeaderSubtitle: "Factura Comercial & Comprobante de Cobro",
+  pdfInvoicePrimaryColor: "#2C21FF",
+  pdfInvoicePaperSize: "letter",
+  pdfInvoiceContactEmail: "contacto@massivocorp.com",
+  pdfInvoiceContactPhone: "+58 412-0000000",
+  pdfInvoiceShowBcvRates: true,
+  pdfInvoiceFooterText: "Massivo Corp · Factura Oficial · Validez fiscal según regulaciones vigentes",
+  pdfInvoiceTermsAndConditions: "Factura pagadera de contado o a los términos acordados. Montos en VES calculados a la tasa oficial BCV del día.",
+
+  // Proformas
+  pdfProformaCompanyName: "Massivo Corp",
+  pdfProformaCompanyRif: "J-50000000-0",
+  pdfProformaHeaderSubtitle: "Proforma / Presupuesto Comercial",
+  pdfProformaPrimaryColor: "#2C21FF",
+  pdfProformaPaperSize: "letter",
+  pdfProformaContactEmail: "contacto@massivocorp.com",
+  pdfProformaContactPhone: "+58 412-0000000",
+  pdfProformaShowBcvRates: true,
+  pdfProformaFooterText: "Massivo Corp · Proforma Preliminar · No válida como factura fiscal hasta su acreditación",
+  pdfProformaTermsAndConditions: "Esta proforma / cotización tiene una validez de 15 días continuos a partir de su emisión. Los precios en divisas se cancelan a la tasa BCV del día de pago.",
 };
 
 /**
@@ -97,4 +150,3 @@ export function formatEntityCode(
   const padded = String(counter).padStart(cleanDigits, "0");
   return `${prefix}${padded}`;
 }
-

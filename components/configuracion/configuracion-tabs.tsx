@@ -30,6 +30,7 @@ interface ConfiguracionTabsProps {
 
 export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsProps) {
   const [activeTab, setActiveTab] = useState<"contabilizadores" | "branding" | "pdf">("contabilizadores");
+  const [pdfSubTab, setPdfSubTab] = useState<"facturas" | "proformas" | "general">("facturas");
   const [config, setConfig] = useState<SystemConfig>(initialConfig);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -214,7 +215,39 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
               <h2 className="font-serif text-[15px] font-medium">Contabilizadores Correlativos por Módulo</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Facturas */}
+                {/* Proformas */}
+                <div className="rounded-xl border border-line bg-soft/50 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-medium">
+                      <ReceiptIcon className="h-4 w-4 text-accent" /> Proformas & Cotizaciones
+                    </span>
+                    <span className="font-mono text-xs font-semibold text-accent">
+                      {config.proformaPrefix || "Mas-Corp-Prof-"}
+                      {String(config.proformaCounter || 1).padStart(config.codeDigits, "0")}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted">Prefijo</label>
+                      <input
+                        type="text"
+                        value={config.proformaPrefix || "Mas-Corp-Prof-"}
+                        onChange={(e) => updateField("proformaPrefix", e.target.value)}
+                        className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted">Próximo Nº</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={config.proformaCounter || 1}
+                        onChange={(e) => updateField("proformaCounter", Number(e.target.value))}
+                        className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
                 <div className="rounded-xl border border-line bg-soft/50 p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-xs font-medium">
@@ -522,130 +555,420 @@ export function ConfiguracionTabs({ initialConfig, canEdit }: ConfiguracionTabsP
 
         {/* PESTAÑA 3: PERSONALIZACIÓN DE PDF & REPORTES */}
         {activeTab === "pdf" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Formulario de opciones */}
-            <div className="space-y-4">
-              <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5">
-                <h2 className="font-serif text-[15px] font-medium">Membrete y Datos del Reporte</h2>
+          <div className="space-y-4">
+            {/* Sub-selector de ámbito PDF */}
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-card p-2 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setPdfSubTab("facturas")}
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
+                  pdfSubTab === "facturas"
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-muted hover:text-foreground hover:bg-soft"
+                }`}
+              >
+                <span>📄 1. PDF Facturas</span>
+              </button>
 
-                <div>
-                  <label className="mb-1 block text-xs text-muted">Nombre de la Empresa en PDF</label>
-                  <input
-                    type="text"
-                    value={config.pdfCompanyName}
-                    onChange={(e) => updateField("pdfCompanyName", e.target.value)}
-                    className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={() => setPdfSubTab("proformas")}
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
+                  pdfSubTab === "proformas"
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-muted hover:text-foreground hover:bg-soft"
+                }`}
+              >
+                <span>📋 2. PDF Proformas</span>
+              </button>
 
-                <div>
-                  <label className="mb-1 block text-xs text-muted">RIF Fiscal</label>
-                  <input
-                    type="text"
-                    value={config.pdfCompanyRif}
-                    onChange={(e) => updateField("pdfCompanyRif", e.target.value)}
-                    className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs text-muted">Subtítulo / Lema de Encabezado</label>
-                  <input
-                    type="text"
-                    value={config.pdfHeaderSubtitle}
-                    onChange={(e) => updateField("pdfHeaderSubtitle", e.target.value)}
-                    className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1 block text-xs text-muted">Teléfono de Contacto</label>
-                    <input
-                      type="text"
-                      value={config.pdfContactPhone}
-                      onChange={(e) => updateField("pdfContactPhone", e.target.value)}
-                      className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-muted">Correo de Contacto</label>
-                    <input
-                      type="text"
-                      value={config.pdfContactEmail}
-                      onChange={(e) => updateField("pdfContactEmail", e.target.value)}
-                      className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-
-                {/* Tipo de Hoja / Tamaño de Papel */}
-                <div>
-                  <label className="mb-1.5 block text-xs text-muted font-medium">
-                    Tipo de Hoja / Formato de Papel
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: "a4", name: "A4", sub: "210 × 297 mm" },
-                      { id: "letter", name: "Carta", sub: "216 × 279 mm" },
-                      { id: "legal", name: "Oficio", sub: "216 × 356 mm" },
-                    ].map((fmt) => (
-                      <button
-                        key={fmt.id}
-                        type="button"
-                        onClick={() => updateField("pdfPaperSize", fmt.id as "a4" | "letter" | "legal")}
-                        className={`rounded-xl border p-2 text-left transition-all ${
-                          (config.pdfPaperSize || "a4") === fmt.id
-                            ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
-                            : "border-line bg-card hover:bg-soft text-foreground"
-                        }`}
-                      >
-                        <p className="text-xs">{fmt.name}</p>
-                        <p className="text-[10px] text-muted">{fmt.sub}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Términos y Condiciones */}
-                <div>
-                  <label className="mb-1 block text-xs text-muted">Términos y Condiciones / Nota Legal</label>
-                  <textarea
-                    rows={2}
-                    value={config.pdfTermsAndConditions || ""}
-                    onChange={(e) => updateField("pdfTermsAndConditions", e.target.value)}
-                    placeholder="Nota que aparece al pie de la factura..."
-                    className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                  />
-                </div>
-
-                {/* Interruptor BCV */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en el reporte</span>
-                  <input
-                    type="checkbox"
-                    checked={config.pdfShowBcvRates}
-                    onChange={(e) => updateField("pdfShowBcvRates", e.target.checked)}
-                    className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
-                  />
-                </div>
-
-                {/* Pie de página */}
-                <div>
-                  <label className="mb-1 block text-xs text-muted">Pie de Página / Confidencialidad</label>
-                  <textarea
-                    rows={2}
-                    value={config.pdfFooterText}
-                    onChange={(e) => updateField("pdfFooterText", e.target.value)}
-                    className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                  />
-                </div>
-              </section>
+              <button
+                type="button"
+                onClick={() => setPdfSubTab("general")}
+                className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
+                  pdfSubTab === "general"
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-muted hover:text-foreground hover:bg-soft"
+                }`}
+              >
+                <span>📊 3. PDF General (Egresos, Nómina, Servicios, etc.)</span>
+              </button>
             </div>
 
-            {/* Vista previa en vivo */}
-            <div className="lg:sticky lg:top-6 self-start">
-              <PdfLivePreview config={config} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Formulario de opciones según sub-pestaña */}
+              <div className="space-y-4">
+                {/* 1. SECCIÓN FACTURAS */}
+                {pdfSubTab === "facturas" && (
+                  <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5 animate-in fade-in duration-150">
+                    <div>
+                      <h2 className="font-serif text-[15px] font-medium text-foreground">
+                        Membrete y Datos de Facturas PDF
+                      </h2>
+                      <p className="text-xs text-muted">
+                        Personaliza los textos, datos fiscales y condiciones exclusivas para los comprobantes de facturación.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Nombre de la Empresa en Facturas</label>
+                      <input
+                        type="text"
+                        value={config.pdfInvoiceCompanyName || config.pdfCompanyName || ""}
+                        onChange={(e) => updateField("pdfInvoiceCompanyName", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">RIF Fiscal en Facturas</label>
+                      <input
+                        type="text"
+                        value={config.pdfInvoiceCompanyRif || config.pdfCompanyRif || ""}
+                        onChange={(e) => updateField("pdfInvoiceCompanyRif", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Subtítulo / Encabezado de Facturas</label>
+                      <input
+                        type="text"
+                        value={config.pdfInvoiceHeaderSubtitle || ""}
+                        onChange={(e) => updateField("pdfInvoiceHeaderSubtitle", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs text-muted">Teléfono de Contacto</label>
+                        <input
+                          type="text"
+                          value={config.pdfInvoiceContactPhone || config.pdfContactPhone || ""}
+                          onChange={(e) => updateField("pdfInvoiceContactPhone", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-muted">Correo de Contacto</label>
+                        <input
+                          type="text"
+                          value={config.pdfInvoiceContactEmail || config.pdfContactEmail || ""}
+                          onChange={(e) => updateField("pdfInvoiceContactEmail", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tipo de Hoja */}
+                    <div>
+                      <label className="mb-1.5 block text-xs text-muted font-medium">Formato de Papel para Facturas</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "a4", name: "A4", sub: "210 × 297 mm" },
+                          { id: "letter", name: "Carta", sub: "216 × 279 mm" },
+                          { id: "legal", name: "Oficio", sub: "216 × 356 mm" },
+                        ].map((fmt) => (
+                          <button
+                            key={fmt.id}
+                            type="button"
+                            onClick={() => updateField("pdfInvoicePaperSize", fmt.id as any)}
+                            className={`rounded-xl border p-2 text-left transition-all ${
+                              (config.pdfInvoicePaperSize || config.pdfPaperSize || "letter") === fmt.id
+                                ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
+                                : "border-line bg-card hover:bg-soft text-foreground"
+                            }`}
+                          >
+                            <p className="text-xs">{fmt.name}</p>
+                            <p className="text-[10px] text-muted">{fmt.sub}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Términos y Condiciones / Nota Legal de Factura</label>
+                      <textarea
+                        rows={2}
+                        value={config.pdfInvoiceTermsAndConditions || ""}
+                        onChange={(e) => updateField("pdfInvoiceTermsAndConditions", e.target.value)}
+                        placeholder="Nota legal para la factura..."
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en facturas</span>
+                      <input
+                        type="checkbox"
+                        checked={config.pdfInvoiceShowBcvRates ?? true}
+                        onChange={(e) => updateField("pdfInvoiceShowBcvRates", e.target.checked)}
+                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Pie de Página en Facturas</label>
+                      <textarea
+                        rows={2}
+                        value={config.pdfInvoiceFooterText || ""}
+                        onChange={(e) => updateField("pdfInvoiceFooterText", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {/* 2. SECCIÓN PROFORMAS */}
+                {pdfSubTab === "proformas" && (
+                  <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5 animate-in fade-in duration-150">
+                    <div>
+                      <h2 className="font-serif text-[15px] font-medium text-foreground">
+                        Membrete y Datos de Proformas PDF
+                      </h2>
+                      <p className="text-xs text-muted">
+                        Personaliza los textos, validez de la oferta y condiciones para las cotizaciones y proformas.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Nombre de la Empresa en Proformas</label>
+                      <input
+                        type="text"
+                        value={config.pdfProformaCompanyName || config.pdfCompanyName || ""}
+                        onChange={(e) => updateField("pdfProformaCompanyName", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">RIF Fiscal en Proformas</label>
+                      <input
+                        type="text"
+                        value={config.pdfProformaCompanyRif || config.pdfCompanyRif || ""}
+                        onChange={(e) => updateField("pdfProformaCompanyRif", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Subtítulo / Encabezado de Proformas</label>
+                      <input
+                        type="text"
+                        value={config.pdfProformaHeaderSubtitle || ""}
+                        onChange={(e) => updateField("pdfProformaHeaderSubtitle", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs text-muted">Teléfono de Contacto</label>
+                        <input
+                          type="text"
+                          value={config.pdfProformaContactPhone || config.pdfContactPhone || ""}
+                          onChange={(e) => updateField("pdfProformaContactPhone", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-muted">Correo de Contacto</label>
+                        <input
+                          type="text"
+                          value={config.pdfProformaContactEmail || config.pdfContactEmail || ""}
+                          onChange={(e) => updateField("pdfProformaContactEmail", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tipo de Hoja */}
+                    <div>
+                      <label className="mb-1.5 block text-xs text-muted font-medium">Formato de Papel para Proformas</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "a4", name: "A4", sub: "210 × 297 mm" },
+                          { id: "letter", name: "Carta", sub: "216 × 279 mm" },
+                          { id: "legal", name: "Oficio", sub: "216 × 356 mm" },
+                        ].map((fmt) => (
+                          <button
+                            key={fmt.id}
+                            type="button"
+                            onClick={() => updateField("pdfProformaPaperSize", fmt.id as any)}
+                            className={`rounded-xl border p-2 text-left transition-all ${
+                              (config.pdfProformaPaperSize || config.pdfPaperSize || "letter") === fmt.id
+                                ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
+                                : "border-line bg-card hover:bg-soft text-foreground"
+                            }`}
+                          >
+                            <p className="text-xs">{fmt.name}</p>
+                            <p className="text-[10px] text-muted">{fmt.sub}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Términos, Validez & Condiciones de Proforma</label>
+                      <textarea
+                        rows={2}
+                        value={config.pdfProformaTermsAndConditions || ""}
+                        onChange={(e) => updateField("pdfProformaTermsAndConditions", e.target.value)}
+                        placeholder="Ej: Validez de la oferta: 15 días continuos..."
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en proformas</span>
+                      <input
+                        type="checkbox"
+                        checked={config.pdfProformaShowBcvRates ?? true}
+                        onChange={(e) => updateField("pdfProformaShowBcvRates", e.target.checked)}
+                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Pie de Página en Proformas</label>
+                      <textarea
+                        rows={2}
+                        value={config.pdfProformaFooterText || ""}
+                        onChange={(e) => updateField("pdfProformaFooterText", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {/* 3. SECCIÓN GENERAL (Otros Módulos) */}
+                {pdfSubTab === "general" && (
+                  <section className="rounded-2xl border border-line bg-card p-4 space-y-3.5 animate-in fade-in duration-150">
+                    <div>
+                      <h2 className="font-serif text-[15px] font-medium text-foreground">
+                        Membrete y Datos para Reportes Generales
+                      </h2>
+                      <p className="text-xs text-muted">
+                        Aplica a los reportes de Gastos, Nómina, Servicios, Cuentas, Auditoría y Reportes Financieros.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Nombre de la Empresa en Reportes</label>
+                      <input
+                        type="text"
+                        value={config.pdfCompanyName}
+                        onChange={(e) => updateField("pdfCompanyName", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">RIF Fiscal</label>
+                      <input
+                        type="text"
+                        value={config.pdfCompanyRif}
+                        onChange={(e) => updateField("pdfCompanyRif", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Subtítulo / Lema de Encabezado</label>
+                      <input
+                        type="text"
+                        value={config.pdfHeaderSubtitle}
+                        onChange={(e) => updateField("pdfHeaderSubtitle", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-xs text-muted">Teléfono de Contacto</label>
+                        <input
+                          type="text"
+                          value={config.pdfContactPhone}
+                          onChange={(e) => updateField("pdfContactPhone", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-muted">Correo de Contacto</label>
+                        <input
+                          type="text"
+                          value={config.pdfContactEmail}
+                          onChange={(e) => updateField("pdfContactEmail", e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tipo de Hoja / Formato de Papel */}
+                    <div>
+                      <label className="mb-1.5 block text-xs text-muted font-medium">Formato de Papel General</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "a4", name: "A4", sub: "210 × 297 mm" },
+                          { id: "letter", name: "Carta", sub: "216 × 279 mm" },
+                          { id: "legal", name: "Oficio", sub: "216 × 356 mm" },
+                        ].map((fmt) => (
+                          <button
+                            key={fmt.id}
+                            type="button"
+                            onClick={() => updateField("pdfPaperSize", fmt.id as "a4" | "letter" | "legal")}
+                            className={`rounded-xl border p-2 text-left transition-all ${
+                              (config.pdfPaperSize || "letter") === fmt.id
+                                ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
+                                : "border-line bg-card hover:bg-soft text-foreground"
+                            }`}
+                          >
+                            <p className="text-xs">{fmt.name}</p>
+                            <p className="text-[10px] text-muted">{fmt.sub}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Términos y Condiciones / Nota de Confidencialidad</label>
+                      <textarea
+                        rows={2}
+                        value={config.pdfTermsAndConditions || ""}
+                        onChange={(e) => updateField("pdfTermsAndConditions", e.target.value)}
+                        placeholder="Nota legal para los reportes..."
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en el reporte</span>
+                      <input
+                        type="checkbox"
+                        checked={config.pdfShowBcvRates}
+                        onChange={(e) => updateField("pdfShowBcvRates", e.target.checked)}
+                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">Pie de Página / Confidencialidad</label>
+                      <textarea
+                        rows={2}
+                        value={config.pdfFooterText}
+                        onChange={(e) => updateField("pdfFooterText", e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+                  </section>
+                )}
+              </div>
+
+              {/* Vista previa en vivo interactiva */}
+              <div className="lg:sticky lg:top-6 self-start">
+                <PdfLivePreview config={config} target={pdfSubTab} />
+              </div>
             </div>
           </div>
         )}

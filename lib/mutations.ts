@@ -546,3 +546,357 @@ export async function deleteClient(id: string): Promise<MutationResult> {
 export async function deletePayment(id: string): Promise<MutationResult> {
   return deleteRow("payments", id, ["/cobros", "/dashboard"]);
 }
+
+/* ----------------------------- Proformas ---------------------------- */
+
+export interface CreateProformaInput {
+  clientId: string;
+  currency: CurrencyCode;
+  lines: { description: string; qty: number; unitPrice: number }[];
+  taxRate: number;
+  discountPct: number; // 0-100
+  validDays: number; // Ej: 15 o 30 días
+  rateRef: RateRef;
+  rate: number;
+  notes?: string;
+}
+
+export async function createProforma(
+  input: CreateProformaInput,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+  const { supabase, companyId } = ctx;
+
+  const issueDateISO = today();
+  const result = computeInvoice({
+    lines: input.lines,
+    taxRate: input.taxRate,
+    discountPct: input.discountPct / 100,
+    creditDays: input.validDays || 15,
+    issueDateISO,
+  });
+  const isForeign = input.currency !== "VES";
+
+  // Obtener contador de proformas
+  const nextNum = await getNextCode("proformaCounter", 1);
+  const validUntilISO = result.dueDateISO;
+
+  // Intentar guardar en tabla proformas
+  try {
+    const { data: prof, error } = await supabase
+      .from("proformas")
+      .insert({
+        company_id: companyId,
+        client_id: input.clientId,
+        number: nextNum,
+        currency: input.currency,
+        subtotal: result.subtotal,
+        discount: result.discount,
+        tax_rate: input.taxRate,
+        tax: result.tax,
+        total: result.total,
+        ves_rate: isForeign ? input.rate : null,
+        ves_rate_ref: isForeign ? input.rateRef : null,
+        ves_total: isForeign ? result.total * input.rate : null,
+        status: "pendiente",
+        issue_date: issueDateISO,
+        valid_until: validUntilISO,
+        notes: input.notes || null,
+      })
+      .select("id")
+      .single();
+
+    if (!error && prof) {
+      if (input.lines.length) {
+        await supabase.from("proforma_items").insert(
+          input.lines.map((l) => ({
+            company_id: companyId,
+            proforma_id: prof.id,
+            description: l.description,
+            qty: l.qty,
+            unit_price: l.unitPrice,
+          })),
+        );
+      }
+
+      await logAuditEvent({
+        action: "crear_proforma",
+        entityType: "proforma",
+        entityId: prof.id as string,
+        description: `Creó la Proforma #${nextNum} por ${result.total.toFixed(2)} ${input.currency} (Validez: ${input.validDays} días)`,
+        details: { number: nextNum, total: result.total, currency: input.currency },
+        customUser: {
+          id: ctx.userId,
+          name: ctx.userName,
+          role: ctx.role,
+          companyId: ctx.companyId,
+        },
+      });
+
+      revalidatePath("/proformas");
+      revalidatePath("/dashboard");
+      return { ok: true, id: prof.id as string };
+    }
+  } catch (err) {
+    // Si la tabla no existe aún en Supabase, creamos en invoices con estatus pendiente
+  }
+
+  // Fallback: crear en invoices como pendiente
+  const { data: company } = await supabase
+    .from("companies")
+    .select("next_invoice_number")
+    .eq("id", companyId)
+    .single();
+  const number = company?.next_invoice_number ?? 1;
+
+  const { data: inv, error: invErr } = await supabase
+    .from("invoices")
+    .insert({
+      company_id: companyId,
+      client_id: input.clientId,
+      number,
+      currency: input.currency,
+      subtotal: result.subtotal,
+      discount: result.discount,
+      tax_rate: input.taxRate,
+      tax: result.tax,
+      total: result.total,
+      ves_rate: isForeign ? input.rate : null,
+      ves_rate_ref: isForeign ? input.rateRef : null,
+      ves_total: isForeign ? result.total * input.rate : null,
+      status: "pendiente",
+      issue_date: issueDateISO,
+      due_date: validUntilISO,
+    })
+    .select("id")
+    .single();
+
+  if (invErr || !inv) return { ok: false, error: invErr?.message ?? "Error al emitir la proforma." };
+
+  if (input.lines.length) {
+    await supabase.from("invoice_items").insert(
+      input.lines.map((l) => ({
+        company_id: companyId,
+        invoice_id: inv.id,
+        description: l.description,
+        qty: l.qty,
+        unit_price: l.unitPrice,
+      })),
+    );
+  }
+
+  await supabase
+    .from("companies")
+    .update({ next_invoice_number: number + 1 })
+    .eq("id", companyId);
+
+  revalidatePath("/proformas");
+  revalidatePath("/cobros");
+  revalidatePath("/dashboard");
+  return { ok: true, id: inv.id as string };
+}
+
+export interface ConvertProformaInput {
+  proformaId: string;
+  accountId: string;
+  accountName: string;
+  paymentMethod: string;
+  paymentReference?: string;
+  notes?: string;
+  amount?: number;
+}
+
+export async function convertProformaToInvoiceAndPay(
+  input: ConvertProformaInput,
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+  const { supabase, companyId } = ctx;
+
+  const issueDateISO = today();
+  let formattedMethod = (input.paymentMethod || "Transferencia Bancaria").trim();
+  const metaParts: string[] = [];
+  if (input.accountName) metaParts.push(input.accountName.trim());
+  if (input.paymentReference) metaParts.push(`Ref: ${input.paymentReference.trim()}`);
+  if (input.notes) metaParts.push(`"${input.notes.trim()}"`);
+  if (metaParts.length > 0) {
+    formattedMethod = `${formattedMethod} · ${metaParts.join(" · ")}`;
+  }
+
+  // 1. Verificar si la proforma está en la tabla proformas
+  try {
+    const { data: prof } = await supabase
+      .from("proformas")
+      .select("*")
+      .eq("id", input.proformaId)
+      .single();
+
+    if (prof) {
+      // Obtener siguiente número de factura
+      const { data: company } = await supabase
+        .from("companies")
+        .select("next_invoice_number")
+        .eq("id", companyId)
+        .single();
+      const invoiceNumber = company?.next_invoice_number ?? 1;
+
+      // Crear factura pagada definitiva
+      const { data: inv, error: invErr } = await supabase
+        .from("invoices")
+        .insert({
+          company_id: companyId,
+          client_id: prof.client_id,
+          number: invoiceNumber,
+          currency: prof.currency,
+          subtotal: prof.subtotal,
+          discount: prof.discount,
+          tax_rate: prof.tax_rate,
+          tax: prof.tax,
+          total: prof.total,
+          ves_rate: prof.ves_rate,
+          ves_rate_ref: prof.ves_rate_ref,
+          ves_total: prof.ves_total,
+          status: "pagada",
+          issue_date: issueDateISO,
+          due_date: issueDateISO,
+        })
+        .select("id")
+        .single();
+
+      if (invErr || !inv) {
+        return { ok: false, error: invErr?.message || "No se pudo generar la factura." };
+      }
+
+      // Copiar ítems
+      const { data: pItems } = await supabase
+        .from("proforma_items")
+        .select("*")
+        .eq("proforma_id", prof.id);
+
+      if (pItems && pItems.length > 0) {
+        await supabase.from("invoice_items").insert(
+          pItems.map((item) => ({
+            company_id: companyId,
+            invoice_id: inv.id,
+            description: item.description,
+            qty: item.qty,
+            unit_price: item.unit_price,
+          })),
+        );
+      }
+
+      // Registrar pago acreditado
+      const payAmount = input.amount && input.amount > 0 ? input.amount : Number(prof.total);
+      await supabase.from("payments").insert({
+        company_id: companyId,
+        invoice_id: inv.id,
+        amount: payAmount,
+        currency: prof.currency,
+        paid_on: issueDateISO,
+        method: formattedMethod,
+      });
+
+      // Actualizar proforma
+      await supabase
+        .from("proformas")
+        .update({ status: "pagada", invoice_id: inv.id })
+        .eq("id", prof.id);
+
+      // Incrementar contador de facturas
+      await supabase
+        .from("companies")
+        .update({ next_invoice_number: invoiceNumber + 1 })
+        .eq("id", companyId);
+
+      await logAuditEvent({
+        action: "convertir_proforma_a_factura",
+        entityType: "factura",
+        entityId: inv.id as string,
+        description: `Proforma #${prof.number} convertida a Factura #${invoiceNumber} (Pagada y acreditada en ${input.accountName})`,
+        details: { proformaId: prof.id, invoiceId: inv.id, invoiceNumber, amount: payAmount, accountName: input.accountName },
+        customUser: {
+          id: ctx.userId,
+          name: ctx.userName,
+          role: ctx.role,
+          companyId: ctx.companyId,
+        },
+      });
+
+      revalidatePath("/proformas");
+      revalidatePath("/cobros");
+      revalidatePath("/cuentas");
+      revalidatePath("/dashboard");
+      return { ok: true, id: inv.id as string };
+    }
+  } catch (err) {}
+
+  // 2. Si venía de facturas pendientes puente:
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", input.proformaId)
+    .single();
+
+  if (inv) {
+    const payAmount = input.amount && input.amount > 0 ? input.amount : Number(inv.total);
+
+    // Registrar pago
+    await supabase.from("payments").insert({
+      company_id: companyId,
+      invoice_id: inv.id,
+      amount: payAmount,
+      currency: inv.currency,
+      paid_on: issueDateISO,
+      method: formattedMethod,
+    });
+
+    // Marcar factura como pagada
+    await supabase
+      .from("invoices")
+      .update({ status: "pagada" })
+      .eq("id", inv.id);
+
+    await logAuditEvent({
+      action: "cobrar_factura_proforma",
+      entityType: "factura",
+      entityId: inv.id as string,
+      description: `Factura #${inv.number} marcada como pagada y acreditada en ${input.accountName}`,
+      details: { invoiceId: inv.id, invoiceNumber: inv.number, amount: payAmount, accountName: input.accountName },
+      customUser: {
+        id: ctx.userId,
+        name: ctx.userName,
+        role: ctx.role,
+        companyId: ctx.companyId,
+      },
+    });
+
+    revalidatePath("/proformas");
+    revalidatePath("/cobros");
+    revalidatePath("/cuentas");
+    revalidatePath("/dashboard");
+    return { ok: true, id: inv.id as string };
+  }
+
+  return { ok: false, error: "Proforma no encontrada." };
+}
+
+export async function deleteProforma(id: string): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+
+  try {
+    await ctx.supabase.from("proformas").delete().eq("id", id);
+  } catch (err) {}
+  // También intentar por si estaba en invoices
+  try {
+    await ctx.supabase.from("invoices").delete().eq("id", id).eq("status", "pendiente");
+  } catch (err) {}
+
+  revalidatePath("/proformas");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}

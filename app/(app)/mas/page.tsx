@@ -18,6 +18,7 @@ import {
   UserIcon,
   ShieldCheckIcon,
   SettingsIcon,
+  FileTextIcon,
 } from "@/components/ui/icons";
 
 type Item = {
@@ -28,18 +29,19 @@ type Item = {
 };
 
 const modules: Item[] = [
-  { href: "/cobros",        label: "Facturación",          desc: "Facturas, cobros y cuentas por cobrar",    Icon: ReceiptIcon },
-  { href: "/gastos",        label: "Gastos",               desc: "Egresos y categorías",                    Icon: ChartIcon },
-  { href: "/nomina",        label: "Nómina",               desc: "Empleados y pagos quincenales",           Icon: PayrollIcon },
-  { href: "/servicios",     label: "Servicios",            desc: "Suscripciones recurrentes",               Icon: RepeatIcon },
-  { href: "/clientes",      label: "Clientes",             desc: "Fichas, historial y score",               Icon: UsersIcon },
-  { href: "/equipo",        label: "Equipo",               desc: "Gestión de roles y miembros",             Icon: UserPlusIcon },
-  { href: "/reportes",      label: "Reportes",             desc: "Ingresos vs egresos del mes",             Icon: ChartIcon },
-  { href: "/auditoria",     label: "Auditoría",            desc: "Registro de movimientos y acciones",      Icon: ShieldCheckIcon },
-  { href: "/cuentas",       label: "Cuentas de Empresa",   desc: "Bancos, Pago Móvil, Zelle y cripto",      Icon: BuildingIcon },
-  { href: "/configuracion", label: "Configuración",        desc: "Personalización PDF y contabilizadores",  Icon: SettingsIcon },
-  { href: "/perfil",        label: "Mi Perfil & Seguridad",desc: "Cambiar clave y datos de cuenta",         Icon: UserIcon },
-  { href: "/empresas",      label: "Empresas",             desc: "Datos fiscales e impuestos",              Icon: BuildingIcon },
+  { href: "/proformas",     label: "Proformas & Cotizaciones", desc: "Cotizaciones y pagos en espera antes de facturar", Icon: FileTextIcon },
+  { href: "/cobros",        label: "Facturación & Cobros",     desc: "Facturas, cobros y cuentas por cobrar",          Icon: ReceiptIcon },
+  { href: "/gastos",        label: "Gastos & Egresos",         desc: "Egresos y categorías",                          Icon: ChartIcon },
+  { href: "/nomina",        label: "Nómina",                   desc: "Empleados y pagos quincenales",                 Icon: PayrollIcon },
+  { href: "/servicios",     label: "Servicios Recurrentes",    desc: "Suscripciones y cobros periódicos",             Icon: RepeatIcon },
+  { href: "/clientes",      label: "Directorio de Clientes",   desc: "Fichas, historial y score",                     Icon: UsersIcon },
+  { href: "/equipo",        label: "Equipo & Accesos",         desc: "Gestión de roles y miembros",                   Icon: UserPlusIcon },
+  { href: "/reportes",      label: "Reportes Financieros",     desc: "Ingresos vs egresos y balances",                Icon: ChartIcon },
+  { href: "/auditoria",     label: "Auditoría del Sistema",    desc: "Registro de movimientos y acciones",            Icon: ShieldCheckIcon },
+  { href: "/cuentas",       label: "Cuentas de Empresa",       desc: "Bancos, Pago Móvil, Zelle y cripto",            Icon: BuildingIcon },
+  { href: "/configuracion", label: "Configuración Mas-Corp-",  desc: "Personalización PDF y contabilizadores",        Icon: SettingsIcon },
+  { href: "/perfil",        label: "Mi Perfil & Seguridad",    desc: "Cambiar clave y datos de cuenta",               Icon: UserIcon },
+  { href: "/empresas",      label: "Empresas",                 desc: "Datos fiscales e impuestos",                    Icon: BuildingIcon },
 ];
 
 export default function MasPage() {

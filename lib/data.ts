@@ -7,6 +7,8 @@ import type { CurrencyCode } from "@/lib/currency";
 import type {
   Client,
   Invoice,
+  Proforma,
+  ProformaStatus,
   Expense,
   Employee,
   PayrollPeriod,
@@ -17,6 +19,8 @@ import type {
 export type {
   Client,
   Invoice,
+  Proforma,
+  ProformaStatus,
   Expense,
   Employee,
   PayrollPeriod,
@@ -80,6 +84,213 @@ export async function getInvoices(): Promise<Invoice[]> {
 
   // Garantizar siempre el orden numérico correlativo descendente (#10, #9, #8... #1)
   return invoices.sort((a, b) => Number(b.number) - Number(a.number));
+}
+
+/* ----------------------------- Proformas ---------------------------- */
+
+export interface ProformaItem {
+  id: string;
+  description: string;
+  qty: number;
+  unitPrice: number;
+}
+
+export interface ProformaDetail {
+  id: string;
+  number: number | string;
+  code?: string;
+  clientId: string;
+  clientName: string;
+  date: string;
+  validUntil?: string;
+  status: ProformaStatus;
+  currency: CurrencyCode;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  vesRate: number | null;
+  vesRateRef: string | null;
+  vesTotal: number | null;
+  notes?: string;
+  items: ProformaItem[];
+  invoiceId?: string;
+}
+
+export async function getProformas(): Promise<Proforma[]> {
+  const config = await getSystemConfig();
+  const prefix = config.proformaPrefix || "Mas-Corp-Prof-";
+  const digits = config.codeDigits || 4;
+
+  if (!isSupabaseConfigured) {
+    return [...mock.proformas]
+      .map((p) => ({
+        ...p,
+        code: formatEntityCode(prefix, Number(p.number), digits),
+      }))
+      .sort((a, b) => Number(b.number) - Number(a.number));
+  }
+
+  const supabase = await createClient();
+
+  // 1. Intentar consultar tabla proformas
+  try {
+    const { data, error } = await supabase
+      .from("proformas")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at",
+      )
+      .order("number", { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      const list = data.map((p) => ({
+        ...p,
+        code: formatEntityCode(prefix, Number(p.number), digits),
+      })) as unknown as Proforma[];
+      return list.sort((a, b) => Number(b.number) - Number(a.number));
+    }
+  } catch (err) {
+    // Si la tabla no existe aún, seguimos al puente de facturas pendientes
+  }
+
+  // 2. Puente / Migración de facturas pendientes existentes
+  const { data: invData } = await supabase
+    .from("invoices")
+    .select(
+      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, created_at",
+    )
+    .order("number", { ascending: false });
+
+  if (invData && invData.length > 0) {
+    return invData
+      .filter((inv) => inv.status !== "pagada")
+      .map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        code: formatEntityCode(prefix, Number(inv.number), digits),
+        clientId: inv.clientId,
+        date: inv.date,
+        validUntil: inv.dueDate,
+        total: inv.total,
+        currency: (inv.currency as CurrencyCode) || "USD",
+        status: "pendiente" as ProformaStatus,
+        notes: "Proforma derivada de cuenta por cobrar",
+        invoiceId: inv.id,
+      }))
+      .sort((a, b) => Number(b.number) - Number(a.number));
+  }
+
+  return [];
+}
+
+export async function getProformaDetail(id: string): Promise<ProformaDetail | null> {
+  const config = await getSystemConfig();
+  const prefix = config.proformaPrefix || "Mas-Corp-Prof-";
+  const digits = config.codeDigits || 4;
+
+  if (!isSupabaseConfigured) {
+    const p = mock.proformas.find((x) => x.id === id);
+    if (!p) return null;
+    const clientName = mock.clients.find((c) => c.id === p.clientId)?.name ?? "—";
+    return {
+      id: p.id,
+      number: p.number,
+      code: formatEntityCode(prefix, Number(p.number), digits),
+      clientId: p.clientId,
+      clientName,
+      date: p.date,
+      validUntil: p.validUntil,
+      status: p.status,
+      currency: p.currency || "USD",
+      subtotal: p.total,
+      discount: 0,
+      tax: 0,
+      total: p.total,
+      vesRate: null,
+      vesRateRef: null,
+      vesTotal: null,
+      notes: p.notes,
+      items: [
+        {
+          id: "item1",
+          description: p.notes || "Servicios Comerciales",
+          qty: 1,
+          unitPrice: p.total,
+        },
+      ],
+      invoiceId: p.invoiceId,
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Buscar en proformas o en invoices
+  let row: Record<string, unknown> | null = null;
+  let isFromInvoices = false;
+
+  try {
+    const { data } = await supabase
+      .from("proformas")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, notes, invoiceId:invoice_id",
+      )
+      .eq("id", id)
+      .single();
+    if (data) row = data as Record<string, unknown>;
+  } catch (err) {}
+
+  if (!row) {
+    // Buscar en invoices
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+      )
+      .eq("id", id)
+      .single();
+    if (inv) {
+      row = inv as Record<string, unknown>;
+      isFromInvoices = true;
+    }
+  }
+
+  if (!row) return null;
+
+  const [itemsRes, clientRes] = await Promise.all([
+    supabase
+      .from(isFromInvoices ? "invoice_items" : "proforma_items")
+      .select("id, description, qty, unitPrice:unit_price")
+      .eq(isFromInvoices ? "invoice_id" : "proforma_id", id),
+    supabase
+      .from("clients")
+      .select("name")
+      .eq("id", row.clientId as string)
+      .maybeSingle(),
+  ]);
+
+  const items = (itemsRes.data ?? []) as unknown as ProformaItem[];
+
+  return {
+    id: row.id as string,
+    number: row.number as string | number,
+    code: formatEntityCode(prefix, Number(row.number), digits),
+    clientId: row.clientId as string,
+    clientName: (clientRes.data?.name as string) ?? "—",
+    date: (row.date as string) || (row.issue_date as string) || new Date().toISOString().slice(0, 10),
+    validUntil: (row.validUntil as string) || (row.dueDate as string) || (row.due_date as string),
+    status: (row.status as ProformaStatus) || "pendiente",
+    currency: (row.currency as CurrencyCode) || "USD",
+    subtotal: Number(row.subtotal) || Number(row.total) || 0,
+    discount: Number(row.discount) || 0,
+    tax: Number(row.tax) || 0,
+    total: Number(row.total) || 0,
+    vesRate: (row.vesRate as number) || null,
+    vesRateRef: (row.vesRateRef as string) || null,
+    vesTotal: (row.vesTotal as number) || null,
+    notes: (row.notes as string) || undefined,
+    items,
+    invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
+  };
 }
 
 export async function getClients(): Promise<Client[]> {

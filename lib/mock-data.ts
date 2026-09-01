@@ -81,6 +81,7 @@ export type InvoiceStatus =
 export interface Invoice {
   id: string;
   number: string;
+  code?: string;
   clientId: string;
   date: string; // ISO yyyy-mm-dd
   dueDate: string;
@@ -95,6 +96,29 @@ export const invoices: Invoice[] = [
   { id: "i4", number: "1050", clientId: "c1", date: "2026-07-02", dueDate: "2026-08-01", total: 12300, status: "parcial" },
   { id: "i5", number: "1039", clientId: "c3", date: "2026-06-28", dueDate: "2026-06-28", total: 6200, status: "pagada" },
   { id: "i6", number: "1052", clientId: "c5", date: "2026-07-10", dueDate: "2026-08-09", total: 0, status: "borrador" },
+];
+
+/* ----------------------------- Proformas ---------------------------- */
+
+export type ProformaStatus = "pendiente" | "aprobada" | "pagada" | "anulada";
+
+export interface Proforma {
+  id: string;
+  number: string;
+  code?: string;
+  clientId: string;
+  date: string; // ISO yyyy-mm-dd
+  validUntil?: string;
+  total: number;
+  currency?: CurrencyCode;
+  status: ProformaStatus;
+  notes?: string;
+  invoiceId?: string;
+}
+
+export const proformas: Proforma[] = [
+  { id: "prf1", number: "1", code: "Mas-Corp-Prof-0001", clientId: "c2", date: "2026-08-20", total: 9750, status: "pendiente", notes: "Cotización de servicios corporativos" },
+  { id: "prf2", number: "2", code: "Mas-Corp-Prof-0002", clientId: "c4", date: "2026-08-25", total: 45200, status: "pendiente", notes: "Presupuesto proyecto inmobiliario" },
 ];
 
 /* ------------------------------ Gastos ------------------------------ */

@@ -18,6 +18,7 @@ import {
   SettingsIcon,
   ShieldCheckIcon,
   UsersIcon,
+  FileTextIcon,
 } from "@/components/ui/icons";
 
 type NavItem = {
@@ -45,6 +46,7 @@ const masterRight: NavItem[] = [
 ];
 
 const quickActions = [
+  { label: "Nueva proforma", href: "/proformas/nueva", Icon: FileTextIcon, color: "text-accent" },
   { label: "Nueva factura", href: "/cobros/nueva", Icon: InvoiceIcon, color: "text-accent" },
   { label: "Registrar cobro", href: "/cobros", Icon: CashIcon, color: "text-income" },
   { label: "Nuevo gasto", href: "/gastos", Icon: ReceiptIcon, color: "text-overdue" },
