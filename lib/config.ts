@@ -31,6 +31,7 @@ export interface SystemConfig {
   pdfContactEmail: string; // "contacto@massivocorp.com"
   pdfContactPhone: string; // "+58 412-0000000"
   pdfShowBcvRates: boolean; // true
+  pdfBcvCurrency?: "usd" | "eur" | "both" | "none"; // "usd" | "eur" | "both" | "none"
   pdfFooterText: string;
   pdfTermsAndConditions: string;
   pdfShowConditions?: boolean;
@@ -50,6 +51,7 @@ export interface SystemConfig {
   pdfInvoiceContactEmail: string;
   pdfInvoiceContactPhone: string;
   pdfInvoiceShowBcvRates: boolean;
+  pdfInvoiceBcvCurrency?: "usd" | "eur" | "both" | "none";
   pdfInvoiceFooterText: string;
   pdfInvoiceTermsAndConditions: string;
   pdfInvoiceShowConditions?: boolean;
@@ -69,6 +71,7 @@ export interface SystemConfig {
   pdfProformaContactEmail: string;
   pdfProformaContactPhone: string;
   pdfProformaShowBcvRates: boolean;
+  pdfProformaBcvCurrency?: "usd" | "eur" | "both" | "none";
   pdfProformaFooterText: string;
   pdfProformaTermsAndConditions: string;
   pdfProformaShowConditions?: boolean;
@@ -109,6 +112,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfContactEmail: "contacto@massivocorp.com",
   pdfContactPhone: "+58 412-0000000",
   pdfShowBcvRates: true,
+  pdfBcvCurrency: "usd",
   pdfFooterText: "Massivo Corp · Confidencial · Generado automáticamente por M-Wallet",
   pdfTermsAndConditions: "Documento oficial generado para fines contables y de auditoría interna.",
   pdfShowConditions: false,
@@ -128,6 +132,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfInvoiceContactEmail: "contacto@massivocorp.com",
   pdfInvoiceContactPhone: "+58 412-0000000",
   pdfInvoiceShowBcvRates: true,
+  pdfInvoiceBcvCurrency: "usd",
   pdfInvoiceFooterText: "Massivo Corp · Factura Oficial · Validez fiscal según regulaciones vigentes",
   pdfInvoiceTermsAndConditions: "Factura pagadera de contado o a los términos acordados. Montos en VES calculados a la tasa oficial BCV del día.",
   pdfInvoiceShowConditions: true,
@@ -147,6 +152,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfProformaContactEmail: "contacto@massivocorp.com",
   pdfProformaContactPhone: "+58 412-0000000",
   pdfProformaShowBcvRates: true,
+  pdfProformaBcvCurrency: "usd",
   pdfProformaFooterText: "Massivo Corp · Proforma Preliminar · No válida como factura fiscal hasta su acreditación",
   pdfProformaTermsAndConditions: "Esta proforma / cotización tiene una validez de 15 días continuos a partir de su emisión. Los precios en divisas se cancelan a la tasa BCV del día de pago.",
   pdfProformaShowConditions: true,

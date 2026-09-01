@@ -79,6 +79,15 @@ export default async function ProformaPrintPage({
           <p className="text-[11px] text-neutral-500 mt-0.5">
             {[phone, email].filter(Boolean).join(" · ")}
           </p>
+          {(config.pdfProformaShowBcvRates ?? true) && config.pdfProformaBcvCurrency !== "none" && (
+            <p className="text-[10px] text-neutral-600 font-medium mt-1">
+              {config.pdfProformaBcvCurrency === "eur"
+                ? `Tasa Ref. BCV: EUR ${prof.vesRate || "926,55"} Bs.`
+                : config.pdfProformaBcvCurrency === "both"
+                  ? `Tasa Ref. BCV: USD ${prof.vesRate || "798,32"} Bs. | EUR ${(prof.vesRate ? (prof.vesRate * 1.16).toFixed(2) : "926,55")} Bs.`
+                  : `Tasa Ref. BCV: USD ${prof.vesRate || "798,32"} Bs.`}
+            </p>
+          )}
         </div>
         <div className="shrink-0 text-right">
           <span className="inline-block rounded-md bg-amber-100 text-amber-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1">

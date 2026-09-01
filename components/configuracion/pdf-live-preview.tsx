@@ -58,10 +58,25 @@ export function PdfLivePreview({ config, target = "general", accounts = [] }: Pd
       : config.pdfContactEmail || "contacto@massivocorp.com";
 
   const showBcv = isFacturas
-    ? config.pdfInvoiceShowBcvRates
+    ? (config.pdfInvoiceShowBcvRates ?? true) && config.pdfInvoiceBcvCurrency !== "none"
     : isProformas
-      ? config.pdfProformaShowBcvRates
-      : config.pdfShowBcvRates;
+      ? (config.pdfProformaShowBcvRates ?? true) && config.pdfProformaBcvCurrency !== "none"
+      : (config.pdfShowBcvRates ?? true) && config.pdfBcvCurrency !== "none";
+
+  const bcvCurrency = isFacturas
+    ? config.pdfInvoiceBcvCurrency || "usd"
+    : isProformas
+      ? config.pdfProformaBcvCurrency || "usd"
+      : config.pdfBcvCurrency || "usd";
+
+  const bcvText =
+    bcvCurrency === "usd"
+      ? "Tasa Ref. BCV: USD 798,32 Bs."
+      : bcvCurrency === "eur"
+        ? "Tasa Ref. BCV: EUR 926,55 Bs."
+        : bcvCurrency === "both"
+          ? "Tasa Ref. BCV: USD 798,32 Bs. | EUR 926,55 Bs."
+          : "";
 
   const footer = isFacturas
     ? config.pdfInvoiceFooterText || "Massivo Corp · Factura Oficial"
@@ -157,9 +172,9 @@ export function PdfLivePreview({ config, target = "general", accounts = [] }: Pd
           </div>
           <div className="text-right text-[9px] text-gray-500 space-y-0.5">
             <p>Emisión: 01 sep. 2026</p>
-            {showBcv && (
+            {showBcv && bcvText && (
               <p className="font-medium text-gray-700">
-                Tasa Ref. BCV: USD 798,32 Bs. | EUR 926,55 Bs.
+                {bcvText}
               </p>
             )}
             <p>{[phone, email].filter(Boolean).join(" · ")}</p>

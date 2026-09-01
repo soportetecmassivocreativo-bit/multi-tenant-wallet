@@ -82,6 +82,15 @@ export default async function FacturaPage({
           <p className="text-[11px] text-neutral-500 mt-0.5">
             {[phone, email].filter(Boolean).join(" · ")}
           </p>
+          {(config.pdfInvoiceShowBcvRates ?? true) && config.pdfInvoiceBcvCurrency !== "none" && (
+            <p className="text-[10px] text-neutral-600 font-medium mt-1">
+              {config.pdfInvoiceBcvCurrency === "eur"
+                ? `Tasa Ref. BCV: EUR ${inv.vesRate || "926,55"} Bs.`
+                : config.pdfInvoiceBcvCurrency === "both"
+                  ? `Tasa Ref. BCV: USD ${inv.vesRate || "798,32"} Bs. | EUR ${(inv.vesRate ? (inv.vesRate * 1.16).toFixed(2) : "926,55")} Bs.`
+                  : `Tasa Ref. BCV: USD ${inv.vesRate || "798,32"} Bs.`}
+            </p>
+          )}
         </div>
         <div className="shrink-0 text-right">
           <span className="inline-block rounded-md bg-blue-100 text-blue-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1">

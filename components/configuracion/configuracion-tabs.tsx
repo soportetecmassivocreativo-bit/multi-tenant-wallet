@@ -802,14 +802,56 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en facturas</span>
-                      <input
-                        type="checkbox"
-                        checked={config.pdfInvoiceShowBcvRates ?? true}
-                        onChange={(e) => updateField("pdfInvoiceShowBcvRates", e.target.checked)}
-                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
-                      />
+                    {/* TASA BCV A PLASMAR EN FACTURAS */}
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-foreground block">
+                            Tasa Oficial del Día (BCV) a plasmar en Facturas
+                          </label>
+                          <p className="text-[11px] text-muted">
+                            Selecciona si deseas reflejar la tasa oficial en Dólar ($), Euro (€) o ambas
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {[
+                          { id: "usd", label: "$ Dólar (USD)", desc: "Solo tasa USD" },
+                          { id: "eur", label: "€ Euro (EUR)", desc: "Solo tasa EUR" },
+                          { id: "both", label: "Ambas ($ y €)", desc: "USD + EUR" },
+                          { id: "none", label: "No mostrar", desc: "Ocultar tasa" },
+                        ].map((opt) => {
+                          const currentVal = !config.pdfInvoiceShowBcvRates
+                            ? "none"
+                            : config.pdfInvoiceBcvCurrency || "usd";
+                          const isSelected = currentVal === opt.id;
+
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                if (opt.id === "none") {
+                                  updateField("pdfInvoiceShowBcvRates", false);
+                                  updateField("pdfInvoiceBcvCurrency", "none");
+                                } else {
+                                  updateField("pdfInvoiceShowBcvRates", true);
+                                  updateField("pdfInvoiceBcvCurrency", opt.id as any);
+                                }
+                              }}
+                              className={`rounded-xl border p-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
+                                  : "border-line bg-card hover:bg-soft text-foreground"
+                              }`}
+                            >
+                              <p className="text-xs">{opt.label}</p>
+                              <p className="text-[10px] text-muted">{opt.desc}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>
@@ -1025,14 +1067,56 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en proformas</span>
-                      <input
-                        type="checkbox"
-                        checked={config.pdfProformaShowBcvRates ?? true}
-                        onChange={(e) => updateField("pdfProformaShowBcvRates", e.target.checked)}
-                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
-                      />
+                    {/* TASA BCV A PLASMAR EN PROFORMAS */}
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-foreground block">
+                            Tasa Oficial del Día (BCV) a plasmar en Proformas
+                          </label>
+                          <p className="text-[11px] text-muted">
+                            Selecciona si deseas reflejar la tasa oficial en Dólar ($), Euro (€) o ambas
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {[
+                          { id: "usd", label: "$ Dólar (USD)", desc: "Solo tasa USD" },
+                          { id: "eur", label: "€ Euro (EUR)", desc: "Solo tasa EUR" },
+                          { id: "both", label: "Ambas ($ y €)", desc: "USD + EUR" },
+                          { id: "none", label: "No mostrar", desc: "Ocultar tasa" },
+                        ].map((opt) => {
+                          const currentVal = !config.pdfProformaShowBcvRates
+                            ? "none"
+                            : config.pdfProformaBcvCurrency || "usd";
+                          const isSelected = currentVal === opt.id;
+
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                if (opt.id === "none") {
+                                  updateField("pdfProformaShowBcvRates", false);
+                                  updateField("pdfProformaBcvCurrency", "none");
+                                } else {
+                                  updateField("pdfProformaShowBcvRates", true);
+                                  updateField("pdfProformaBcvCurrency", opt.id as any);
+                                }
+                              }}
+                              className={`rounded-xl border p-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
+                                  : "border-line bg-card hover:bg-soft text-foreground"
+                              }`}
+                            >
+                              <p className="text-xs">{opt.label}</p>
+                              <p className="text-[10px] text-muted">{opt.desc}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>
@@ -1182,14 +1266,56 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [] }: Con
                       />
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs font-medium">Mostrar tasas oficiales del día (BCV) en el reporte</span>
-                      <input
-                        type="checkbox"
-                        checked={config.pdfShowBcvRates}
-                        onChange={(e) => updateField("pdfShowBcvRates", e.target.checked)}
-                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
-                      />
+                    {/* TASA BCV A PLASMAR EN REPORTES GENERALES */}
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-foreground block">
+                            Tasa Oficial del Día (BCV) a plasmar en Reportes Generales
+                          </label>
+                          <p className="text-[11px] text-muted">
+                            Selecciona si deseas reflejar la tasa oficial en Dólar ($), Euro (€) o ambas
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {[
+                          { id: "usd", label: "$ Dólar (USD)", desc: "Solo tasa USD" },
+                          { id: "eur", label: "€ Euro (EUR)", desc: "Solo tasa EUR" },
+                          { id: "both", label: "Ambas ($ y €)", desc: "USD + EUR" },
+                          { id: "none", label: "No mostrar", desc: "Ocultar tasa" },
+                        ].map((opt) => {
+                          const currentVal = !config.pdfShowBcvRates
+                            ? "none"
+                            : config.pdfBcvCurrency || "usd";
+                          const isSelected = currentVal === opt.id;
+
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                if (opt.id === "none") {
+                                  updateField("pdfShowBcvRates", false);
+                                  updateField("pdfBcvCurrency", "none");
+                                } else {
+                                  updateField("pdfShowBcvRates", true);
+                                  updateField("pdfBcvCurrency", opt.id as any);
+                                }
+                              }}
+                              className={`rounded-xl border p-2 text-left transition-all ${
+                                isSelected
+                                  ? "border-accent bg-accent-bg text-accent shadow-sm font-semibold"
+                                  : "border-line bg-card hover:bg-soft text-foreground"
+                              }`}
+                            >
+                              <p className="text-xs">{opt.label}</p>
+                              <p className="text-[10px] text-muted">{opt.desc}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>

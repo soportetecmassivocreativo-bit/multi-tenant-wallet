@@ -103,9 +103,17 @@ export function exportPdfReport(options: PdfReportOptions): void {
     align: "right",
   });
 
-  if (config.pdfShowBcvRates && options.bcvRates && options.bcvRates.usd > 0) {
+  if ((config.pdfShowBcvRates ?? true) && config.pdfBcvCurrency !== "none" && options.bcvRates && options.bcvRates.usd > 0) {
+    const bcvCurr = config.pdfBcvCurrency || "usd";
+    const rateText =
+      bcvCurr === "eur"
+        ? `Tasa Ref. BCV: EUR ${options.bcvRates.eur.toFixed(2)} Bs.`
+        : bcvCurr === "both"
+          ? `Tasa Ref. BCV: USD ${options.bcvRates.usd.toFixed(2)} Bs. | EUR ${options.bcvRates.eur.toFixed(2)} Bs.`
+          : `Tasa Ref. BCV: USD ${options.bcvRates.usd.toFixed(2)} Bs.`;
+
     doc.text(
-      `Tasa Ref. BCV: USD ${options.bcvRates.usd.toFixed(2)} Bs. | EUR ${options.bcvRates.eur.toFixed(2)} Bs.`,
+      rateText,
       pageWidth - margin - 5,
       margin + 15,
       { align: "right" }
