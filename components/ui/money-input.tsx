@@ -17,12 +17,14 @@ function sanitize(raw: string): string {
 export function MoneyInput({
   value,
   onValueChange,
+  onChange,
   placeholder,
   className,
   autoFocus,
 }: {
   value: number;
-  onValueChange: (n: number) => void;
+  onValueChange?: (n: number) => void;
+  onChange?: (n: number) => void;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
@@ -36,6 +38,11 @@ export function MoneyInput({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
+  const emitChange = (val: number) => {
+    if (onValueChange) onValueChange(val);
+    if (onChange) onChange(val);
+  };
+
   return (
     <input
       inputMode="decimal"
@@ -43,7 +50,7 @@ export function MoneyInput({
       onChange={(e) => {
         const t = sanitize(e.target.value);
         setText(t);
-        onValueChange(Number(t) || 0);
+        emitChange(Number(t) || 0);
       }}
       placeholder={placeholder}
       className={className}

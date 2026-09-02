@@ -526,7 +526,7 @@ export function NuevaProformaForm({
                 <div className="w-28">
                   <MoneyInput
                     value={l.unitPrice}
-                    onChange={(v) => updateLine(l.id, { unitPrice: v })}
+                    onValueChange={(v) => updateLine(l.id, { unitPrice: v })}
                     placeholder="Precio"
                     className={inputClass}
                   />

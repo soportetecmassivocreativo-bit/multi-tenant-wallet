@@ -687,7 +687,6 @@ export async function createProforma(
       status: "pendiente",
       issue_date: issueDateISO,
       due_date: validUntilISO,
-      note: notePayload || null,
     })
     .select("id")
     .single();
@@ -696,10 +695,10 @@ export async function createProforma(
 
   if (input.lines.length) {
     await supabase.from("invoice_items").insert(
-      input.lines.map((l) => ({
+      input.lines.map((l, idx) => ({
         company_id: companyId,
         invoice_id: inv.id,
-        description: l.description,
+        description: idx === 0 && notePayload ? `${l.description} [${notePayload}]` : l.description,
         qty: l.qty,
         unit_price: l.unitPrice,
       })),
@@ -1018,7 +1017,6 @@ export async function updateInvoice(
   try {
     const updateData: Record<string, unknown> = {};
     if (input.clientId) updateData.client_id = input.clientId;
-    if (input.note !== undefined) updateData.note = input.note;
     if (input.status) updateData.status = input.status;
 
     if (input.lines && input.lines.length > 0) {
