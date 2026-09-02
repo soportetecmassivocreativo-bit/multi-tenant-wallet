@@ -38,22 +38,27 @@ const inputClass =
   "w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent";
 
 export function NuevaProformaForm({
-  clients,
-  products,
+  clients = [],
+  products = [],
   bcv,
   accounts = [],
 }: {
-  clients: Client[];
-  products: Product[];
-  bcv: { usd: number; eur: number; date: string };
+  clients?: Client[];
+  products?: Product[];
+  bcv?: { usd: number; eur: number; date: string };
   accounts?: CompanyAccount[];
 }) {
-  const [currentBcv, setCurrentBcv] = useState(bcv);
+  const safeBcv = {
+    usd: bcv?.usd ?? 798.326,
+    eur: bcv?.eur ?? 926.5531,
+    date: bcv?.date ?? new Date().toISOString().slice(0, 10),
+  };
+  const [currentBcv, setCurrentBcv] = useState(safeBcv);
   const [clientId, setClientId] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [rateRef, setRateRef] = useState<RateRef>("USD");
   const [rateMode, setRateMode] = useState<"usd" | "eur" | "manual">("usd");
-  const [rate, setRate] = useState<number>(bcv.usd);
+  const [rate, setRate] = useState<number>(safeBcv.usd);
   const [targetAccountId, setTargetAccountId] = useState(accounts[0]?.id || "");
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncPending, startSyncTransition] = useTransition();
@@ -295,9 +300,9 @@ export function NuevaProformaForm({
               onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
               className={inputClass}
             >
-              {CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name} ({c.symbol})
+              {(Object.keys(CURRENCIES) as CurrencyCode[]).map((c) => (
+                <option key={c} value={c}>
+                  {CURRENCIES[c].label} ({CURRENCIES[c].symbol})
                 </option>
               ))}
             </select>
@@ -354,7 +359,7 @@ export function NuevaProformaForm({
                 className="w-32 rounded-lg border border-line bg-card px-2.5 py-1 text-xs font-mono font-bold"
               />
               <span className="text-xs text-muted">
-                Bs. por {currency} (Fecha oficial: {formatDate(currentBcv.date)})
+                Bs. por {currency} (Fecha oficial: {formatDate(currentBcv?.date) || "Hoy"})
               </span>
             </div>
           </div>
