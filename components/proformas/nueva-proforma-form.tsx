@@ -94,7 +94,39 @@ export function NuevaProformaForm({
   const isForeign = currency !== "VES";
   const selectedAccount = accounts.find((a) => a.id === targetAccountId) || accounts[0];
 
-  async function handleSyncBcv() {
+  function onCurrencyChange(c: CurrencyCode) {
+    setCurrency(c);
+    if (c === "EUR") {
+      setRateRef("EUR");
+      if (rateMode !== "manual") {
+        setRateMode("eur");
+        setRate(currentBcv.eur);
+      }
+    } else {
+      setRateRef("USD");
+      if (rateMode !== "manual") {
+        setRateMode("usd");
+        setRate(currentBcv.usd);
+      }
+    }
+  }
+
+  function onSelectRateRef(ref: RateRef) {
+    setRateRef(ref);
+    setRateMode(ref === "USD" ? "usd" : "eur");
+    setRate(ref === "USD" ? currentBcv.usd : currentBcv.eur);
+  }
+
+  function onSelectManual() {
+    setRateMode("manual");
+  }
+
+  function onRateValueChange(val: number) {
+    setRate(val);
+    setRateMode("manual");
+  }
+
+  function handleSync() {
     setSyncMsg(null);
     startSyncTransition(async () => {
       const res = await syncBcvRates();
@@ -106,20 +138,26 @@ export function NuevaProformaForm({
         });
         if (rateMode === "usd") setRate(res.data.usd);
         if (rateMode === "eur") setRate(res.data.eur);
-        setSyncMsg(`✓ Tasas sincronizadas: USD ${res.data.usd} · ${res.data.date}`);
+        setSyncMsg(`Sincronizado (${res.data.source || "BCV"})`);
       } else {
-        setSyncMsg(`⚠ ${res.error || "No se pudo sincronizar automáticamente"}`);
+        setSyncMsg("No se pudo sincronizar con BCV");
       }
       setTimeout(() => setSyncMsg(null), 4000);
     });
   }
 
-  function handleSaveManualRate(newRate: number) {
-    setRate(newRate);
-    saveManualBcvRates({
-      usd: rateMode === "usd" || rateMode === "manual" ? newRate : currentBcv.usd,
-      eur: rateMode === "eur" ? newRate : currentBcv.eur,
-      date: new Date().toISOString().slice(0, 10),
+  function handleSaveAsGlobalRate() {
+    startSyncTransition(async () => {
+      const isUsd = rateRef === "USD";
+      const res = await saveManualBcvRates({
+        usd: isUsd ? rate : currentBcv.usd,
+        eur: !isUsd ? rate : currentBcv.eur,
+        date: new Date().toISOString().slice(0, 10),
+      });
+      if (res.ok) {
+        setSyncMsg("Tasa manual fijada en todo el sistema");
+      }
+      setTimeout(() => setSyncMsg(null), 4000);
     });
   }
 
@@ -297,7 +335,7 @@ export function NuevaProformaForm({
             </label>
             <select
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+              onChange={(e) => onCurrencyChange(e.target.value as CurrencyCode)}
               className={inputClass}
             >
               {(Object.keys(CURRENCIES) as CurrencyCode[]).map((c) => (
@@ -329,42 +367,109 @@ export function NuevaProformaForm({
             </select>
           </div>
         </div>
+      </section>
 
-        {/* Tasa BCV si aplica divisa extranjera */}
-        {isForeign && (
-          <div className="rounded-xl border border-line bg-soft/30 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground">
-                Tasa Oficial BCV del Día
-              </span>
+      {/* Conversión a Bolívares (BCV / Manual) */}
+      {isForeign && (
+        <section className="space-y-3 rounded-2xl border border-line bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-serif text-[15px]">Conversión a Bolívares</p>
+              <p className="text-[11px] text-hint flex items-center gap-1.5 flex-wrap">
+                <span>
+                  {rateMode === "manual"
+                    ? "Tasa manual de contingencia"
+                    : `BCV Oficial · Fecha Valor: ${formatDate(currentBcv?.date) || "Hoy"}`}
+                </span>
+                {syncMsg && (
+                  <span className="rounded-md bg-income/15 px-1.5 py-0.5 text-[10px] font-semibold text-income">
+                    ✓ {syncMsg}
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={syncPending}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-soft px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-line active:scale-95 disabled:opacity-50 transition-all border border-line"
+              title="Sincronizar tasa y fecha oficial del BCV en vivo"
+            >
+              <ArrowPathIcon className={`h-3.5 w-3.5 ${syncPending ? "animate-spin text-accent" : ""}`} />
+              <span className="text-[11px]">{syncPending ? "Sincronizando…" : "Actualizar BCV"}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => onSelectRateRef("USD")}
+              className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                rateMode === "usd"
+                  ? "border-accent bg-accent-bg text-accent-text"
+                  : "border-line text-muted hover:bg-soft"
+              }`}
+            >
+              Tasa Dólar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectRateRef("EUR")}
+              className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                rateMode === "eur"
+                  ? "border-accent bg-accent-bg text-accent-text"
+                  : "border-line text-muted hover:bg-soft"
+              }`}
+            >
+              Tasa Euro
+            </button>
+
+            <button
+              type="button"
+              onClick={onSelectManual}
+              className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                rateMode === "manual"
+                  ? "border-accent bg-accent-bg text-accent-text"
+                  : "border-line text-muted hover:bg-soft"
+              }`}
+            >
+              Tasa Manual
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <span className="whitespace-nowrap text-xs text-muted">
+              Bs por {CURRENCIES[rateRef].symbol}
+            </span>
+            <MoneyInput
+              value={rate}
+              onValueChange={onRateValueChange}
+              className={inputClass}
+            />
+          </div>
+
+          {rateMode === "manual" && (
+            <div className="flex items-center justify-between rounded-xl bg-accent-bg/40 p-2.5 text-xs text-muted">
+              <span>Personalizada para esta proforma</span>
               <button
                 type="button"
-                onClick={handleSyncBcv}
+                onClick={handleSaveAsGlobalRate}
                 disabled={syncPending}
-                className="inline-flex items-center gap-1 rounded-lg bg-card border border-line px-2.5 py-1 text-[11px] font-semibold text-accent hover:bg-soft shadow-xs"
+                className="font-medium text-accent hover:underline disabled:opacity-50"
               >
-                <ArrowPathIcon className={`h-3 w-3 ${syncPending ? "animate-spin" : ""}`} />
-                <span>Actualizar BCV</span>
+                Fijar como tasa general
               </button>
             </div>
-            {syncMsg && (
-              <p className="text-[11px] text-accent font-medium">{syncMsg}</p>
-            )}
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                step="any"
-                value={rate}
-                onChange={(e) => handleSaveManualRate(parseFloat(e.target.value) || 0)}
-                className="w-32 rounded-lg border border-line bg-card px-2.5 py-1 text-xs font-mono font-bold"
-              />
-              <span className="text-xs text-muted">
-                Bs. por {currency} (Fecha oficial: {formatDate(currentBcv?.date) || "Hoy"})
-              </span>
-            </div>
-          </div>
-        )}
-      </section>
+          )}
+
+          {syncMsg && (
+            <p className="text-[11px] text-income animate-fade-in">
+              ✓ {syncMsg}
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Conceptos / Ítems */}
       <section className="rounded-2xl border border-line bg-card p-4 space-y-4 shadow-sm">

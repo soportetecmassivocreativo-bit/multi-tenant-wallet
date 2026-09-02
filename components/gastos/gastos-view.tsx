@@ -13,6 +13,7 @@ interface GastosViewProps {
   expenses: Expense[];
   admin: boolean;
   accounts: CompanyAccount[];
+  bcv?: { usd: number; eur: number; date: string };
   totalPagado: number;
   totalPorPagar: number;
 }
@@ -21,6 +22,7 @@ export function GastosView({
   expenses,
   admin,
   accounts,
+  bcv,
   totalPagado,
   totalPorPagar,
 }: GastosViewProps) {
@@ -54,6 +56,7 @@ export function GastosView({
       {openNew && (
         <NuevoGastoForm
           accounts={accounts}
+          bcv={bcv}
           onClose={() => setOpenNew(false)}
         />
       )}
