@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
@@ -86,16 +86,24 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function BottomNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [isTenantHost, setIsTenantHost] = useState(false);
   const barRef = useRef<HTMLElement>(null);
   const plusRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.host;
+      if (h.includes("multi-tenant") || h.includes("muti-tenant")) {
+        setIsTenantHost(true);
+      }
+    }
+  }, []);
+
   const isMaster =
     pathname.startsWith("/admin") ||
     process.env.NEXT_PUBLIC_APP_MODE === "master" ||
-    (typeof window !== "undefined" &&
-      (window.location.host.includes("multi-tenant") ||
-        window.location.host.includes("muti-tenant")));
+    isTenantHost;
 
   const currentLeft = isMaster ? masterLeft : left;
   const currentRight = isMaster ? masterRight : right;

@@ -5,17 +5,18 @@ import { ArrowDownLeftIcon, ArrowUpRightIcon } from "@/components/ui/icons";
 import { formatSigned, formatDate } from "@/lib/format";
 import type { Movement } from "@/lib/data";
 
-export function Transactions({ movements }: { movements: Movement[] }) {
+export function Transactions({ movements = [] }: { movements?: Movement[] }) {
+  const list = Array.isArray(movements) ? movements : [];
   return (
     <div>
       <h2 className="mb-1 font-serif text-[15px]">Movimientos</h2>
-      {movements.length === 0 ? (
+      {list.length === 0 ? (
         <p className="py-8 text-center text-sm text-hint">
           Sin movimientos aún. Registra un cobro o un gasto para empezar.
         </p>
       ) : (
         <Reveal>
-          {movements.map((m) => (
+          {list.map((m) => (
             <div
               key={m.id}
               className="flex items-center gap-3 border-t border-line py-2.5"

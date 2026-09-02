@@ -2,17 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { PlusIcon, SearchIcon, ReceiptIcon } from "@/components/ui/icons";
 
 export function DesktopHeader() {
   const pathname = usePathname();
+  const [isTenantHost, setIsTenantHost] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.host;
+      if (h.includes("multi-tenant") || h.includes("muti-tenant")) {
+        setIsTenantHost(true);
+      }
+    }
+  }, []);
 
   const isMaster =
     pathname.startsWith("/admin") ||
     process.env.NEXT_PUBLIC_APP_MODE === "master" ||
-    (typeof window !== "undefined" &&
-      (window.location.host.includes("multi-tenant") ||
-        window.location.host.includes("muti-tenant")));
+    isTenantHost;
 
   const getPageTitle = () => {
     if (pathname.startsWith("/admin/empresas")) return "Panel de Empresas & Bases de Datos";

@@ -47,12 +47,12 @@ export default async function DashboardPage() {
             <DashboardBcvPill initialBcv={s.bcv} />
           </section>
 
-          <MiniLineChart series={s.chartSeries} hasData={s.hasMovements} />
+          <MiniLineChart series={s?.chartSeries || []} hasData={Boolean(s?.hasMovements)} />
 
           <StatPills
-            porCobrar={s.porCobrar}
-            vencidas={s.vencidas}
-            cobradoMes={s.cobradoMes}
+            porCobrar={s?.porCobrar || 0}
+            vencidas={s?.vencidas || 0}
+            cobradoMes={s?.cobradoMes || 0}
           />
         </div>
 
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
                 <PayrollIcon className="h-4 w-4 text-purple-600" /> Nómina (mes)
               </p>
               <p className="tnum mt-1 text-lg font-medium">
-                {formatMoney(s.nominaMes)}
+                {formatMoney(s?.nominaMes || 0)}
               </p>
             </div>
             <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
@@ -73,13 +73,13 @@ export default async function DashboardPage() {
                 <GridIcon className="h-4 w-4 text-accent" /> Servicios (mes)
               </p>
               <p className="tnum mt-1 text-lg font-medium">
-                {formatMoney(s.serviciosMes)}
+                {formatMoney(s?.serviciosMes || 0)}
               </p>
             </div>
           </section>
 
           <div className="rounded-3xl border border-line bg-card p-5 shadow-sm">
-            <Transactions movements={s.movements} />
+            <Transactions movements={s?.movements || []} />
           </div>
         </div>
       </div>

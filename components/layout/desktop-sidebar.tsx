@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -56,14 +57,22 @@ const masterNav: NavItem[] = [
 
 export function DesktopSidebar() {
   const pathname = usePathname();
+  const [isTenantHost, setIsTenantHost] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.host;
+      if (h.includes("multi-tenant") || h.includes("muti-tenant")) {
+        setIsTenantHost(true);
+      }
+    }
+  }, []);
 
   // Detectar si está en el portal master multi-tenant
   const isMaster =
     pathname.startsWith("/admin") ||
     process.env.NEXT_PUBLIC_APP_MODE === "master" ||
-    (typeof window !== "undefined" &&
-      (window.location.host.includes("multi-tenant") ||
-        window.location.host.includes("muti-tenant")));
+    isTenantHost;
 
   const currentNav = isMaster ? masterNav : mainNav;
 
