@@ -88,13 +88,23 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
           ? `Tasa Ref. BCV: USD ${usdRateFormatted} Bs. | EUR ${eurRateFormatted} Bs.`
           : "";
 
-  const emissionDateFormatted = bcv?.date
-    ? new Date(bcv.date + "T00:00:00").toLocaleDateString("es-VE", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : "01 sep. 2026";
+  const emissionDateFormatted = (() => {
+    if (!bcv?.date) return "01 sep. 2026";
+    try {
+      const clean = bcv.date.trim().split("T")[0].split(" ")[0];
+      const parts = clean.split("-").map(Number);
+      if (parts.length === 3 && !parts.some(isNaN)) {
+        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString("es-VE", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+      return clean;
+    } catch {
+      return "01 sep. 2026";
+    }
+  })();
 
   const footer = isFacturas
     ? config.pdfInvoiceFooterText || "Massivo Corp · Factura Oficial"

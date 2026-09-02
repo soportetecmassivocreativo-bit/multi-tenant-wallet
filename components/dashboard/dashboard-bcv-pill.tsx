@@ -17,7 +17,7 @@ interface DashboardBcvPillProps {
 
 export function DashboardBcvPill({ initialBcv }: DashboardBcvPillProps) {
   const router = useRouter();
-  const [bcv, setBcv] = useState(initialBcv);
+  const [bcv, setBcv] = useState(initialBcv || { usd: 798.326, eur: 926.5531, date: "" });
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -44,14 +44,14 @@ export function DashboardBcvPill({ initialBcv }: DashboardBcvPillProps) {
     <div className="mt-4 flex flex-wrap items-center justify-between gap-2.5 rounded-2xl bg-soft p-3 text-xs text-muted border border-line/60">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <span className="font-semibold text-foreground">
-          Tasas Oficiales BCV ({formatDate(bcv.date)}):
+          Tasas Oficiales BCV ({formatDate(bcv?.date) || "Hoy"}):
         </span>
         <span>
-          $ 1 = <strong className="font-bold text-foreground">{formatCurrency(bcv.usd, "VES")}</strong>
+          $ 1 = <strong className="font-bold text-foreground">{formatCurrency(bcv?.usd || 0, "VES")}</strong>
         </span>
         <span className="text-hint">·</span>
         <span>
-          € 1 = <strong className="font-bold text-foreground">{formatCurrency(bcv.eur, "VES")}</strong>
+          € 1 = <strong className="font-bold text-foreground">{formatCurrency(bcv?.eur || 0, "VES")}</strong>
         </span>
       </div>
 

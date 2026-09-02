@@ -28,15 +28,19 @@ const fmt = (decimals: number) =>
 
 /** Formatea un monto con su símbolo: formatCurrency(1234.5, "USD") → "$1.234,50". */
 export function formatCurrency(
-  amount: number,
-  code: CurrencyCode = "USD",
+  amount: number | null | undefined,
+  code: string = "USD",
   decimals = 2,
 ): string {
-  const n = fmt(decimals).format(amount);
-  return code === "VES" ? `Bs ${n}` : `${CURRENCIES[code].symbol}${n}`;
+  const safeAmount = typeof amount === "number" && !isNaN(amount) ? amount : 0;
+  const n = fmt(decimals).format(safeAmount);
+  const normalized = (code || "USD").toUpperCase();
+  if (normalized === "VES" || normalized === "BS" || normalized === "BS.") return `Bs ${n}`;
+  if (normalized === "EUR") return `€${n}`;
+  return `$${n}`;
 }
 
 /** Convierte un monto en divisa a Bolívares usando la tasa (Bs por unidad de divisa). */
 export function toBolivars(amount: number, rate: number): number {
-  return amount * rate;
+  return (amount || 0) * (rate || 0);
 }

@@ -16,8 +16,11 @@ export default async function DashboardPage() {
   const s = await getDashboardSummary();
 
   const currentMonth = new Intl.DateTimeFormat("es-VE", { month: "long" }).format(new Date());
-  const vesEquivalent = s.balance * s.bcv.usd;
-  const eurEquivalent = s.bcv.eur > 0 ? (s.balance * s.bcv.usd) / s.bcv.eur : 0;
+  const balance = s?.balance || 0;
+  const bcvUsd = s?.bcv?.usd || 798.326;
+  const bcvEur = s?.bcv?.eur || 926.5531;
+  const vesEquivalent = balance * bcvUsd;
+  const eurEquivalent = bcvEur > 0 ? (balance * bcvUsd) / bcvEur : 0;
 
   return (
     <div className="space-y-6">
