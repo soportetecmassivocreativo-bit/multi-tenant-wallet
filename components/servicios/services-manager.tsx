@@ -5,8 +5,8 @@ import {
   addService,
   updateService,
   deleteService,
+  payService,
 } from "@/lib/servicios-actions";
-import { payService } from "@/lib/accounting-actions";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { ActionButton } from "@/components/ui/action-button";
 import { MoneyInput } from "@/components/ui/money-input";
