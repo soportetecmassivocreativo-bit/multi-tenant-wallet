@@ -207,14 +207,22 @@ export default async function ProformaPrintPage({
                       </td>
                     </tr>
                   ) : (
-                    prof.items.map((item) => (
-                      <tr key={item.id} className="text-neutral-800">
-                        <td className="py-3 pr-4 leading-relaxed">{item.description}</td>
-                        <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
-                        <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.unitPrice, prof.currency)}</td>
-                        <td className="py-3 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, prof.currency)}</td>
-                      </tr>
-                    ))
+                    prof.items.map((item) => {
+                      const cleanDescription = (item.description || "")
+                        .replace(/\[\[.*?\]\]/g, "")
+                        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+                        .replace(/\[Cuenta:.*?\]/gi, "")
+                        .trim();
+
+                      return (
+                        <tr key={item.id} className="text-neutral-800">
+                          <td className="py-3 pr-4 leading-relaxed">{cleanDescription || item.description}</td>
+                          <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
+                          <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.unitPrice, prof.currency)}</td>
+                          <td className="py-3 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, prof.currency)}</td>
+                        </tr>
+                      );
+                    })
                   )}
                   {/* Líneas complementarias de relleno si hay pocos items */}
                   {prof.items.length < 5 && (
@@ -231,7 +239,7 @@ export default async function ProformaPrintPage({
 
           {/* 6. RESUMEN DE TOTALES */}
           <div className="pt-8 flex justify-end">
-            <div className="w-full sm:w-64 space-y-2 text-right text-xs">
+            <div className="w-full sm:w-64 space-y-1.5 text-right text-xs">
               <div className="flex justify-between items-center py-1 border-b border-neutral-200">
                 <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
                 <span className="font-mono font-bold text-neutral-900">
@@ -247,8 +255,11 @@ export default async function ProformaPrintPage({
               </div>
 
               {isForeign && (
-                <div className="text-[10px] text-neutral-500 pt-0.5">
-                  Equiv. BCV: <strong className="font-mono text-neutral-800">{formatCurrency(vesTotalCalculated, "VES")}</strong>
+                <div className="flex justify-between items-center py-1.5 border-b border-neutral-300">
+                  <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL BS</span>
+                  <span className="font-mono font-black text-neutral-900 text-sm">
+                    {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                  </span>
                 </div>
               )}
             </div>
@@ -266,7 +277,7 @@ export default async function ProformaPrintPage({
               <span>✖</span>
               <span>💬</span>
             </span>
-            <span className="font-bold tracking-wide">@massivocreativos</span>
+            <span className="font-bold tracking-wide">@massivocreativo</span>
           </div>
         </footer>
 

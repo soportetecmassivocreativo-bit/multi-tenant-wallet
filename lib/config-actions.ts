@@ -239,15 +239,7 @@ export async function saveSystemConfig(
     const rawJson = JSON.stringify(safeCookieConfig);
     const chunks = splitIntoCookieChunks(rawJson, 2200);
 
-    // Limpiar slots viejos
-    for (let i = 0; i < 6; i++) {
-      const chunkName = i === 0 ? targetCookieName : `${targetCookieName}_${i}`;
-      try {
-        cookieStore.delete(chunkName);
-      } catch {}
-    }
-
-    // Escribir nuevos chunks
+    // 1. Escribir nuevos chunks directamente (sobreescribe los existentes sin conflicto)
     chunks.forEach((chunk, i) => {
       const chunkName = i === 0 ? targetCookieName : `${targetCookieName}_${i}`;
       cookieStore.set(chunkName, encodeURIComponent(chunk), {
@@ -256,6 +248,14 @@ export async function saveSystemConfig(
         sameSite: "lax",
       });
     });
+
+    // 2. Limpiar únicamente los chunks sobrantes que ya no se usan (i >= chunks.length)
+    for (let i = chunks.length; i < 8; i++) {
+      const chunkName = i === 0 ? targetCookieName : `${targetCookieName}_${i}`;
+      try {
+        cookieStore.delete(chunkName);
+      } catch {}
+    }
   } catch (err) {
     console.error("Error setting config cookie chunks:", err);
   }

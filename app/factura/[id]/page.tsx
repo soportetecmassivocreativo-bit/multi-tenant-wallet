@@ -231,14 +231,22 @@ export default async function FacturaPage({
                       </td>
                     </tr>
                   ) : (
-                    inv.items.map((item) => (
-                      <tr key={item.id} className="text-neutral-800">
-                        <td className="py-3 pr-4 leading-relaxed">{item.description}</td>
-                        <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
-                        <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.unitPrice, inv.currency)}</td>
-                        <td className="py-3 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, inv.currency)}</td>
-                      </tr>
-                    ))
+                    inv.items.map((item) => {
+                      const cleanDescription = (item.description || "")
+                        .replace(/\[\[.*?\]\]/g, "")
+                        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+                        .replace(/\[Cuenta:.*?\]/gi, "")
+                        .trim();
+
+                      return (
+                        <tr key={item.id} className="text-neutral-800">
+                          <td className="py-3 pr-4 leading-relaxed">{cleanDescription || item.description}</td>
+                          <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
+                          <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.unitPrice, inv.currency)}</td>
+                          <td className="py-3 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, inv.currency)}</td>
+                        </tr>
+                      );
+                    })
                   )}
                   {/* Líneas complementarias de relleno si hay pocos items */}
                   {inv.items.length < 3 && (
@@ -266,8 +274,8 @@ export default async function FacturaPage({
               </p>
             </div>
 
-            {/* Resumen PAGADO y TOTAL */}
-            <div className="space-y-2 sm:pl-8 text-right text-xs">
+            {/* Resumen PAGADO, TOTAL y TOTAL BS */}
+            <div className="space-y-1.5 sm:pl-8 text-right text-xs">
               <div className="flex justify-between items-center py-1 border-b border-neutral-200">
                 <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
                 <span className="font-mono font-bold text-neutral-900">
@@ -283,8 +291,11 @@ export default async function FacturaPage({
               </div>
 
               {isForeign && (
-                <div className="text-[10px] text-neutral-500 pt-0.5">
-                  Equiv. BCV: <strong className="font-mono text-neutral-800">{formatCurrency(vesTotalCalculated, "VES")}</strong>
+                <div className="flex justify-between items-center py-1.5 border-b border-neutral-300">
+                  <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL BS</span>
+                  <span className="font-mono font-black text-neutral-900 text-sm">
+                    {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                  </span>
                 </div>
               )}
             </div>
@@ -309,7 +320,7 @@ export default async function FacturaPage({
               <span>✖</span>
               <span>💬</span>
             </span>
-            <span className="font-bold tracking-wide">@massivocreativos</span>
+            <span className="font-bold tracking-wide">@massivocreativo</span>
           </div>
         </footer>
 
