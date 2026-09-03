@@ -42,7 +42,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    setConfig(initialConfig);
+    setConfig((prev) => ({ ...prev, ...initialConfig }));
     if (initialConfig.brandPrimaryColor) {
       applyBrandColor(initialConfig.brandPrimaryColor);
     }
@@ -89,6 +89,12 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
       if (typeof window !== "undefined") {
         localStorage.setItem("m_wallet_brand_color", config.brandPrimaryColor);
       }
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("m_wallet_client_config", JSON.stringify(config));
+      } catch {}
     }
 
     startTransition(async () => {

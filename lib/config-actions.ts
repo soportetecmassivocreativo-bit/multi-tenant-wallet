@@ -73,6 +73,17 @@ async function getContext() {
 }
 
 /**
+ * Divide un string en fragmentos de tamaño seguro para cookies HTTP.
+ */
+function splitIntoCookieChunks(str: string, chunkSize = 2200): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < str.length; i += chunkSize) {
+    chunks.push(str.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
+/**
  * Obtiene la configuración persistente del sistema (desde cookies / DB) por empresa / tenant.
  */
 export async function getSystemConfig(tenantSlug?: string): Promise<SystemConfig> {
@@ -89,21 +100,27 @@ export async function getSystemConfig(tenantSlug?: string): Promise<SystemConfig
 
   let cookieConfig: Partial<SystemConfig> = {};
   let hasCookie = false;
+
   try {
-    const raw = cookieStore.get(targetCookieName)?.value;
-    if (raw) {
-      if (raw.length > 3500) {
-        // Eliminar cookie inflada para evitar 431 Request Header Too Large
-        cookieStore.delete(targetCookieName);
-      } else {
-        cookieConfig = JSON.parse(decodeURIComponent(raw));
-        hasCookie = true;
+    let fullRaw = "";
+    // Leer fragmentos de cookies (hasta 6 chunks para soportar textos largos de términos/condiciones)
+    for (let i = 0; i < 6; i++) {
+      const chunkName = i === 0 ? targetCookieName : `${targetCookieName}_${i}`;
+      const chunkVal = cookieStore.get(chunkName)?.value;
+      if (!chunkVal) break;
+      try {
+        fullRaw += decodeURIComponent(chunkVal);
+      } catch {
+        fullRaw += chunkVal;
       }
     }
-  } catch {
-    try {
-      cookieStore.delete(targetCookieName);
-    } catch {}
+
+    if (fullRaw) {
+      cookieConfig = JSON.parse(fullRaw);
+      hasCookie = true;
+    }
+  } catch (err) {
+    console.error("Error al leer configuración de cookies:", err);
   }
 
   // Prefijo por defecto inteligente según la empresa
@@ -203,7 +220,7 @@ export async function saveSystemConfig(
       ? CONFIG_COOKIE_NAME
       : `${CONFIG_COOKIE_NAME}_${activeSlug}`;
 
-  // 1. Guardar siempre en Cookie persistente de la empresa específica (1 año de vigencia)
+  // 1. Guardar en Cookie persistente de la empresa usando chunking seguro (1 año de vigencia)
   try {
     const current = await getSystemConfig(activeSlug);
     const merged = { ...current, ...newConfig };
@@ -214,21 +231,33 @@ export async function saveSystemConfig(
       if (typeof v === "string" && v.startsWith("data:")) {
         continue;
       }
-      (safeCookieConfig as any)[k] = v;
+      if (v !== undefined && v !== null) {
+        (safeCookieConfig as any)[k] = v;
+      }
     }
 
-    const encoded = encodeURIComponent(JSON.stringify(safeCookieConfig));
-    if (encoded.length < 3500) {
-      cookieStore.set(targetCookieName, encoded, {
+    const rawJson = JSON.stringify(safeCookieConfig);
+    const chunks = splitIntoCookieChunks(rawJson, 2200);
+
+    // Limpiar slots viejos
+    for (let i = 0; i < 6; i++) {
+      const chunkName = i === 0 ? targetCookieName : `${targetCookieName}_${i}`;
+      try {
+        cookieStore.delete(chunkName);
+      } catch {}
+    }
+
+    // Escribir nuevos chunks
+    chunks.forEach((chunk, i) => {
+      const chunkName = i === 0 ? targetCookieName : `${targetCookieName}_${i}`;
+      cookieStore.set(chunkName, encodeURIComponent(chunk), {
         maxAge: 60 * 60 * 24 * 365, // 1 año
         path: "/",
         sameSite: "lax",
       });
-    } else {
-      cookieStore.delete(targetCookieName);
-    }
+    });
   } catch (err) {
-    console.error("Error setting config cookie:", err);
+    console.error("Error setting config cookie chunks:", err);
   }
 
   if (!isSupabaseConfigured) {
