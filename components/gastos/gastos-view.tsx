@@ -9,11 +9,12 @@ import { GastosEspecialesTab } from "./gastos-especiales-tab";
 import { formatMoney } from "@/lib/format";
 import type { Expense } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
-import type { DeferredCharge } from "@/lib/gastos-especiales-actions";
+import type { DeferredCharge, DeferredAbono } from "@/lib/gastos-especiales-actions";
 
 interface GastosViewProps {
   expenses: Expense[];
   deferredCharges?: DeferredCharge[];
+  deferredAbonos?: DeferredAbono[];
   admin: boolean;
   accounts: CompanyAccount[];
   bcv?: { usd: number; eur: number; date: string };
@@ -24,6 +25,7 @@ interface GastosViewProps {
 export function GastosView({
   expenses,
   deferredCharges = [],
+  deferredAbonos = [],
   admin,
   accounts,
   bcv,
@@ -143,6 +145,7 @@ export function GastosView({
       {activeTab === "especiales" && (
         <GastosEspecialesTab
           charges={deferredCharges}
+          abonos={deferredAbonos}
           accounts={accounts}
           bcv={bcv}
           admin={admin}

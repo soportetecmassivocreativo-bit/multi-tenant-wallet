@@ -548,7 +548,18 @@ export async function getExpenses(): Promise<Expense[]> {
     .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
     .order("created_at", { ascending: true });
 
-  const withPermanentCodes = (data ?? []).map((e, idx) => ({
+  // Excluir consumos directos de la tarjeta de José Miguel (que son diferidos y viven en Gastos Especiales)
+  // para que no sumen como egresos corrientes duplicados:
+  const filtered = (data ?? []).filter((e) => {
+    const note = (e.note || "").toLowerCase();
+    const isDirectCardCharge =
+      note.includes("[tarjeta josé miguel]") ||
+      note.includes("[tarjeta jose miguel]") ||
+      e.source === "tarjeta_jm_consumo";
+    return !isDirectCardCharge;
+  });
+
+  const withPermanentCodes = filtered.map((e, idx) => ({
     ...e,
     code: formatEntityCode(prefix, startNum + idx, digits),
   }));
