@@ -70,6 +70,7 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
 
       <ConfiguracionTabs
         key={activeSlug}
+        tenantSlug={activeSlug}
         initialConfig={config}
         canEdit={canEdit}
         accounts={accounts}

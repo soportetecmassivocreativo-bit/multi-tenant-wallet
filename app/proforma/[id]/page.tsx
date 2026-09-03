@@ -32,7 +32,12 @@ export default async function ProformaPrintPage({
   const terms = config.pdfProformaTermsAndConditions || "Esta proforma / cotización tiene una validez de 15 días continuos.";
   const footer = config.pdfProformaFooterText || "Massivo Corp · Proforma Preliminar · No válida como factura fiscal";
 
-  const targetAccount = accounts.find((a) => a.id === prof.targetAccountId) || (prof.targetAccountName ? { name: prof.targetAccountName } : null);
+  const primaryColor = config.pdfProformaPrimaryColor || config.brandPrimaryColor || "#2C21FF";
+  const paperSize = config.pdfProformaPaperSize || config.pdfPaperSize || "letter";
+  const templateUrl = config.pdfProformaTemplateUrl || config.pdfGeneralTemplateUrl;
+
+  const targetAccountId = prof.targetAccountId || config.pdfProformaTargetAccountId;
+  const targetAccount = accounts.find((a) => a.id === targetAccountId) || (prof.targetAccountName ? { name: prof.targetAccountName } : null);
 
   const showConditions = prof.hasConditions ?? config.pdfProformaShowConditions ?? true;
   const conditions = prof.conditions || {
@@ -52,7 +57,26 @@ export default async function ProformaPrintPage({
   });
 
   return (
-    <div className="mx-auto min-h-[100dvh] max-w-[680px] bg-white p-6 text-[#14151A]">
+    <div
+      style={{
+        backgroundImage: templateUrl ? `url("${templateUrl}")` : undefined,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+      className="mx-auto min-h-[100dvh] max-w-[680px] bg-white p-6 text-[#14151A] relative"
+    >
+      <style>{`
+        @media print {
+          @page {
+            size: ${paperSize === "a4" ? "A4" : paperSize === "legal" ? "legal" : "letter"};
+            margin: 8mm;
+          }
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
       <div className="no-print mb-5 flex items-center justify-between">
         <Link href={`/proformas/${prof.id}`} className="text-sm text-neutral-500 hover:text-black">
           ‹ Volver al Sistema
@@ -100,7 +124,10 @@ export default async function ProformaPrintPage({
           )}
         </div>
         <div className="shrink-0 text-right">
-          <span className="inline-block rounded-md bg-amber-100 text-amber-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1">
+          <span
+            style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}
+            className="inline-block rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1"
+          >
             Proforma / Cotización
           </span>
           <p className="font-serif text-xl leading-none font-bold">
@@ -129,11 +156,14 @@ export default async function ProformaPrintPage({
           <p className="text-base font-bold text-neutral-900 mt-0.5">{prof.clientName}</p>
         </div>
         {targetAccount && (
-          <div className="sm:text-right rounded-lg bg-blue-50/70 p-2.5 border border-blue-100">
-            <p className="text-[10px] text-blue-900 uppercase tracking-wider font-bold">Cuenta de Pago / Anticipo</p>
-            <p className="text-xs font-bold text-blue-950 mt-0.5">{targetAccount.name}</p>
+          <div
+            style={{ backgroundColor: `${primaryColor}0d`, borderColor: `${primaryColor}26` }}
+            className="sm:text-right rounded-lg p-2.5 border"
+          >
+            <p style={{ color: primaryColor }} className="text-[10px] uppercase tracking-wider font-bold">Cuenta de Pago / Anticipo</p>
+            <p className="text-xs font-bold text-neutral-900 mt-0.5">{targetAccount.name}</p>
             {"bankName" in targetAccount && targetAccount.bankName && (
-              <p className="text-[11px] text-blue-800 font-mono">
+              <p className="text-[11px] text-neutral-700 font-mono">
                 {targetAccount.bankName} {targetAccount.accountNumber ? `· ${targetAccount.accountNumber}` : ""}
               </p>
             )}

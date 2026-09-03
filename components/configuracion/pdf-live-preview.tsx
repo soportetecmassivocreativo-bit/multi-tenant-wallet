@@ -131,6 +131,12 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
     confidentiality: isFacturas ? config.pdfInvoiceConditionsConfidentiality : config.pdfProformaConditionsConfidentiality,
   };
 
+  const templateUrl = isFacturas
+    ? config.pdfInvoiceTemplateUrl
+    : isProformas
+      ? config.pdfProformaTemplateUrl
+      : config.pdfGeneralTemplateUrl;
+
   const targetAccountId = isFacturas
     ? config.pdfInvoiceTargetAccountId
     : isProformas
@@ -178,9 +184,19 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
       </div>
 
       {/* Hoja de papel simulada */}
-      <div className={`rounded-xl border border-line/80 bg-white p-4 sm:p-5 text-[#14151A] shadow-md space-y-3 text-[11px] select-none ${paperDetails.ratio} transition-all`}>
+      <div
+        style={{
+          backgroundImage: templateUrl ? `url("${templateUrl}")` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+        className={`rounded-xl border border-line/80 bg-white p-4 sm:p-5 text-[#14151A] shadow-md space-y-3 text-[11px] select-none ${paperDetails.ratio} transition-all relative overflow-hidden`}
+      >
         {/* Encabezado */}
-        <div className="rounded-lg bg-[#F5F6FF] p-3 flex items-center justify-between border border-line/40">
+        <div
+          style={{ backgroundColor: `${primaryColor}0d`, borderColor: `${primaryColor}26` }}
+          className="rounded-lg p-3 flex items-center justify-between border"
+        >
           <div className="space-y-1">
             {config.pdfLogoUrl || config.systemLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

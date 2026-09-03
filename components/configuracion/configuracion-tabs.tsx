@@ -28,11 +28,12 @@ import type { CompanyAccount } from "@/lib/cuentas-actions";
 interface ConfiguracionTabsProps {
   initialConfig: SystemConfig;
   canEdit: boolean;
+  tenantSlug?: string;
   accounts?: CompanyAccount[];
   bcv?: { usd: number; eur: number; date?: string };
 }
 
-export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [], bcv }: ConfiguracionTabsProps) {
+export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts = [], bcv }: ConfiguracionTabsProps) {
   const [activeTab, setActiveTab] = useState<"contabilizadores" | "branding" | "pdf">("contabilizadores");
   const [pdfSubTab, setPdfSubTab] = useState<"facturas" | "proformas" | "general">("facturas");
   const [config, setConfig] = useState<SystemConfig>(initialConfig);
@@ -91,7 +92,7 @@ export function ConfiguracionTabs({ initialConfig, canEdit, accounts = [], bcv }
     }
 
     startTransition(async () => {
-      const res = await saveSystemConfig(config);
+      const res = await saveSystemConfig(config, tenantSlug);
       if (res.ok) {
         setMsg("¡Configuración y personalización de la empresa guardadas con éxito!");
       } else {
