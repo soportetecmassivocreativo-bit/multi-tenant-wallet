@@ -78,6 +78,13 @@ export async function updateSession(request: NextRequest) {
   });
   response.headers.set("x-tenant-slug", activeTenant.slug);
 
+  // Limpiar cookies infladas para prevenir error 431 y excepciones en el cliente
+  for (const c of cookiesList) {
+    if (c.name.startsWith("m_wallet_system_config") && c.value.length > 3000) {
+      response.cookies.delete(c.name);
+    }
+  }
+
   // Si no hay cookies de autenticación, resolvemos al instante
   if (!hasAuthCookie) {
     if (isPublic) {

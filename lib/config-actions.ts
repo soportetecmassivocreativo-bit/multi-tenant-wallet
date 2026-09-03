@@ -92,10 +92,19 @@ export async function getSystemConfig(tenantSlug?: string): Promise<SystemConfig
   try {
     const raw = cookieStore.get(targetCookieName)?.value;
     if (raw) {
-      cookieConfig = JSON.parse(decodeURIComponent(raw));
-      hasCookie = true;
+      if (raw.length > 3500) {
+        // Eliminar cookie inflada para evitar 431 Request Header Too Large
+        cookieStore.delete(targetCookieName);
+      } else {
+        cookieConfig = JSON.parse(decodeURIComponent(raw));
+        hasCookie = true;
+      }
     }
-  } catch {}
+  } catch {
+    try {
+      cookieStore.delete(targetCookieName);
+    } catch {}
+  }
 
   // Prefijo por defecto inteligente según la empresa
   let dynamicDefaultPrefix = "Mas-Corp-";
@@ -198,11 +207,26 @@ export async function saveSystemConfig(
   try {
     const current = await getSystemConfig(activeSlug);
     const merged = { ...current, ...newConfig };
-    cookieStore.set(targetCookieName, encodeURIComponent(JSON.stringify(merged)), {
-      maxAge: 60 * 60 * 24 * 365, // 1 año
-      path: "/",
-      sameSite: "lax",
-    });
+
+    // Sanitizar: NO almacenar archivos base64 pesados (PDFs/logos data: URLs) en cookies HTTP para evitar errores de tamaño 431
+    const safeCookieConfig: Partial<SystemConfig> = {};
+    for (const [k, v] of Object.entries(merged)) {
+      if (typeof v === "string" && v.startsWith("data:")) {
+        continue;
+      }
+      (safeCookieConfig as any)[k] = v;
+    }
+
+    const encoded = encodeURIComponent(JSON.stringify(safeCookieConfig));
+    if (encoded.length < 3500) {
+      cookieStore.set(targetCookieName, encoded, {
+        maxAge: 60 * 60 * 24 * 365, // 1 año
+        path: "/",
+        sameSite: "lax",
+      });
+    } else {
+      cookieStore.delete(targetCookieName);
+    }
   } catch (err) {
     console.error("Error setting config cookie:", err);
   }
