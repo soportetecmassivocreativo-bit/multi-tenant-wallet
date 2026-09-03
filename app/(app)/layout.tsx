@@ -5,6 +5,7 @@ import { getMaintenanceStatus } from "@/lib/maintenance-actions";
 import { isAdmin } from "@/lib/data";
 import { MaintenanceScreen } from "@/components/maintenance/maintenance-screen";
 import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
+import { PdfPreviewModal } from "@/components/ui/pdf-preview-modal";
 
 export default async function AppLayout({
   children,
@@ -27,6 +28,9 @@ export default async function AppLayout({
       {maintenance.active && userIsAdmin && (
         <MaintenanceBanner message={maintenance.message} updatedAt={maintenance.updatedAt} />
       )}
+
+      {/* Previsualizador de PDF Interactivo Global */}
+      <PdfPreviewModal />
 
       <div className="flex-1 flex min-w-0">
         {/* Barra lateral para PC / Laptop (pantallas lg+) */}

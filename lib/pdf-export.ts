@@ -92,9 +92,9 @@ export function resolveEffectiveBranding(passedBranding?: Partial<SystemConfig>)
 }
 
 /**
- * Genera y descarga un reporte PDF profesional con el branding y personalización corporativa.
+ * Construye la instancia completa de jsPDF con encabezados, tablas y branding.
  */
-export function exportPdfReport(options: PdfReportOptions): void {
+export function generatePdfDoc(options: PdfReportOptions): { doc: jsPDF; filename: string; blobUrl: string } {
   const config = resolveEffectiveBranding(options.branding);
 
   const doc = new jsPDF({
@@ -285,15 +285,49 @@ export function exportPdfReport(options: PdfReportOptions): void {
     },
   });
 
-  // 6. Guardar / Descargar PDF
   const cleanFilename = options.filename.endsWith(".pdf")
     ? options.filename
     : `${options.filename}.pdf`;
-  doc.save(cleanFilename);
+
+  let blobUrl = "";
+  if (typeof window !== "undefined") {
+    try {
+      const blob = doc.output("blob");
+      blobUrl = URL.createObjectURL(blob);
+    } catch {}
+  }
+
+  return { doc, filename: cleanFilename, blobUrl };
 }
 
 /**
- * Genera y descarga un PDF de muestra para verificar el diseño, color y formato de papel.
+ * Abre el reporte PDF en el Previsualizador de PDF Interactivo (sin duplicar el sistema).
+ */
+export function previewPdfReport(options: PdfReportOptions): void {
+  const { filename, blobUrl } = generatePdfDoc(options);
+  if (typeof window !== "undefined") {
+    const event = new CustomEvent("m_wallet_open_pdf_preview", {
+      detail: {
+        title: options.title,
+        subtitle: options.subtitle,
+        filename,
+        blobUrl,
+      },
+    });
+    window.dispatchEvent(event);
+  }
+}
+
+/**
+ * Genera y descarga directamente un reporte PDF.
+ */
+export function exportPdfReport(options: PdfReportOptions): void {
+  const { doc, filename } = generatePdfDoc(options);
+  doc.save(filename);
+}
+
+/**
+ * Genera y previsualiza un PDF de muestra para verificar el diseño, color y formato de papel.
  */
 export function exportSamplePdf(branding: Partial<SystemConfig>): void {
   const paperLabel =
@@ -303,7 +337,7 @@ export function exportSamplePdf(branding: Partial<SystemConfig>): void {
       ? "Oficio (Legal)"
       : "A4 Estándar";
 
-  exportPdfReport({
+  previewPdfReport({
     title: "Reporte de Muestra & Previsualización",
     subtitle: `Formato de Papel: ${paperLabel} · Nomenclatura activa: ${branding.basePrefix || "Mas-Corp-"}0001`,
     filename: `M-Wallet_Muestra_${branding.pdfPaperSize || "A4"}`,
@@ -369,7 +403,7 @@ export function exportSamplePdf(branding: Partial<SystemConfig>): void {
 }
 
 /**
- * Genera y descarga el Comprobante Individual de Gasto / Egreso en PDF.
+ * Genera y previsualiza el Comprobante Individual de Gasto / Egreso en PDF.
  */
 export function exportExpenseVoucherPdf(
   expense: { id: string; code?: string; category: string; note: string; amount: number; date: string; currency?: string },
@@ -378,7 +412,7 @@ export function exportExpenseVoucherPdf(
   const code = expense.code || "Mas-Corp-GAS-0001";
   const noteClean = cleanExpenseNote(expense.note);
 
-  exportPdfReport({
+  previewPdfReport({
     title: "Comprobante de Egreso / Gasto",
     subtitle: `Comprobante Nº: ${code} · Fecha: ${expense.date}`,
     filename: `Comprobante_Gasto_${code}`,
@@ -435,7 +469,7 @@ export function exportPayrollReceiptPdf(
     .filter(Boolean)
     .join(" · ");
 
-  exportPdfReport({
+  previewPdfReport({
     title: "Recibo de Pago de Nómina",
     subtitle: `Empleado: ${employee.name} (${code})${employee.idNumber ? ` · CI: ${employee.idNumber}` : ""} · Período: ${period}`,
     filename: `Recibo_Nomina_${employee.name.replace(/\s+/g, "_")}_${code}`,
@@ -469,14 +503,14 @@ export function exportPayrollReceiptPdf(
 }
 
 /**
- * Genera y descarga el Comprobante Individual de Pago de Servicio en PDF.
+ * Genera y previsualiza el Comprobante Individual de Pago de Servicio en PDF.
  */
 export function exportServiceVoucherPdf(
   service: { id: string; code?: string; name: string; category: string; cycle: string; amount: number; currency: string; nextChargeDate: string },
   branding?: Partial<SystemConfig>
 ): void {
   const code = service.code || "Mas-Corp-SRV-0001";
-  exportPdfReport({
+  previewPdfReport({
     title: "Comprobante de Pago de Servicio Recurrente",
     subtitle: `Servicio: ${service.name} (${code}) · Ciclo: ${service.cycle}`,
     filename: `Comprobante_Servicio_${service.name.replace(/\s+/g, "_")}_${code}`,
