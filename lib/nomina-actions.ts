@@ -29,6 +29,11 @@ export interface EmployeeInput {
   role: string;
   salary: number;
   currency: CurrencyCode;
+  idNumber?: string;
+  bankName?: string;
+  accountType?: string;
+  accountNumber?: string;
+  bankNotes?: string;
 }
 
 export async function addEmployee(
@@ -38,7 +43,29 @@ export async function addEmployee(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  const { error } = await ctx.supabase.from("employees").insert({
+  try {
+    const { error } = await ctx.supabase.from("employees").insert({
+      company_id: ctx.companyId,
+      full_name: input.fullName,
+      role: input.role,
+      salary: input.salary,
+      currency: input.currency,
+      id_number: input.idNumber || null,
+      bank_name: input.bankName || null,
+      account_type: input.accountType || null,
+      account_number: input.accountNumber || null,
+      bank_notes: input.bankNotes || null,
+      active: true,
+    });
+    if (!error) {
+      revalidatePath("/nomina");
+      revalidatePath("/dashboard");
+      return { ok: true };
+    }
+  } catch {}
+
+  // Fallback seguro si la tabla aún no tiene las columnas adicionales en Supabase
+  const { error: baseError } = await ctx.supabase.from("employees").insert({
     company_id: ctx.companyId,
     full_name: input.fullName,
     role: input.role,
@@ -46,7 +73,7 @@ export async function addEmployee(
     currency: input.currency,
     active: true,
   });
-  if (error) return { ok: false, error: error.message };
+  if (baseError) return { ok: false, error: baseError.message };
 
   revalidatePath("/nomina");
   revalidatePath("/dashboard");
@@ -61,7 +88,30 @@ export async function updateEmployee(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  const { error } = await ctx.supabase
+  try {
+    const { error } = await ctx.supabase
+      .from("employees")
+      .update({
+        full_name: input.fullName,
+        role: input.role,
+        salary: input.salary,
+        currency: input.currency,
+        id_number: input.idNumber || null,
+        bank_name: input.bankName || null,
+        account_type: input.accountType || null,
+        account_number: input.accountNumber || null,
+        bank_notes: input.bankNotes || null,
+      })
+      .eq("id", id);
+    if (!error) {
+      revalidatePath("/nomina");
+      revalidatePath("/dashboard");
+      return { ok: true };
+    }
+  } catch {}
+
+  // Fallback seguro
+  const { error: baseError } = await ctx.supabase
     .from("employees")
     .update({
       full_name: input.fullName,
@@ -70,7 +120,7 @@ export async function updateEmployee(
       currency: input.currency,
     })
     .eq("id", id);
-  if (error) return { ok: false, error: error.message };
+  if (baseError) return { ok: false, error: baseError.message };
 
   revalidatePath("/nomina");
   revalidatePath("/dashboard");

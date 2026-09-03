@@ -564,12 +564,26 @@ export async function getEmployees(): Promise<Employee[]> {
     }));
   }
   const supabase = await createClient();
-  // Ordenamos por created_at ASC para fijar el código inmutable del empleado
-  const { data } = await supabase
-    .from("employees")
-    .select("id, name:full_name, role, salary, currency, created_at")
-    .eq("active", true)
-    .order("created_at", { ascending: true });
+  let data: any[] | null = null;
+  try {
+    const res = await supabase
+      .from("employees")
+      .select("id, name:full_name, role, salary, currency, idNumber:id_number, bankName:bank_name, accountType:account_type, accountNumber:account_number, bankNotes:bank_notes, created_at")
+      .eq("active", true)
+      .order("created_at", { ascending: true });
+    if (!res.error && res.data) {
+      data = res.data;
+    }
+  } catch {}
+
+  if (!data) {
+    const fallbackRes = await supabase
+      .from("employees")
+      .select("id, name:full_name, role, salary, currency, created_at")
+      .eq("active", true)
+      .order("created_at", { ascending: true });
+    data = fallbackRes.data ?? [];
+  }
 
   const withPermanentCodes = (data ?? []).map((e, idx) => ({
     ...e,

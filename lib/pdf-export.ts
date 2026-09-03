@@ -348,28 +348,46 @@ export function exportExpenseVoucherPdf(
  * Genera y descarga el Recibo Individual de Pago de Nómina en PDF.
  */
 export function exportPayrollReceiptPdf(
-  employee: { id: string; code?: string; name: string; role: string; salary: number; currency: string; payDate?: string; period?: string },
+  employee: {
+    id: string;
+    code?: string;
+    name: string;
+    role: string;
+    salary: number;
+    currency: string;
+    idNumber?: string;
+    bankName?: string;
+    accountType?: string;
+    accountNumber?: string;
+    payDate?: string;
+    period?: string;
+  },
   branding?: Partial<SystemConfig>
 ): void {
   const code = employee.code || "Mas-Corp-NOM-0001";
   const period = employee.period || "Quincena Actual (15 y último)";
   const payDate = employee.payDate || new Date().toISOString().slice(0, 10);
+  const bankInfo = [employee.bankName, employee.accountType, employee.accountNumber]
+    .filter(Boolean)
+    .join(" · ");
 
   exportPdfReport({
     title: "Recibo de Pago de Nómina",
-    subtitle: `Empleado: ${employee.name} (${code}) · Período: ${period}`,
+    subtitle: `Empleado: ${employee.name} (${code})${employee.idNumber ? ` · CI: ${employee.idNumber}` : ""} · Período: ${period}`,
     filename: `Recibo_Nomina_${employee.name.replace(/\s+/g, "_")}_${code}`,
     branding,
     kpis: [
       { label: "Código Empleado", value: code },
+      { label: "Cédula de Identidad", value: employee.idNumber || "No registrada" },
       { label: "Cargo / Rol", value: employee.role },
-      { label: "Período Liquidado", value: period },
       { label: "Salario Quincenal", value: `${employee.currency} ${employee.salary.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+      ...(bankInfo ? [{ label: "Coordenadas Bancarias", value: bankInfo }] : []),
     ],
     columns: [
       { header: "Concepto", dataKey: "concept", align: "left" },
       { header: "Beneficiario", dataKey: "name", align: "left" },
-      { header: "Cargo", dataKey: "role", align: "left" },
+      { header: "Cédula", dataKey: "idNumber", align: "center" },
+      { header: "Banco / Cuenta", dataKey: "bank", align: "left" },
       { header: "Fecha de Pago", dataKey: "date", align: "center" },
       { header: "Neto a Cobrar", dataKey: "amount", align: "right" },
     ],
@@ -377,7 +395,8 @@ export function exportPayrollReceiptPdf(
       {
         concept: `Honorarios / Sueldo Quincenal (${period})`,
         name: employee.name,
-        role: employee.role,
+        idNumber: employee.idNumber || "—",
+        bank: bankInfo || "En efectivo / Por asignar",
         date: payDate,
         amount: `${employee.currency} ${employee.salary.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
       },

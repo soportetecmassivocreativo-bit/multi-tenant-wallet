@@ -28,6 +28,31 @@ import type { Employee, PayrollPeriod } from "@/lib/mock-data";
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent";
 
+const POPULAR_BANKS = [
+  "Banesco",
+  "Banco de Venezuela",
+  "Mercantil",
+  "BBVA Provincial",
+  "Banco Nacional de Crédito (BNC)",
+  "Bancamiga",
+  "Bancaribe",
+  "Banco Exterior",
+  "Banco Plaza",
+  "Zelle",
+  "Binance Pay",
+  "Efectivo",
+  "Otro",
+];
+
+const ACCOUNT_TYPES = [
+  "Pago Móvil",
+  "Cuenta Corriente",
+  "Cuenta Ahorro",
+  "Zelle",
+  "Binance / USDT",
+  "Efectivo en Mano",
+];
+
 interface EmployeesManagerProps {
   employees: Employee[];
   payrollPeriods?: PayrollPeriod[];
@@ -42,9 +67,15 @@ export function EmployeesManager({
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [idNumber, setIdNumber] = useState("");
   const [role, setRole] = useState("");
   const [salary, setSalary] = useState(0);
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
+  const [bankName, setBankName] = useState("");
+  const [accountType, setAccountType] = useState("Pago Móvil");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [bankNotes, setBankNotes] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
   const [pending, start] = useTransition();
@@ -61,17 +92,33 @@ export function EmployeesManager({
       return (
         (e.name || "").toLowerCase().includes(q) ||
         (e.role || "").toLowerCase().includes(q) ||
-        (e.code || "").toLowerCase().includes(q)
+        (e.code || "").toLowerCase().includes(q) ||
+        (e.idNumber || "").toLowerCase().includes(q) ||
+        (e.bankName || "").toLowerCase().includes(q) ||
+        (e.accountNumber || "").toLowerCase().includes(q)
       );
     })
     .sort((a, b) => (a.code || "").localeCompare(b.code || "", undefined, { numeric: true }));
 
+  function copyToClipboard(id: string, text: string) {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2500);
+    }
+  }
+
   function openAdd() {
     setEditId(null);
     setName("");
+    setIdNumber("");
     setRole("");
     setSalary(0);
     setCurrency("USD");
+    setBankName("");
+    setAccountType("Pago Móvil");
+    setAccountNumber("");
+    setBankNotes("");
     setError(null);
     setFormOpen(true);
   }
@@ -79,9 +126,14 @@ export function EmployeesManager({
   function openEdit(e: Employee) {
     setEditId(e.id);
     setName(e.name);
+    setIdNumber(e.idNumber || "");
     setRole(e.role);
     setSalary(e.salary);
     setCurrency(e.currency);
+    setBankName(e.bankName || "");
+    setAccountType(e.accountType || "Pago Móvil");
+    setAccountNumber(e.accountNumber || "");
+    setBankNotes(e.bankNotes || "");
     setError(null);
     setFormOpen(true);
   }
@@ -89,7 +141,17 @@ export function EmployeesManager({
   function submit() {
     if (!name || salary <= 0) return;
     setError(null);
-    const input = { fullName: name, role, salary, currency };
+    const input = {
+      fullName: name,
+      role,
+      salary,
+      currency,
+      idNumber: idNumber.trim() || undefined,
+      bankName: bankName.trim() || undefined,
+      accountType: accountType.trim() || undefined,
+      accountNumber: accountNumber.trim() || undefined,
+      bankNotes: bankNotes.trim() || undefined,
+    };
     start(async () => {
       const r = editId
         ? await updateEmployee(editId, input)
@@ -168,7 +230,7 @@ export function EmployeesManager({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar empleado por nombre, cargo o código..."
+                placeholder="Buscar empleado por nombre, cédula, cargo o banco..."
                 className="w-full rounded-xl border border-line bg-card pl-10 pr-4 py-2 text-xs outline-none focus:border-accent"
               />
             </div>
@@ -186,59 +248,172 @@ export function EmployeesManager({
 
           {/* Formulario Agregar / Editar */}
           {formOpen && (
-            <section className="space-y-3 rounded-2xl border border-line bg-card p-4 shadow-sm animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Nombre completo del empleado"
-                  className={inputClass}
-                  autoFocus
-                />
-                <input
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  placeholder="Cargo / Descripción del Puesto (ej. Diseñador UI, Desarrollador)"
-                  className={inputClass}
-                />
+            <section className="space-y-4 rounded-2xl border border-line bg-card p-5 shadow-lg animate-in fade-in duration-200">
+              <div className="border-b border-line pb-2">
+                <h3 className="font-serif text-sm font-bold text-foreground">
+                  {editId ? "Editar Información del Trabajador" : "Registrar Nuevo Trabajador"}
+                </h3>
+                <p className="text-[11px] text-hint">
+                  Completa los datos personales, cédula y coordenadas bancarias para la dispersión de nómina
+                </p>
               </div>
-              <div className="flex gap-2">
-                <MoneyInput
-                  value={salary}
-                  onValueChange={setSalary}
-                  placeholder="Salario quincenal"
-                  className={inputClass}
-                />
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-                  className="rounded-xl border border-line bg-card px-3 text-sm outline-none"
-                >
-                  <option value="USD">USD</option>
-                  <option value="VES">VES</option>
-                  <option value="EUR">EUR</option>
-                </select>
+
+              {/* Fila 1: Nombre y Cédula */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-[11px] font-semibold text-muted">Nombre y Apellido *</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej: Ana María Reyes"
+                    className={inputClass}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-muted">Cédula de Identidad *</label>
+                  <input
+                    value={idNumber}
+                    onChange={(e) => setIdNumber(e.target.value)}
+                    placeholder="Ej: V-19.452.890"
+                    className={`${inputClass} font-mono`}
+                  />
+                </div>
+              </div>
+
+              {/* Fila 2: Cargo, Salario Quincenal y Moneda */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-muted">Cargo / Rol en la Empresa</label>
+                  <input
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    placeholder="Ej: Diseñadora UI/UX, Desarrollador..."
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-muted">Salario Quincenal *</label>
+                  <MoneyInput
+                    value={salary}
+                    onValueChange={setSalary}
+                    placeholder="0.00"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-muted">Moneda de Pago</label>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+                    className={inputClass}
+                  >
+                    <option value="USD">USD ($ Dólar)</option>
+                    <option value="VES">VES (Bs. Bolívares)</option>
+                    <option value="EUR">EUR (€ Euro)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fila 3: Sección Datos Bancarios & Pago de Nómina */}
+              <div className="rounded-xl border border-line bg-soft/40 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <span>🏦 Coordenadas Bancarias & Vía de Pago</span>
+                  </label>
+                  <span className="text-[10px] text-hint font-medium">Para transferencias o Pago Móvil</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted">Banco / Plataforma</label>
+                    <input
+                      list="bank-suggestions"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="Ej: Banesco, Venezuela, Zelle..."
+                      className={inputClass}
+                    />
+                    <datalist id="bank-suggestions">
+                      {POPULAR_BANKS.map((b) => (
+                        <option key={b} value={b} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted">Tipo de Cuenta / Método</label>
+                    <select
+                      value={accountType}
+                      onChange={(e) => setAccountType(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Selecciona tipo...</option>
+                      {ACCOUNT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted">
+                      {accountType === "Pago Móvil"
+                        ? "Teléfono Pago Móvil"
+                        : accountType === "Zelle"
+                          ? "Correo o Teléfono Zelle"
+                          : "Nº de Cuenta (20 dígitos)"}
+                    </label>
+                    <input
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      placeholder={
+                        accountType === "Pago Móvil"
+                          ? "Ej: 0414-1234567"
+                          : accountType === "Zelle"
+                            ? "Ej: pagos@empresa.com"
+                            : "Ej: 0134-0123-45-0001234567"
+                      }
+                      className={`${inputClass} font-mono`}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-muted">Titular / Observaciones de Pago (Opcional)</label>
+                  <input
+                    value={bankNotes}
+                    onChange={(e) => setBankNotes(e.target.value)}
+                    placeholder="Ej: Cuenta a nombre de familiar XYZ / C.I. distinta..."
+                    className={inputClass}
+                  />
+                </div>
               </div>
 
               {error && (
-                <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue">
+                <p className="rounded-xl bg-overdue/10 px-3.5 py-2 text-xs text-overdue font-medium">
                   {error}
                 </p>
               )}
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setFormOpen(false)}
+                  className="rounded-xl border border-line px-4 py-2 text-xs text-muted hover:text-foreground font-semibold"
+                >
+                  Cancelar
+                </button>
                 <button
                   onClick={submit}
                   disabled={!name || salary <= 0 || pending}
-                  className="flex-1 rounded-xl bg-accent py-2.5 text-xs font-medium text-white disabled:opacity-40"
+                  className="rounded-xl bg-accent px-6 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 disabled:opacity-40 transition-all"
                 >
-                  {pending ? "Guardando…" : "Guardar empleado"}
-                </button>
-                <button
-                  onClick={() => setFormOpen(false)}
-                  className="rounded-xl border border-line px-4 py-2.5 text-xs text-muted hover:text-foreground"
-                >
-                  Cancelar
+                  {pending ? "Guardando…" : editId ? "Actualizar Trabajador" : "Registrar Trabajador"}
                 </button>
               </div>
             </section>
@@ -258,26 +433,60 @@ export function EmployeesManager({
             ) : (
               <div className="divide-y divide-line">
                 {filteredEmployees.map((e) => (
-                  <div key={e.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-bg font-serif font-bold text-accent">
+                  <div key={e.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent-bg font-serif font-bold text-accent text-base">
                         {(e.name || "?").charAt(0).toUpperCase()}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold">{e.name}</p>
-                          <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-bold text-foreground">{e.name}</p>
+                          <span className="rounded-md bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
                             {e.code || "Mas-Corp-0001"}
                           </span>
+                          {e.idNumber && (
+                            <span className="rounded-md bg-accent-bg/80 border border-accent/20 font-mono px-2 py-0.5 text-[10px] font-semibold text-accent">
+                              CI: {e.idNumber}
+                            </span>
+                          )}
                         </div>
-                        <p className="text-xs text-hint">{e.role}</p>
+
+                        <p className="text-xs text-hint font-medium">{e.role || "Sin cargo especificado"}</p>
+
+                        {/* Coordenadas Bancarias */}
+                        {(e.bankName || e.accountNumber) && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-soft border border-line/80 px-2 py-0.5 text-[11px] font-mono text-muted">
+                              <span>{e.accountType === "Pago Móvil" ? "📱" : e.bankName === "Zelle" ? "⚡" : "🏦"}</span>
+                              <strong className="text-foreground">{e.bankName || "Banco"}</strong>
+                              {e.accountType && <span className="text-hint">({e.accountType})</span>}
+                              {e.accountNumber && (
+                                <span className="text-foreground font-bold">· {e.accountNumber}</span>
+                              )}
+                            </span>
+
+                            {e.accountNumber && (
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(e.id, `${e.idNumber ? `CI: ${e.idNumber} · ` : ""}${e.bankName ? `${e.bankName} · ` : ""}${e.accountNumber}`)}
+                                className="text-[10px] text-accent hover:underline font-medium px-1.5 py-0.5 rounded bg-card border border-line"
+                                title="Copiar datos bancarios"
+                              >
+                                {copiedId === e.id ? "✓ Copiado" : "Copiar datos"}
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pl-13 sm:pl-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
-                      <span className="tnum text-sm font-semibold text-foreground">
-                        {formatCurrency(e.salary, e.currency)}
-                      </span>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pl-14 sm:pl-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
+                      <div className="text-left sm:text-right">
+                        <span className="tnum text-sm font-bold text-foreground block">
+                          {formatCurrency(e.salary, e.currency)}
+                        </span>
+                        <span className="text-[10px] text-hint">quincenal</span>
+                      </div>
 
                       <div className="flex items-center gap-1.5">
                         {/* Botón Descargar Recibo Individual PDF */}

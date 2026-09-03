@@ -182,13 +182,62 @@ export interface Employee {
   role: string;
   salary: number; // salario por quincena
   currency: CurrencyCode;
+  idNumber?: string; // Cédula de Identidad (ej: V-19.845.120)
+  bankName?: string; // Banco (ej: Banesco, Banco de Venezuela, Mercantil, Zelle, Pago Móvil)
+  accountType?: string; // Cuenta Corriente, Cuenta Ahorro, Pago Móvil, Zelle, Binance
+  accountNumber?: string; // Número de cuenta / Teléfono / Correo
+  bankNotes?: string; // Titular o notas adicionales
 }
 
 export const employees: Employee[] = [
-  { id: "e1", code: "Mas-Corp-0001", name: "Ana Reyes", role: "Diseñadora", salary: 220, currency: "USD" },
-  { id: "e2", code: "Mas-Corp-0002", name: "Luis Peña", role: "Desarrollador", salary: 300, currency: "USD" },
-  { id: "e3", code: "Mas-Corp-0003", name: "María Gómez", role: "Administración", salary: 180, currency: "USD" },
-  { id: "e4", code: "Mas-Corp-0004", name: "Jorge Díaz", role: "Ventas", salary: 160, currency: "USD" },
+  {
+    id: "e1",
+    code: "Mas-Corp-0001",
+    name: "Ana Reyes",
+    role: "Diseñadora UI/UX",
+    salary: 220,
+    currency: "USD",
+    idNumber: "V-20.451.890",
+    bankName: "Banesco",
+    accountType: "Pago Móvil",
+    accountNumber: "0414-1234567",
+  },
+  {
+    id: "e2",
+    code: "Mas-Corp-0002",
+    name: "Luis Peña",
+    role: "Desarrollador Full-Stack",
+    salary: 300,
+    currency: "USD",
+    idNumber: "V-18.789.234",
+    bankName: "Banco de Venezuela",
+    accountType: "Cuenta Corriente",
+    accountNumber: "0102-0123-45-0001234567",
+  },
+  {
+    id: "e3",
+    code: "Mas-Corp-0003",
+    name: "María Gómez",
+    role: "Administración & Finanzas",
+    salary: 180,
+    currency: "USD",
+    idNumber: "V-22.110.456",
+    bankName: "Mercantil",
+    accountType: "Pago Móvil",
+    accountNumber: "0424-9876543",
+  },
+  {
+    id: "e4",
+    code: "Mas-Corp-0004",
+    name: "Jorge Díaz",
+    role: "Ejecutivo de Ventas",
+    salary: 160,
+    currency: "USD",
+    idNumber: "V-19.340.567",
+    bankName: "Zelle",
+    accountType: "Zelle",
+    accountNumber: "jorge.diaz.pagos@gmail.com",
+  },
 ];
 
 export type PayrollStatus = "pendiente" | "pagada";
