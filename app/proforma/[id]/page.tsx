@@ -41,6 +41,7 @@ export default async function ProformaPrintPage({
   const isForeign = prof.currency !== "VES";
   const vesTotalCalculated = prof.vesTotal ?? (prof.total * currentRate);
   const paperSize = config.pdfProformaPaperSize || "letter";
+  const showRif = config.pdfProformaShowRif ?? false;
 
   return (
     <div className="min-h-[100dvh] bg-neutral-100 py-6 px-2 sm:px-4 text-[#14151A]">
@@ -149,7 +150,9 @@ export default async function ProformaPrintPage({
               <p><strong className="font-bold text-neutral-900">Titular Cuenta:</strong> {targetHolder}</p>
               <p><strong className="font-bold text-neutral-900">Número Cuenta:</strong> <span className="font-mono">{targetNumber}</span></p>
               <p><strong className="font-bold text-neutral-900">Banco:</strong> {targetBank}</p>
-              <p><strong className="font-bold text-neutral-900">Cedula de identidad:</strong> <span className="font-mono">{targetId}</span></p>
+              {showRif && targetId && (
+                <p><strong className="font-bold text-neutral-900">Cedula de identidad:</strong> <span className="font-mono">{targetId}</span></p>
+              )}
             </div>
           </div>
 
@@ -164,16 +167,23 @@ export default async function ProformaPrintPage({
           </div>
 
           {/* 4. FILA DE CLIENTE Y RIF */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
-            <div>
+          {showRif ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
+              <div>
+                <p className="font-bold text-neutral-900">Empresa Cliente:</p>
+                <p className="text-neutral-700 truncate">{prof.clientName}</p>
+              </div>
+              <div>
+                <p className="font-bold text-neutral-900">RIF:</p>
+                <p className="text-neutral-700 font-mono">{prof.clientRif || "J-00000000-0"}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs pt-1 pb-2 border-b border-neutral-200">
               <p className="font-bold text-neutral-900">Empresa Cliente:</p>
-              <p className="text-neutral-700 truncate">{prof.clientName}</p>
+              <p className="text-neutral-700 font-semibold text-sm">{prof.clientName}</p>
             </div>
-            <div>
-              <p className="font-bold text-neutral-900">RIF:</p>
-              <p className="text-neutral-700 font-mono">{prof.clientRif || "J-00000000-0"}</p>
-            </div>
-          </div>
+          )}
 
           {/* 5. SECCIÓN DE CONCEPTOS / COTIZACIÓN */}
           <div className="space-y-2 pt-2">

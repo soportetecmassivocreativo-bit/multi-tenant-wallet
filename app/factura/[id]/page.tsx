@@ -47,6 +47,7 @@ export default async function FacturaPage({
   const isForeign = inv.currency !== "VES";
   const vesTotalCalculated = inv.vesTotal ?? (inv.total * currentRate);
   const paperSize = config.pdfInvoicePaperSize || "letter";
+  const showRif = config.pdfInvoiceShowRif ?? false;
 
   return (
     <div className="min-h-[100dvh] bg-neutral-100 py-6 px-2 sm:px-4 text-[#14151A]">
@@ -155,7 +156,9 @@ export default async function FacturaPage({
               <p><strong className="font-bold text-neutral-900">Titular Cuenta:</strong> {targetHolder}</p>
               <p><strong className="font-bold text-neutral-900">Número Cuenta:</strong> <span className="font-mono">{targetNumber}</span></p>
               <p><strong className="font-bold text-neutral-900">Banco:</strong> {targetBank}</p>
-              <p><strong className="font-bold text-neutral-900">Cedula de identidad:</strong> <span className="font-mono">{targetId}</span></p>
+              {showRif && targetId && (
+                <p><strong className="font-bold text-neutral-900">Cedula de identidad:</strong> <span className="font-mono">{targetId}</span></p>
+              )}
             </div>
           </div>
 
@@ -169,25 +172,42 @@ export default async function FacturaPage({
             <div className="h-6 w-full bg-[#E5E7EB] rounded-sm" />
           </div>
 
-          {/* 4. FILA DE 4 COLUMNAS: EMPRESA CLIENTE, RIF, LA SUMA DE, TASA */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
-            <div>
-              <p className="font-bold text-neutral-900">Empresa Cliente:</p>
-              <p className="text-neutral-700 truncate">{inv.clientName}</p>
+          {/* 4. FILA DE CLIENTE, RIF, LA SUMA DE, TASA */}
+          {showRif ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
+              <div>
+                <p className="font-bold text-neutral-900">Empresa Cliente:</p>
+                <p className="text-neutral-700 truncate">{inv.clientName}</p>
+              </div>
+              <div>
+                <p className="font-bold text-neutral-900">RIF:</p>
+                <p className="text-neutral-700 font-mono">{inv.clientRif || "J-00000000-0"}</p>
+              </div>
+              <div>
+                <p className="font-bold text-neutral-900">La suma de:</p>
+                <p className="text-neutral-700 font-semibold">{formatCurrency(inv.total, inv.currency)}</p>
+              </div>
+              <div>
+                <p className="font-bold text-neutral-900">Tasa:</p>
+                <p className="text-neutral-700 font-mono font-medium">{rateFormatted} Bs.</p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-neutral-900">RIF:</p>
-              <p className="text-neutral-700 font-mono">{inv.clientRif || "J-00000000-0"}</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
+              <div>
+                <p className="font-bold text-neutral-900">Empresa Cliente:</p>
+                <p className="text-neutral-700 truncate font-semibold">{inv.clientName}</p>
+              </div>
+              <div>
+                <p className="font-bold text-neutral-900">La suma de:</p>
+                <p className="text-neutral-700 font-semibold">{formatCurrency(inv.total, inv.currency)}</p>
+              </div>
+              <div>
+                <p className="font-bold text-neutral-900">Tasa:</p>
+                <p className="text-neutral-700 font-mono font-medium">{rateFormatted} Bs.</p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-neutral-900">La suma de:</p>
-              <p className="text-neutral-700 font-semibold">{formatCurrency(inv.total, inv.currency)}</p>
-            </div>
-            <div>
-              <p className="font-bold text-neutral-900">Tasa:</p>
-              <p className="text-neutral-700 font-mono font-medium">{rateFormatted} Bs.</p>
-            </div>
-          </div>
+          )}
 
           {/* 5. SECCIÓN DE CONCEPTOS DE LA FACTURA */}
           <div className="space-y-2 pt-2">

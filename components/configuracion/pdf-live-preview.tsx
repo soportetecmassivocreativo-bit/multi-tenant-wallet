@@ -106,6 +106,12 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
     }
   })();
 
+  const showRif = isFacturas
+    ? (config.pdfInvoiceShowRif ?? false)
+    : isProformas
+      ? (config.pdfProformaShowRif ?? false)
+      : (config.pdfShowRif ?? false);
+
   const footer = isFacturas
     ? config.pdfInvoiceFooterText || "Massivo Corp · Factura Oficial"
     : isProformas
@@ -211,7 +217,7 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
               </span>
             )}
             <p className="text-[10px] text-gray-500">
-              {subtitle} · RIF: {companyRif}
+              {subtitle}{showRif && companyRif ? ` · RIF: ${companyRif}` : ""}
             </p>
           </div>
           <div className="text-right text-[9px] text-gray-500 space-y-0.5">

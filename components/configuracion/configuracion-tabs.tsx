@@ -684,14 +684,36 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                       />
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-xs text-muted">RIF Fiscal en Facturas</label>
-                      <input
-                        type="text"
-                        value={config.pdfInvoiceCompanyRif || config.pdfCompanyRif || ""}
-                        onChange={(e) => updateField("pdfInvoiceCompanyRif", e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                      />
+                    {/* Selector para Aplicar / Desaplicar RIF en Facturas */}
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-foreground block">
+                            Mostrar RIF en Facturas
+                          </label>
+                          <p className="text-[11px] text-muted">
+                            Activa o desactiva la inclusión del RIF en la factura y datos bancarios (desactivado por defecto si no dispones de RIF).
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={config.pdfInvoiceShowRif ?? false}
+                          onChange={(e) => updateField("pdfInvoiceShowRif", e.target.checked)}
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                        />
+                      </div>
+                      {(config.pdfInvoiceShowRif ?? false) && (
+                        <div className="pt-2">
+                          <label className="mb-1 block text-xs text-muted">RIF Fiscal en Facturas</label>
+                          <input
+                            type="text"
+                            value={config.pdfInvoiceCompanyRif || config.pdfCompanyRif || ""}
+                            onChange={(e) => updateField("pdfInvoiceCompanyRif", e.target.value)}
+                            placeholder="J-00000000-0"
+                            className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -949,14 +971,36 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                       />
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-xs text-muted">RIF Fiscal en Proformas</label>
-                      <input
-                        type="text"
-                        value={config.pdfProformaCompanyRif || config.pdfCompanyRif || ""}
-                        onChange={(e) => updateField("pdfProformaCompanyRif", e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                      />
+                    {/* Selector para Aplicar / Desaplicar RIF en Proformas */}
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-foreground block">
+                            Mostrar RIF en Proformas
+                          </label>
+                          <p className="text-[11px] text-muted">
+                            Activa o desactiva la inclusión del RIF en la proforma (desactivado por defecto si no dispones de RIF).
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={config.pdfProformaShowRif ?? false}
+                          onChange={(e) => updateField("pdfProformaShowRif", e.target.checked)}
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                        />
+                      </div>
+                      {(config.pdfProformaShowRif ?? false) && (
+                        <div className="pt-2">
+                          <label className="mb-1 block text-xs text-muted">RIF Fiscal en Proformas</label>
+                          <input
+                            type="text"
+                            value={config.pdfProformaCompanyRif || config.pdfCompanyRif || ""}
+                            onChange={(e) => updateField("pdfProformaCompanyRif", e.target.value)}
+                            placeholder="J-00000000-0"
+                            className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -1190,14 +1234,36 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                       />
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-xs text-muted">RIF Fiscal</label>
-                      <input
-                        type="text"
-                        value={config.pdfCompanyRif}
-                        onChange={(e) => updateField("pdfCompanyRif", e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
-                      />
+                    {/* Selector para Aplicar / Desaplicar RIF en Reportes Generales */}
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-foreground block">
+                            Mostrar RIF en Reportes Generales
+                          </label>
+                          <p className="text-[11px] text-muted">
+                            Activa o desactiva la visualización del RIF en los reportes generales del sistema.
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={config.pdfShowRif ?? false}
+                          onChange={(e) => updateField("pdfShowRif", e.target.checked)}
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                        />
+                      </div>
+                      {(config.pdfShowRif ?? false) && (
+                        <div className="pt-2">
+                          <label className="mb-1 block text-xs text-muted">RIF Fiscal</label>
+                          <input
+                            type="text"
+                            value={config.pdfCompanyRif}
+                            onChange={(e) => updateField("pdfCompanyRif", e.target.value)}
+                            placeholder="J-00000000-0"
+                            className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div>

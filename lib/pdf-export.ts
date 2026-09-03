@@ -77,8 +77,11 @@ export function exportPdfReport(options: PdfReportOptions): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(90, 90, 110);
+  const subtitleText = config.pdfShowRif && config.pdfCompanyRif
+    ? `${config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF: ${config.pdfCompanyRif}`
+    : (config.pdfHeaderSubtitle || "Sistema Financiero & Facturación");
   doc.text(
-    `${config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF: ${config.pdfCompanyRif || "J-50000000-0"}`,
+    subtitleText,
     margin + 5,
     margin + 19
   );

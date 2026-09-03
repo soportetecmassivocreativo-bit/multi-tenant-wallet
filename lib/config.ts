@@ -34,6 +34,7 @@ export interface SystemConfig {
   pdfBcvCurrency?: "usd" | "eur" | "both" | "none"; // "usd" | "eur" | "both" | "none"
   pdfFooterText: string;
   pdfTermsAndConditions: string;
+  pdfShowRif?: boolean;
   pdfShowConditions?: boolean;
   pdfConditionsPayment?: string;
   pdfConditionsDelivery?: string;
@@ -45,6 +46,7 @@ export interface SystemConfig {
   pdfInvoiceTargetAccountId?: string;
   pdfInvoiceCompanyName: string;
   pdfInvoiceCompanyRif: string;
+  pdfInvoiceShowRif?: boolean;
   pdfInvoiceHeaderSubtitle: string;
   pdfInvoicePrimaryColor: string;
   pdfInvoicePaperSize: "a4" | "letter" | "legal";
@@ -65,6 +67,7 @@ export interface SystemConfig {
   pdfProformaTargetAccountId?: string;
   pdfProformaCompanyName: string;
   pdfProformaCompanyRif: string;
+  pdfProformaShowRif?: boolean;
   pdfProformaHeaderSubtitle: string;
   pdfProformaPrimaryColor: string;
   pdfProformaPaperSize: "a4" | "letter" | "legal";
@@ -106,6 +109,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfGeneralTemplateUrl: "",
   pdfCompanyName: "Massivo Corp",
   pdfCompanyRif: "J-50000000-0",
+  pdfShowRif: false,
   pdfHeaderSubtitle: "Sistema Financiero & Reportes",
   pdfPrimaryColor: "#2C21FF",
   pdfPaperSize: "letter",
@@ -126,6 +130,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfInvoiceTargetAccountId: "",
   pdfInvoiceCompanyName: "Massivo Corp",
   pdfInvoiceCompanyRif: "J-50000000-0",
+  pdfInvoiceShowRif: false,
   pdfInvoiceHeaderSubtitle: "Factura Comercial & Comprobante de Cobro",
   pdfInvoicePrimaryColor: "#2C21FF",
   pdfInvoicePaperSize: "letter",
@@ -146,6 +151,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfProformaTargetAccountId: "",
   pdfProformaCompanyName: "Massivo Corp",
   pdfProformaCompanyRif: "J-50000000-0",
+  pdfProformaShowRif: false,
   pdfProformaHeaderSubtitle: "Proforma / Presupuesto Comercial",
   pdfProformaPrimaryColor: "#2C21FF",
   pdfProformaPaperSize: "letter",
