@@ -153,29 +153,62 @@ export async function deactivateEmployee(id: string): Promise<MutationResult> {
   return deleteEmployee(id);
 }
 
-/** Paga la nómina: registra un egreso por cada empleado activo (en su moneda). */
-export async function payPayroll(): Promise<MutationResult> {
+export interface PayPayrollOptions {
+  accountId?: string;
+  accountName?: string;
+  reference?: string;
+  notes?: string;
+  periodLabel?: string;
+  status?: "pagado" | "pendiente"; // 'pagado' = aprobado y liquidado, 'pendiente' = pendiente por aprobar en gastos
+}
+
+/** Paga la nómina completa: registra los egresos vinculados para cada empleado activo */
+export async function payPayroll(
+  options?: PayPayrollOptions,
+): Promise<MutationResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   const { data: emps } = await ctx.supabase
     .from("employees")
-    .select("full_name, salary, currency")
+    .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
     .eq("company_id", ctx.companyId)
     .eq("active", true);
   if (!emps || emps.length === 0)
     return { ok: false, error: "No hay empleados activos." };
 
-  const rows = emps.map((e) => ({
-    company_id: ctx.companyId,
-    category: "Nómina",
-    note: `Nómina · ${e.full_name} [Por Aprobar / Pendiente de Pago]`,
-    amount: e.salary,
-    currency: e.currency,
-    spent_on: today(),
-    source: "nomina",
-  }));
+  const isApproved = options?.status === "pagado";
+  const rows = emps.map((e) => {
+    let note = `Nómina · ${e.full_name}`;
+    const metaParts: string[] = [];
+    if (isApproved) {
+      if (options?.accountName) metaParts.push(`Pagado desde ${options.accountName}`);
+      else metaParts.push("Pagado");
+      if (options?.reference) metaParts.push(`Ref: ${options.reference}`);
+    } else {
+      metaParts.push("Por Aprobar / Pendiente de Pago");
+      if (options?.accountName) metaParts.push(`Previsto: ${options.accountName}`);
+    }
+    if (options?.periodLabel) metaParts.push(options.periodLabel);
+    if (options?.notes) metaParts.push(`"${options.notes}"`);
+
+    if (metaParts.length > 0) {
+      note = `${note} [${metaParts.join(" · ")}]`;
+    }
+
+    return {
+      company_id: ctx.companyId,
+      category: "Nómina",
+      note,
+      amount: e.salary,
+      currency: e.currency,
+      spent_on: today(),
+      source: "nomina",
+      ref_id: e.id,
+    };
+  });
+
   const { error } = await ctx.supabase.from("expenses").insert(rows);
   if (error) return { ok: false, error: error.message };
 
@@ -185,9 +218,10 @@ export async function payPayroll(): Promise<MutationResult> {
   return { ok: true };
 }
 
-/** Paga a un solo empleado: registra su egreso (en su moneda). Para pagar de a poco. */
+/** Paga a un solo empleado: registra su egreso vinculado (en su moneda) */
 export async function payEmployee(
   employeeId: string,
+  options?: PayPayrollOptions,
 ): Promise<MutationResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
   const ctx = await getContext();
@@ -195,20 +229,79 @@ export async function payEmployee(
 
   const { data: emp } = await ctx.supabase
     .from("employees")
-    .select("full_name, salary, currency")
+    .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
     .eq("id", employeeId)
     .single();
   if (!emp) return { ok: false, error: "Empleado no encontrado." };
 
+  const isApproved = options?.status === "pagado";
+  let note = `Nómina · ${emp.full_name}`;
+  const metaParts: string[] = [];
+  if (isApproved) {
+    if (options?.accountName) metaParts.push(`Pagado desde ${options.accountName}`);
+    else metaParts.push("Pagado");
+    if (options?.reference) metaParts.push(`Ref: ${options.reference}`);
+  } else {
+    metaParts.push("Por Aprobar / Pendiente de Pago");
+    if (options?.accountName) metaParts.push(`Previsto: ${options.accountName}`);
+  }
+  if (options?.periodLabel) metaParts.push(options.periodLabel);
+  if (options?.notes) metaParts.push(`"${options.notes}"`);
+
+  if (metaParts.length > 0) {
+    note = `${note} [${metaParts.join(" · ")}]`;
+  }
+
   const { error } = await ctx.supabase.from("expenses").insert({
     company_id: ctx.companyId,
     category: "Nómina",
-    note: `Nómina · ${emp.full_name} [Por Aprobar / Pendiente de Pago]`,
+    note,
     amount: emp.salary,
     currency: emp.currency,
     spent_on: today(),
     source: "nomina",
+    ref_id: emp.id,
   });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/nomina");
+  revalidatePath("/gastos");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+/** Aprueba y liquida un gasto de nómina pendiente directamente */
+export async function approvePayrollExpense(
+  expenseId: string,
+  options?: { accountName?: string; reference?: string; notes?: string },
+): Promise<MutationResult> {
+  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  const ctx = await getContext();
+  if (!ctx) return { ok: false, error: "No autenticado." };
+
+  const { data: exp } = await ctx.supabase
+    .from("expenses")
+    .select("id, note, amount, currency")
+    .eq("id", expenseId)
+    .single();
+  if (!exp) return { ok: false, error: "Gasto de nómina no encontrado." };
+
+  const cleanBaseNote = exp.note.replace(/\s*\[.*?\]\s*$/, "").trim();
+  const metaParts: string[] = [];
+  if (options?.accountName) metaParts.push(`Pagado desde ${options.accountName}`);
+  else metaParts.push("Pagado y Aprobado");
+  if (options?.reference?.trim()) metaParts.push(`Ref: ${options.reference.trim()}`);
+  if (options?.notes?.trim()) metaParts.push(`"${options.notes.trim()}"`);
+
+  const updatedNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
+
+  const { error } = await ctx.supabase
+    .from("expenses")
+    .update({
+      note: updatedNote,
+    })
+    .eq("id", expenseId);
+
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/nomina");

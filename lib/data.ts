@@ -545,7 +545,7 @@ export async function getExpenses(): Promise<Expense[]> {
   // Ordenamos por created_at ASC para fijar el número único permanente de cada gasto
   const { data } = await supabase
     .from("expenses")
-    .select("id, category, note, amount, currency, date:spent_on, created_at")
+    .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
     .order("created_at", { ascending: true });
 
   const withPermanentCodes = (data ?? []).map((e, idx) => ({
@@ -555,6 +555,18 @@ export async function getExpenses(): Promise<Expense[]> {
 
   // Retornamos de forma fija y correlativa descendente (el más reciente arriba)
   return withPermanentCodes.reverse() as unknown as Expense[];
+}
+
+export async function getPayrollExpenses(): Promise<Expense[]> {
+  const allExpenses = await getExpenses();
+  return allExpenses.filter(
+    (e) =>
+      (e.source || "").toLowerCase() === "nomina" ||
+      (e.category || "").toLowerCase().includes("nómina") ||
+      (e.category || "").toLowerCase().includes("nomina") ||
+      (e.note || "").toLowerCase().includes("nómina") ||
+      (e.note || "").toLowerCase().includes("nomina")
+  );
 }
 
 export async function getEmployees(): Promise<Employee[]> {

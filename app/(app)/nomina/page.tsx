@@ -3,12 +3,15 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { EmployeesManager } from "@/components/nomina/employees-manager";
 import { NominaPdfButton } from "@/components/nomina/nomina-pdf-button";
-import { getEmployees, getPayrollPeriods } from "@/lib/data";
+import { getEmployees, getPayrollPeriods, getPayrollExpenses } from "@/lib/data";
+import { getCompanyAccounts } from "@/lib/cuentas-actions";
 
 export default async function NominaPage() {
-  const [employees, payrollPeriods] = await Promise.all([
+  const [employees, payrollPeriods, payrollExpenses, accounts] = await Promise.all([
     getEmployees(),
     getPayrollPeriods(),
+    getPayrollExpenses(),
+    getCompanyAccounts(),
   ]);
 
   return (
@@ -20,7 +23,7 @@ export default async function NominaPage() {
         <div className="hidden lg:block">
           <h1 className="font-serif text-2xl tracking-tight">Nómina de Empleados</h1>
           <p className="text-xs text-hint mt-0.5">
-            Gestión quincenal, historial de liquidaciones y recibos PDF
+            Gestión quincenal, historial de liquidaciones, pagos y recibos PDF
           </p>
         </div>
         <NominaPdfButton employees={employees} />
@@ -33,7 +36,12 @@ export default async function NominaPage() {
         </p>
       </div>
 
-      <EmployeesManager employees={employees} payrollPeriods={payrollPeriods} />
+      <EmployeesManager
+        employees={employees}
+        payrollPeriods={payrollPeriods}
+        payrollExpenses={payrollExpenses}
+        accounts={accounts}
+      />
     </div>
   );
 }

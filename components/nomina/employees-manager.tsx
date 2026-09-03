@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import {
   addEmployee,
   updateEmployee,
   deleteEmployee,
   payPayroll,
   payEmployee,
+  approvePayrollExpense,
+  type PayPayrollOptions,
 } from "@/lib/nomina-actions";
 import { DeleteButton } from "@/components/ui/delete-button";
-import { ActionButton } from "@/components/ui/action-button";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
   PlusIcon,
@@ -19,11 +21,14 @@ import {
   UsersIcon,
   PayrollIcon,
   SearchIcon,
+  ReceiptIcon,
 } from "@/components/ui/icons";
 import { formatCurrency, type CurrencyCode } from "@/lib/currency";
 import { formatDate, formatMoney } from "@/lib/format";
 import { exportPayrollReceiptPdf } from "@/lib/pdf-export";
-import type { Employee, PayrollPeriod } from "@/lib/mock-data";
+import type { Employee, PayrollPeriod, Expense } from "@/lib/mock-data";
+import type { CompanyAccount } from "@/lib/cuentas-actions";
+import { getExpenseBreakdown } from "@/lib/cuentas-helpers";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent";
@@ -56,14 +61,22 @@ const ACCOUNT_TYPES = [
 interface EmployeesManagerProps {
   employees: Employee[];
   payrollPeriods?: PayrollPeriod[];
+  payrollExpenses?: Expense[];
+  accounts?: CompanyAccount[];
 }
 
 export function EmployeesManager({
   employees,
   payrollPeriods = [],
+  payrollExpenses = [],
+  accounts = [],
 }: EmployeesManagerProps) {
   const [tab, setTab] = useState<"empleados" | "historial">("empleados");
   const [query, setQuery] = useState("");
+  const [histQuery, setHistQuery] = useState("");
+  const [histFilterWorker, setHistFilterWorker] = useState<string>("todos");
+  const [histFilterStatus, setHistFilterStatus] = useState<"todos" | "aprobado" | "pendiente">("todos");
+
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -77,13 +90,24 @@ export function EmployeesManager({
   const [bankNotes, setBankNotes] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [paid, setPaid] = useState(false);
-  const [pending, start] = useTransition();
 
-  const totals = employees.reduce<Record<string, number>>((acc, e) => {
-    acc[e.currency] = (acc[e.currency] ?? 0) + e.salary;
-    return acc;
-  }, {});
+  const [payingTarget, setPayingTarget] = useState<Employee | "all" | null>(null);
+  const [payAccountId, setPayAccountId] = useState(accounts[0]?.id || "");
+  const [payStatus, setPayStatus] = useState<"pagado" | "pendiente">("pagado");
+  const [payReference, setPayReference] = useState("");
+  const [payPeriodLabel, setPayPeriodLabel] = useState(
+    `${new Date().getDate() <= 15 ? "1ra Quincena" : "2da Quincena"} ${new Date().toLocaleDateString("es-VE", { month: "long", year: "numeric" })}`
+  );
+  const [payNotes, setPayNotes] = useState("");
+  const [payModalError, setPayModalError] = useState<string | null>(null);
+
+  const [approvingExpense, setApprovingExpense] = useState<Expense | null>(null);
+  const [approveAccountId, setApproveAccountId] = useState(accounts[0]?.id || "");
+  const [approveReference, setApproveReference] = useState("");
+  const [approveNotes, setApproveNotes] = useState("");
+  const [approveError, setApproveError] = useState<string | null>(null);
+
+  const [pending, start] = useTransition();
 
   const filteredEmployees = employees
     .filter((e) => {
@@ -99,6 +123,79 @@ export function EmployeesManager({
       );
     })
     .sort((a, b) => (a.code || "").localeCompare(b.code || "", undefined, { numeric: true }));
+
+  const processedPayrollExpenses = payrollExpenses.map((exp) => {
+    const breakdown = getExpenseBreakdown(exp);
+    const rawNote = exp.note || "";
+    const isPending = breakdown.isPending;
+
+    const matchedEmployee = employees.find(
+      (emp) =>
+        (exp.refId && emp.id === exp.refId) ||
+        rawNote.toLowerCase().includes(emp.name.toLowerCase())
+    );
+
+    const metaMatch = rawNote.match(/\[(.*?)\]$/);
+    let detailsText = "";
+    let refNum = "";
+    let accountName = "";
+
+    if (metaMatch) {
+      detailsText = metaMatch[1];
+      const refMatch = detailsText.match(/Ref:\s*([^\s·]+)/i);
+      if (refMatch) refNum = refMatch[1];
+      const accFound = accounts.find((a) =>
+        detailsText.toLowerCase().includes(a.name.toLowerCase())
+      );
+      if (accFound) accountName = accFound.name;
+    }
+
+    const cleanConcept = rawNote.replace(/\s*\[.*?\]$/, "").replace(/^Nómina\s*·\s*/i, "").trim();
+
+    return {
+      ...exp,
+      matchedEmployee,
+      isPending,
+      cleanConcept,
+      detailsText,
+      refNum,
+      accountName,
+      statusLabel: isPending ? "Pendiente en Gastos" : "Pagado y Aprobado",
+    };
+  });
+
+  const filteredHistory = processedPayrollExpenses.filter((item) => {
+    if (histFilterWorker === "general") {
+      if (item.matchedEmployee) return false;
+    } else if (histFilterWorker !== "todos") {
+      if (!item.matchedEmployee || item.matchedEmployee.id !== histFilterWorker) return false;
+    }
+
+    if (histFilterStatus === "aprobado" && item.isPending) return false;
+    if (histFilterStatus === "pendiente" && !item.isPending) return false;
+
+    const q = histQuery.toLowerCase().trim();
+    if (q) {
+      const matchText =
+        (item.code || "").toLowerCase().includes(q) ||
+        (item.note || "").toLowerCase().includes(q) ||
+        (item.matchedEmployee?.name || "").toLowerCase().includes(q) ||
+        (item.matchedEmployee?.idNumber || "").toLowerCase().includes(q) ||
+        (item.detailsText || "").toLowerCase().includes(q) ||
+        (item.refNum || "").toLowerCase().includes(q);
+      if (!matchText) return false;
+    }
+
+    return true;
+  });
+
+  const totalHistoryPaid = processedPayrollExpenses
+    .filter((i) => !i.isPending)
+    .reduce((s, i) => s + i.amount, 0);
+
+  const totalHistoryPending = processedPayrollExpenses
+    .filter((i) => i.isPending)
+    .reduce((s, i) => s + i.amount, 0);
 
   function copyToClipboard(id: string, text: string) {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -161,66 +258,107 @@ export function EmployeesManager({
     });
   }
 
-  function pay() {
-    setError(null);
+  function openPayModal(target: Employee | "all") {
+    setPayingTarget(target);
+    setPayAccountId(accounts[0]?.id || "");
+    setPayStatus("pagado");
+    setPayReference("");
+    setPayNotes("");
+    setPayModalError(null);
+  }
+
+  function handleConfirmPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!payingTarget) return;
+    setPayModalError(null);
+
+    const selectedAcc = accounts.find((a) => a.id === payAccountId);
+    const options: PayPayrollOptions = {
+      accountId: payAccountId || undefined,
+      accountName: selectedAcc?.name || undefined,
+      reference: payReference.trim() || undefined,
+      periodLabel: payPeriodLabel.trim() || undefined,
+      notes: payNotes.trim() || undefined,
+      status: payStatus,
+    };
+
     start(async () => {
-      const r = await payPayroll();
-      if (r.ok) setPaid(true);
-      else setError(r.error ?? "No se pudo pagar la nómina.");
+      let r;
+      if (payingTarget === "all") {
+        r = await payPayroll(options);
+      } else {
+        r = await payEmployee(payingTarget.id, options);
+      }
+
+      if (r.ok) {
+        setPayingTarget(null);
+        setTab("historial");
+      } else {
+        setPayModalError(r.error || "No se pudo procesar el pago de nómina.");
+      }
+    });
+  }
+
+  function openApproveModal(exp: Expense) {
+    setApprovingExpense(exp);
+    setApproveAccountId(accounts[0]?.id || "");
+    setApproveReference("");
+    setApproveNotes("");
+    setApproveError(null);
+  }
+
+  function handleConfirmApprove(e: React.FormEvent) {
+    e.preventDefault();
+    if (!approvingExpense) return;
+    setApproveError(null);
+
+    const selectedAcc = accounts.find((a) => a.id === approveAccountId);
+
+    start(async () => {
+      const r = await approvePayrollExpense(approvingExpense.id, {
+        accountName: selectedAcc?.name,
+        reference: approveReference.trim() || undefined,
+        notes: approveNotes.trim() || undefined,
+      });
+
+      if (r.ok) {
+        setApprovingExpense(null);
+      } else {
+        setApproveError(r.error || "No se pudo aprobar el pago.");
+      }
     });
   }
 
   return (
     <div className="space-y-5">
-      {/* Total por moneda */}
-      <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-        <p className="text-xs text-muted font-medium">Presupuesto Nómina Quincenal</p>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-          {Object.keys(totals).length === 0 ? (
-            <p className="text-lg font-medium text-hint">—</p>
-          ) : (
-            Object.entries(totals).map(([cur, amt]) => (
-              <p key={cur} className="tnum text-xl font-bold text-foreground">
-                {formatCurrency(amt, cur as CurrencyCode)}
-              </p>
-            ))
-          )}
-        </div>
-        <p className="mt-1 text-[11px] text-hint">
-          {employees.length} empleados activos · Frecuencia 15 y último
-        </p>
-      </div>
-
-      {/* Selector de Pestañas: Empleados / Historial */}
       <div className="flex gap-2 border-b border-line pb-2">
         <button
           type="button"
           onClick={() => setTab("empleados")}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
             tab === "empleados"
               ? "bg-accent text-white shadow-sm"
               : "bg-card border border-line text-muted hover:text-foreground"
           }`}
         >
           <UsersIcon className="h-4 w-4" />
-          <span>Empleados ({employees.length})</span>
+          <span>Plantilla de Trabajadores ({employees.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab("historial")}
-          className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all ${
             tab === "historial"
               ? "bg-accent text-white shadow-sm"
               : "bg-card border border-line text-muted hover:text-foreground"
           }`}
         >
           <PayrollIcon className="h-4 w-4" />
-          <span>Historial de Pagos & Recibos</span>
+          <span>Historial de Pagos & Liquidaciones ({processedPayrollExpenses.length})</span>
         </button>
       </div>
 
-      {/* PESTAÑA 1: EMPLEADOS ACTIVOS */}
       {tab === "empleados" && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -236,29 +374,36 @@ export function EmployeesManager({
             </div>
 
             {!formOpen && (
-              <button
-                onClick={openAdd}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-accent/90 transition-all active:scale-95"
-              >
-                <PlusIcon className="h-4 w-4" />
-                <span>Agregar empleado</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openPayModal("all")}
+                  disabled={employees.length === 0 || pending}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-40"
+                >
+                  <CheckIcon className="h-4 w-4" />
+                  <span>Pagar Toda la Nómina</span>
+                </button>
+
+                <button
+                  onClick={openAdd}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 transition-all active:scale-95"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  <span>Agregar Empleado</span>
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Formulario Agregar / Editar */}
           {formOpen && (
             <section className="space-y-4 rounded-2xl border border-line bg-card p-5 shadow-lg animate-in fade-in duration-200">
               <div className="border-b border-line pb-2">
                 <h3 className="font-serif text-sm font-bold text-foreground">
                   {editId ? "Editar Información del Trabajador" : "Registrar Nuevo Trabajador"}
                 </h3>
-                <p className="text-[11px] text-hint">
-                  Completa los datos personales, cédula y coordenadas bancarias para la dispersión de nómina
-                </p>
               </div>
 
-              {/* Fila 1: Nombre y Cédula */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2 space-y-1">
                   <label className="text-[11px] font-semibold text-muted">Nombre y Apellido *</label>
@@ -270,7 +415,6 @@ export function EmployeesManager({
                     autoFocus
                   />
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted">Cédula de Identidad *</label>
                   <input
@@ -282,28 +426,25 @@ export function EmployeesManager({
                 </div>
               </div>
 
-              {/* Fila 2: Cargo, Salario Quincenal y Moneda */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-muted">Cargo / Rol en la Empresa</label>
+                  <label className="text-[11px] font-semibold text-muted">Cargo / Rol</label>
                   <input
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    placeholder="Ej: Diseñadora UI/UX, Desarrollador..."
+                    placeholder="Ej: Diseñadora..."
                     className={inputClass}
                   />
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted">Salario Quincenal *</label>
                   <MoneyInput
                     value={salary}
-                    onValueChange={setSalary}
-                    placeholder="0.00"
+                    onChange={setSalary}
+                    currency={currency}
                     className={inputClass}
                   />
                 </div>
-
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-muted">Moneda de Pago</label>
                   <select
@@ -311,195 +452,171 @@ export function EmployeesManager({
                     onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
                     className={inputClass}
                   >
-                    <option value="USD">USD ($ Dólar)</option>
-                    <option value="VES">VES (Bs. Bolívares)</option>
-                    <option value="EUR">EUR (€ Euro)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="VES">VES (Bs)</option>
+                    <option value="EUR">EUR (€)</option>
                   </select>
                 </div>
               </div>
 
-              {/* Fila 3: Sección Datos Bancarios & Pago de Nómina */}
-              <div className="rounded-xl border border-line bg-soft/40 p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <span>🏦 Coordenadas Bancarias & Vía de Pago</span>
-                  </label>
-                  <span className="text-[10px] text-hint font-medium">Para transferencias o Pago Móvil</span>
-                </div>
-
+              <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
+                <p className="text-xs font-bold text-foreground">Coordenadas Bancarias</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-muted">Banco / Plataforma</label>
                     <input
-                      list="bank-suggestions"
+                      list="popular-banks"
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
-                      placeholder="Ej: Banesco, Venezuela, Zelle..."
+                      placeholder="Ej: Banesco..."
                       className={inputClass}
                     />
-                    <datalist id="bank-suggestions">
+                    <datalist id="popular-banks">
                       {POPULAR_BANKS.map((b) => (
                         <option key={b} value={b} />
                       ))}
                     </datalist>
                   </div>
-
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-muted">Tipo de Cuenta / Método</label>
+                    <label className="text-[11px] font-semibold text-muted">Tipo de Cuenta</label>
                     <select
                       value={accountType}
                       onChange={(e) => setAccountType(e.target.value)}
                       className={inputClass}
                     >
-                      <option value="">Selecciona tipo...</option>
                       {ACCOUNT_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
+                        <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
                   </div>
-
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-muted">
-                      {accountType === "Pago Móvil"
-                        ? "Teléfono Pago Móvil"
-                        : accountType === "Zelle"
-                          ? "Correo o Teléfono Zelle"
-                          : "Nº de Cuenta (20 dígitos)"}
-                    </label>
+                    <label className="text-[11px] font-semibold text-muted">Número / Teléfono / Correo</label>
                     <input
                       value={accountNumber}
                       onChange={(e) => setAccountNumber(e.target.value)}
-                      placeholder={
-                        accountType === "Pago Móvil"
-                          ? "Ej: 0414-1234567"
-                          : accountType === "Zelle"
-                            ? "Ej: pagos@empresa.com"
-                            : "Ej: 0134-0123-45-0001234567"
-                      }
+                      placeholder="0134-... / 0414-..."
                       className={`${inputClass} font-mono`}
                     />
                   </div>
                 </div>
-
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-muted">Titular / Observaciones de Pago (Opcional)</label>
+                  <label className="text-[11px] font-semibold text-muted">Notas / Titular</label>
                   <input
                     value={bankNotes}
                     onChange={(e) => setBankNotes(e.target.value)}
-                    placeholder="Ej: Cuenta a nombre de familiar XYZ / C.I. distinta..."
+                    placeholder="Ej: Cuenta a nombre de un tercero..."
                     className={inputClass}
                   />
                 </div>
               </div>
 
-              {error && (
-                <p className="rounded-xl bg-overdue/10 px-3.5 py-2 text-xs text-overdue font-medium">
-                  {error}
-                </p>
-              )}
+              {error && <p className="text-xs text-rose-500 font-medium">{error}</p>}
 
-              <div className="flex items-center justify-end gap-2 pt-1 border-t border-line">
+              <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setFormOpen(false)}
-                  className="rounded-xl border border-line px-4 py-2 text-xs text-muted hover:text-foreground font-semibold"
+                  className="rounded-xl border border-line bg-soft px-4 py-2 text-xs font-semibold text-muted hover:text-foreground"
                 >
                   Cancelar
                 </button>
                 <button
+                  type="button"
                   onClick={submit}
                   disabled={!name || salary <= 0 || pending}
-                  className="rounded-xl bg-accent px-6 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 disabled:opacity-40 transition-all"
+                  className="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 disabled:opacity-40"
                 >
-                  {pending ? "Guardando…" : editId ? "Actualizar Trabajador" : "Registrar Trabajador"}
+                  {pending ? "Guardando…" : editId ? "Guardar Cambios" : "Registrar Empleado"}
                 </button>
               </div>
             </section>
           )}
 
-          {/* Lista de Empleados */}
           <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
-            <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
-              <span>Nómina de Empleados ({filteredEmployees.length})</span>
-              <span>Salario Quincenal</span>
+            <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-semibold text-muted">
+              <span>Trabajador & Datos Bancarios</span>
+              <span>Salario Quincenal & Acciones</span>
             </div>
 
             {filteredEmployees.length === 0 ? (
-              <div className="py-10 text-center text-sm text-hint">
-                No se encontraron empleados registrados.
+              <div className="py-12 text-center text-sm text-hint">
+                {query ? "No se encontraron empleados coincidentes." : "No hay empleados registrados."}
               </div>
             ) : (
               <div className="divide-y divide-line">
                 {filteredEmployees.map((e) => (
-                  <div key={e.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors">
-                    <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent-bg font-serif font-bold text-accent text-base">
-                        {(e.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-bold text-foreground">{e.name}</p>
-                          <span className="rounded-md bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
-                            {e.code || "Mas-Corp-0001"}
+                  <div
+                    key={e.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[10px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-md">
+                          {e.code || "Mas-Corp-Nom"}
+                        </span>
+                        <p className="text-sm font-bold text-foreground">{e.name}</p>
+                        {e.idNumber && (
+                          <span className="font-mono text-[11px] font-semibold text-neutral-600 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded border border-line">
+                            CI: {e.idNumber}
                           </span>
-                          {e.idNumber && (
-                            <span className="rounded-md bg-accent-bg/80 border border-accent/20 font-mono px-2 py-0.5 text-[10px] font-semibold text-accent">
-                              CI: {e.idNumber}
-                            </span>
+                        )}
+                        <span className="rounded-full bg-soft px-2 py-0.5 text-[10px] text-muted">
+                          {e.role || "Personal"}
+                        </span>
+                      </div>
+                      {(e.bankName || e.accountNumber) && (
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-neutral-600">
+                          <span className="font-semibold text-neutral-800">
+                            🏦 {e.bankName || "Banco"} ({e.accountType || "Cuenta"}):
+                          </span>
+                          <span className="font-mono font-medium text-neutral-900 bg-soft px-2 py-0.5 rounded border border-line">
+                            {e.accountNumber || "—"}
+                          </span>
+                          {e.accountNumber && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(e.id, `${e.name} - ${e.idNumber || ""} - ${e.bankName || ""} - ${e.accountNumber}`)}
+                              className="text-[10px] font-semibold text-accent hover:underline active:scale-95"
+                            >
+                              {copiedId === e.id ? "✓ Copiado" : "Copiar datos"}
+                            </button>
                           )}
                         </div>
-
-                        <p className="text-xs text-hint font-medium">{e.role || "Sin cargo especificado"}</p>
-
-                        {/* Coordenadas Bancarias */}
-                        {(e.bankName || e.accountNumber) && (
-                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                            <span className="inline-flex items-center gap-1 rounded-lg bg-soft border border-line/80 px-2 py-0.5 text-[11px] font-mono text-muted">
-                              <span>{e.accountType === "Pago Móvil" ? "📱" : e.bankName === "Zelle" ? "⚡" : "🏦"}</span>
-                              <strong className="text-foreground">{e.bankName || "Banco"}</strong>
-                              {e.accountType && <span className="text-hint">({e.accountType})</span>}
-                              {e.accountNumber && (
-                                <span className="text-foreground font-bold">· {e.accountNumber}</span>
-                              )}
-                            </span>
-
-                            {e.accountNumber && (
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(e.id, `${e.idNumber ? `CI: ${e.idNumber} · ` : ""}${e.bankName ? `${e.bankName} · ` : ""}${e.accountNumber}`)}
-                                className="text-[10px] text-accent hover:underline font-medium px-1.5 py-0.5 rounded bg-card border border-line"
-                                title="Copiar datos bancarios"
-                              >
-                                {copiedId === e.id ? "✓ Copiado" : "Copiar datos"}
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pl-14 sm:pl-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-line">
                       <div className="text-left sm:text-right">
-                        <span className="tnum text-sm font-bold text-foreground block">
+                        <p className="tnum text-base font-bold text-foreground">
                           {formatCurrency(e.salary, e.currency)}
-                        </span>
-                        <span className="text-[10px] text-hint">quincenal</span>
+                        </p>
+                        <p className="text-[10px] text-hint">quincenal</p>
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        {/* Botón Descargar Recibo Individual PDF */}
                         <button
                           type="button"
-                          onClick={() => exportPayrollReceiptPdf(e)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-accent/20 bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
-                          title={`Descargar Recibo de Pago PDF para ${e.name}`}
+                          onClick={() =>
+                            exportPayrollReceiptPdf({
+                              id: e.id,
+                              code: e.code,
+                              name: e.name,
+                              role: e.role,
+                              salary: e.salary,
+                              currency: e.currency,
+                              idNumber: e.idNumber,
+                              bankName: e.bankName,
+                              accountType: e.accountType,
+                              accountNumber: e.accountNumber,
+                              payDate: new Date().toISOString().slice(0, 10),
+                            })
+                          }
+                          title="Descargar Recibo Individual PDF"
+                          className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-soft transition-all shadow-2xs"
                         >
-                          <DownloadIcon className="h-3 w-3" />
-                          <span>Recibo PDF</span>
+                          <DownloadIcon className="h-3.5 w-3.5 text-accent" />
+                          <span>Recibo</span>
                         </button>
-
                         <button
                           onClick={() => openEdit(e)}
                           aria-label={`Editar ${e.name}`}
@@ -507,18 +624,17 @@ export function EmployeesManager({
                         >
                           <EditIcon className="h-3.5 w-3.5" />
                         </button>
-
                         <DeleteButton
                           action={() => deleteEmployee(e.id)}
                           ariaLabel={`Eliminar ${e.name}`}
                         />
-
-                        <ActionButton
-                          label="Pagar"
-                          doneLabel="Pagado"
-                          action={() => payEmployee(e.id)}
-                          className="px-3 py-1 text-xs"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => openPayModal(e)}
+                          className="inline-flex items-center gap-1 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 transition-all shadow-sm active:scale-95"
+                        >
+                          Pagar
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -526,93 +642,349 @@ export function EmployeesManager({
               </div>
             )}
           </div>
-
-          {/* Botón Pagar Nómina Completa */}
-          {paid ? (
-            <p className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-income/10 py-3.5 text-sm font-semibold text-income border border-income/20">
-              <CheckIcon className="h-4 w-4" /> Nómina pagada y registrada en egresos
-            </p>
-          ) : (
-            <button
-              onClick={pay}
-              disabled={employees.length === 0 || pending}
-              className="w-full rounded-2xl bg-accent py-3.5 text-sm font-semibold text-white shadow-md hover:bg-accent/90 active:scale-[0.98] disabled:opacity-40 transition-all"
-            >
-              {pending ? "Procesando pagos…" : "Pagar toda la nómina quincenal"}
-            </button>
-          )}
         </div>
       )}
 
-      {/* PESTAÑA 2: HISTORIAL DE PAGOS DE NÓMINA */}
       {tab === "historial" && (
         <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+              <p className="text-xs text-muted font-medium">Total Liquidado & Aprobado</p>
+              <p className="tnum text-xl font-bold text-income mt-1">
+                {formatMoney(totalHistoryPaid)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+              <p className="text-xs text-muted font-medium">Pendiente por Aprobar</p>
+              <p className="tnum text-xl font-bold text-pending mt-1">
+                {formatMoney(totalHistoryPending)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+              <p className="text-xs text-muted font-medium">Total Pagos en Historial</p>
+              <p className="tnum text-xl font-bold text-foreground mt-1">
+                {processedPayrollExpenses.length}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-hint" />
+              <input
+                type="text"
+                value={histQuery}
+                onChange={(e) => setHistQuery(e.target.value)}
+                placeholder="Buscar por código, trabajador, banco o referencia..."
+                className="w-full rounded-xl border border-line bg-card pl-10 pr-4 py-2 text-xs outline-none focus:border-accent"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={histFilterWorker}
+                onChange={(e) => setHistFilterWorker(e.target.value)}
+                className="rounded-xl border border-line bg-card px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-accent"
+              >
+                <option value="todos">Todos los Trabajadores</option>
+                <option value="general">Liquidaciones Generales</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name} ({emp.code || "Nom"})
+                  </option>
+                ))}
+              </select>
+              <select
+                value={histFilterStatus}
+                onChange={(e) => setHistFilterStatus(e.target.value as any)}
+                className="rounded-xl border border-line bg-card px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-accent"
+              >
+                <option value="todos">Todos los Estados</option>
+                <option value="aprobado">🟢 Pagados y Aprobados</option>
+                <option value="pendiente">🟡 Pendientes en Gastos</option>
+              </select>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
-            <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
-              <span>Historial de Períodos & Quincenas Liquidadas</span>
-              <span>Total & Recibo</span>
+            <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-semibold text-muted">
+              <span>Registro de Pago / Trabajador</span>
+              <span>Monto, Estado en Gastos & Recibo</span>
             </div>
 
-            {payrollPeriods.length === 0 ? (
-              <div className="py-10 text-center text-sm text-hint">
-                Aún no hay períodos de nómina registrados.
+            {filteredHistory.length === 0 ? (
+              <div className="py-12 text-center text-sm text-hint space-y-1">
+                <p>No se encontraron pagos de nómina con los filtros seleccionados.</p>
               </div>
             ) : (
               <div className="divide-y divide-line">
-                {payrollPeriods.map((p) => (
+                {filteredHistory.map((item) => (
                   <div
-                    key={p.id}
-                    className="p-4 flex items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
+                    key={item.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">
-                          Quincena {p.label}
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-[10px] font-bold text-muted bg-soft px-2 py-0.5 rounded border border-line">
+                          {item.code || "Gasto"}
+                        </span>
+                        <p className="text-sm font-bold text-foreground">
+                          {item.matchedEmployee?.name || item.cleanConcept || "Liquidación de Nómina"}
                         </p>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            p.status === "pagada"
-                              ? "bg-income/10 text-income border border-income/20"
-                              : "bg-pending/10 text-pending border border-pending/20"
-                          }`}
-                        >
-                          {p.status === "pagada" ? "Liquidada" : "Pendiente"}
+                        <span className="text-xs text-hint">
+                          · {formatDate(item.date)}
                         </span>
                       </div>
-                      <p className="text-xs text-hint mt-0.5">
-                        Fecha de pago: {formatDate(p.payDate)} · {p.startDate} al {p.endDate}
-                      </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="tnum text-sm font-bold text-foreground">
-                        {formatMoney(p.total)}
-                      </span>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-line">
+                      <div className="text-left sm:text-right">
+                        <p className="tnum text-base font-bold text-foreground">
+                          {formatMoney(item.amount)}
+                        </p>
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            item.isPending
+                              ? "bg-pending/10 text-pending border border-pending/20"
+                              : "bg-income/10 text-income border border-income/20"
+                          }`}
+                        >
+                          {item.statusLabel}
+                        </span>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          exportPayrollReceiptPdf({
-                            id: p.id,
-                            code: "Mas-Corp-NOM-LQD",
-                            name: `Nómina General (${p.label})`,
-                            role: "Personal General",
-                            salary: p.total,
-                            currency: "USD",
-                            payDate: p.payDate,
-                            period: p.label,
-                          })
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
-                      >
-                        <DownloadIcon className="h-3.5 w-3.5" />
-                        <span>Recibo PDF</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            exportPayrollReceiptPdf({
+                              id: item.id,
+                              code: item.code,
+                              name: item.matchedEmployee?.name || item.cleanConcept || "Liquidación General de Nómina",
+                              role: item.matchedEmployee?.role || "Personal",
+                              salary: item.amount,
+                              currency: item.currency || "USD",
+                              idNumber: item.matchedEmployee?.idNumber,
+                              bankName: item.matchedEmployee?.bankName || item.accountName,
+                              accountType: item.matchedEmployee?.accountType,
+                              accountNumber: item.matchedEmployee?.accountNumber || item.refNum,
+                              payDate: item.date,
+                              period: item.detailsText || "Liquidación Quincenal",
+                            })
+                          }
+                          title="Descargar Comprobante / Recibo PDF"
+                          className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground hover:bg-soft transition-all shadow-2xs"
+                        >
+                          <DownloadIcon className="h-3.5 w-3.5 text-accent" />
+                          <span>Recibo</span>
+                        </button>
+                        <Link
+                          href="/gastos"
+                          title="Ver en el módulo de Gastos"
+                          className="inline-flex items-center gap-1 rounded-xl border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:bg-soft transition-all"
+                        >
+                          <ReceiptIcon className="h-3.5 w-3.5" />
+                          <span>Gastos</span>
+                        </Link>
+                        {item.isPending && (
+                          <button
+                            type="button"
+                            onClick={() => openApproveModal(item)}
+                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-all shadow-sm active:scale-95"
+                          >
+                            <CheckIcon className="h-3.5 w-3.5" />
+                            <span>Aprobar</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {payingTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl border border-line bg-card p-6 shadow-2xl space-y-4">
+            <div className="border-b border-line pb-3 flex items-start justify-between">
+              <div>
+                <h3 className="font-serif text-base font-bold text-foreground">
+                  {payingTarget === "all"
+                    ? "Liquidar Toda la Nómina Quincenal"
+                    : `Dispersar Pago a ${payingTarget.name}`}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPayingTarget(null)}
+                className="rounded-lg p-1 text-hint hover:text-foreground hover:bg-soft"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmPayment} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted">Cuenta de Origen de los Fondos *</label>
+                <select
+                  value={payAccountId}
+                  onChange={(e) => setPayAccountId(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-accent"
+                >
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted">Estado del Registro de Egreso</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPayStatus("pagado")}
+                    className={`rounded-xl border p-2.5 text-left transition-all ${
+                      payStatus === "pagado"
+                        ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm"
+                        : "border-line bg-card text-muted hover:bg-soft"
+                    }`}
+                  >
+                    <p className="text-xs">🟢 Pagado & Aprobado</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayStatus("pendiente")}
+                    className={`rounded-xl border p-2.5 text-left transition-all ${
+                      payStatus === "pendiente"
+                        ? "border-amber-600 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 font-semibold shadow-sm"
+                        : "border-line bg-card text-muted hover:bg-soft"
+                    }`}
+                  >
+                    <p className="text-xs">🟡 Enviar a Gastos</p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted">Referencia (Opcional)</label>
+                  <input
+                    type="text"
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    placeholder="Ej: 489218"
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-mono outline-none focus:border-accent"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted">Período / Quincena</label>
+                  <input
+                    type="text"
+                    value={payPeriodLabel}
+                    onChange={(e) => setPayPeriodLabel(e.target.value)}
+                    placeholder="Ej: 1ra Quincena"
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+
+              {payModalError && (
+                <p className="text-xs text-rose-500 font-semibold">{payModalError}</p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setPayingTarget(null)}
+                  className="rounded-xl border border-line bg-soft px-4 py-2 text-xs font-semibold text-muted hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-xl bg-accent px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 disabled:opacity-40"
+                >
+                  {pending ? "Procesando pago..." : "Confirmar y Registrar Pago"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {approvingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-2xl space-y-4">
+            <div className="border-b border-line pb-3 flex items-start justify-between">
+              <div>
+                <h3 className="font-serif text-base font-bold text-foreground">
+                  Aprobar Pago de Nómina
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApprovingExpense(null)}
+                className="rounded-lg p-1 text-hint hover:text-foreground hover:bg-soft"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmApprove} className="space-y-4">
+              {accounts.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted">Cuenta desde donde se pagó *</label>
+                  <select
+                    value={approveAccountId}
+                    onChange={(e) => setApproveAccountId(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-medium text-foreground outline-none focus:border-accent"
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted">Referencia Bancaria / Comprobante</label>
+                <input
+                  type="text"
+                  value={approveReference}
+                  onChange={(e) => setApproveReference(e.target.value)}
+                  placeholder="Ej: 9481923"
+                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-mono outline-none focus:border-accent"
+                />
+              </div>
+
+              {approveError && (
+                <p className="text-xs text-rose-500 font-semibold">{approveError}</p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setApprovingExpense(null)}
+                  className="rounded-xl border border-line bg-soft px-4 py-2 text-xs font-semibold text-muted hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-40"
+                >
+                  {pending ? "Aprobando..." : "Confirmar y Aprobar Pago"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
