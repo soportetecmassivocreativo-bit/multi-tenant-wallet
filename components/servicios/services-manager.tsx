@@ -21,7 +21,7 @@ import {
 import { formatCurrency, type CurrencyCode } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
 import { exportServiceVoucherPdf } from "@/lib/pdf-export";
-import type { Service } from "@/lib/mock-data";
+import type { Service, Expense } from "@/lib/mock-data";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -30,9 +30,10 @@ const inputClass =
 
 interface ServicesManagerProps {
   services: Service[];
+  serviceExpenses?: Expense[];
 }
 
-export function ServicesManager({ services }: ServicesManagerProps) {
+export function ServicesManager({ services, serviceExpenses = [] }: ServicesManagerProps) {
   const [tab, setTab] = useState<"activos" | "historial">("activos");
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -373,50 +374,81 @@ export function ServicesManager({ services }: ServicesManagerProps) {
         <div className="space-y-4">
           <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
             <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
-              <span>Historial de Pagos & Renovaciones de Servicios</span>
-              <span>Comprobante</span>
+              <span>Historial de Pagos Registrados ({serviceExpenses.length})</span>
+              <span>Monto · Comprobante</span>
             </div>
 
-            <div className="divide-y divide-line">
-              {services.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-3.5 flex items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{s.name}</p>
-                      <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] text-muted">
-                        {s.code || "Mas-Corp-0001"}
-                      </span>
-                      <span className="rounded-full bg-income/10 text-income px-2 py-0.5 text-[10px] font-medium border border-income/20">
-                        Activo
-                      </span>
-                    </div>
-                    <p className="text-xs text-hint mt-0.5">
-                      Frecuencia: {s.cycle} · {s.category} · Vigencia hasta {formatDate(s.nextChargeDate)}
-                    </p>
-                  </div>
+            {serviceExpenses.length === 0 ? (
+              <div className="py-10 text-center space-y-1">
+                <p className="text-sm font-medium text-hint">Sin pagos registrados</p>
+                <p className="text-xs text-hint">
+                  Los pagos que realices con el botón &quot;Pagar&quot; aparecerán aquí automáticamente.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-line">
+                {serviceExpenses.map((exp) => {
+                  // Buscar el servicio relacionado para poder generar el comprobante PDF
+                  const relatedService = services.find(
+                    (s) => s.id === (exp as Expense & { refId?: string }).refId
+                  );
 
-                  <div className="flex items-center gap-3">
-                    <span className="tnum text-sm font-bold text-foreground">
-                      {formatCurrency(s.amount, s.currency)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => exportServiceVoucherPdf(s)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
+                  return (
+                    <div
+                      key={exp.id}
+                      className="p-3.5 flex items-center justify-between gap-3 hover:bg-soft/40 transition-colors"
                     >
-                      <DownloadIcon className="h-3.5 w-3.5" />
-                      <span>Comprobante PDF</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-9 w-9 shrink-0 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-bold text-sm">
+                          {(exp.note || "S").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            {exp.note
+                              ? exp.note.replace(/\s*\[.*?\]\s*/g, "").trim()
+                              : "Servicio"}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-muted">
+                              {formatDate(exp.date)} · {exp.category}
+                            </span>
+                            {exp.code && (
+                              <span className="rounded-full bg-soft font-mono px-1.5 py-0.5 text-[10px] text-muted">
+                                {exp.code}
+                              </span>
+                            )}
+                            <span className="rounded-full bg-income/10 text-income px-2 py-0.5 text-[10px] font-medium border border-income/20">
+                              Pagado
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="tnum text-sm font-bold text-overdue">
+                          − {formatCurrency(exp.amount, exp.currency as CurrencyCode)}
+                        </span>
+
+                        {relatedService && (
+                          <button
+                            type="button"
+                            onClick={() => exportServiceVoucherPdf(relatedService)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent hover:text-white transition-all active:scale-95 shadow-sm"
+                          >
+                            <DownloadIcon className="h-3.5 w-3.5" />
+                            <span>Comprobante PDF</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+

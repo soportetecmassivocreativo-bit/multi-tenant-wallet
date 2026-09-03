@@ -569,6 +569,17 @@ export async function getPayrollExpenses(): Promise<Expense[]> {
   );
 }
 
+/** Egresos registrados desde pagos de Servicios Recurrentes, ordenados más recientes primero. */
+export async function getServiceExpenses(): Promise<Expense[]> {
+  const allExpenses = await getExpenses();
+  return allExpenses.filter(
+    (e) =>
+      (e.source || "").toLowerCase() === "servicio" ||
+      ((e.note || "").toLowerCase().includes("servicio") &&
+        !(e.note || "").toLowerCase().includes("nomina"))
+  );
+}
+
 export async function getEmployees(): Promise<Employee[]> {
   const config = await getSystemConfig();
   const prefix = config.employeePrefix || config.basePrefix || "Mas-Corp-Nom-";

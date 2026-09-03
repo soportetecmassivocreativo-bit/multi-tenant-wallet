@@ -3,10 +3,13 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { ServicesManager } from "@/components/servicios/services-manager";
 import { ServiciosPdfButton } from "@/components/servicios/servicios-pdf-button";
-import { getServices } from "@/lib/data";
+import { getServices, getServiceExpenses } from "@/lib/data";
 
 export default async function ServiciosPage() {
-  const services = await getServices();
+  const [services, serviceExpenses] = await Promise.all([
+    getServices(),
+    getServiceExpenses(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -24,7 +27,7 @@ export default async function ServiciosPage() {
         </p>
       </div>
 
-      <ServicesManager services={services} />
+      <ServicesManager services={services} serviceExpenses={serviceExpenses} />
     </div>
   );
 }
