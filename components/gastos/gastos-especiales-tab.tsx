@@ -11,14 +11,16 @@ import {
   settleDeferredCharge,
   deleteDeferredCharge,
   deleteDeferredAbono,
+  updateDeferredCardLimit,
 } from "@/lib/gastos-especiales-actions";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
-import { PlusIcon, CheckIcon, TrashIcon, SearchIcon } from "@/components/ui/icons";
+import { PlusIcon, CheckIcon, TrashIcon, SearchIcon, EditIcon } from "@/components/ui/icons";
 import { MoneyInput } from "@/components/ui/money-input";
 
 interface GastosEspecialesTabProps {
   charges: DeferredCharge[];
   abonos?: DeferredAbono[];
+  cardLimit?: number;
   accounts: CompanyAccount[];
   bcv?: { usd: number; eur: number; date: string };
   admin: boolean;
@@ -27,6 +29,7 @@ interface GastosEspecialesTabProps {
 export function GastosEspecialesTab({
   charges,
   abonos = [],
+  cardLimit = 539.12,
   accounts,
   bcv,
   admin,
@@ -35,6 +38,8 @@ export function GastosEspecialesTab({
   const [search, setSearch] = useState("");
   const [openNewCharge, setOpenNewCharge] = useState(false);
   const [openNewAbono, setOpenNewAbono] = useState(false);
+  const [openEditLimit, setOpenEditLimit] = useState(false);
+  const [newLimitValue, setNewLimitValue] = useState(cardLimit);
   const [settlingCharge, setSettlingCharge] = useState<DeferredCharge | null>(null);
 
   // Form states para nuevo cargo
@@ -73,10 +78,15 @@ export function GastosEspecialesTab({
       !a.name.toLowerCase().includes("tarjeta jm")
   );
 
-  // Cálculos de Totales en USD
+  // Cálculos Financieros
   const totalCargosUSD = charges.reduce((s, c) => (c.currency === "USD" ? s + c.amount : s), 0);
   const totalAbonosUSD = abonos.reduce((s, a) => (a.currency === "USD" ? s + a.amount : s), 0);
-  const saldoPendienteUSD = Math.max(0, totalCargosUSD - totalAbonosUSD);
+  
+  // Saldo Disponible Restante en la Tarjeta (Límite - Consumos)
+  const saldoDisponibleTarjeta = Math.max(0, cardLimit - totalCargosUSD);
+
+  // Saldo Neto Pendiente por Liquidar/Pagar a José Miguel (Consumos - Abonos)
+  const saldoNetoPagar = Math.max(0, totalCargosUSD - totalAbonosUSD);
 
   // Filtrado de cargos
   const filteredCharges = charges.filter((c) => {
@@ -100,6 +110,15 @@ export function GastosEspecialesTab({
       (a.code && a.code.toLowerCase().includes(q))
     );
   });
+
+  function handleSaveLimit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newLimitValue <= 0) return;
+    startTransition(async () => {
+      await updateDeferredCardLimit(newLimitValue);
+      setOpenEditLimit(false);
+    });
+  }
 
   function handleCreateCharge(e: React.FormEvent) {
     e.preventDefault();
@@ -236,11 +255,11 @@ export function GastosEspecialesTab({
                 Gastos Especiales · Tarjeta José Miguel
               </h3>
               <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-[10px] font-bold text-accent uppercase tracking-wider">
-                Post-Pago Diferido
+                Límite: {formatCurrency(cardLimit, "USD")}
               </span>
             </div>
             <p className="text-xs text-muted mt-0.5">
-              Los consumos de la tarjeta acumulan deuda. Los abonos y pagos (ej. albañil o liquidaciones directas) descuentan el saldo y se registran como egresos reales.
+              Los consumos descuentan del límite disponible de la tarjeta. Los abonos y pagos bancarios descuentan la deuda neta y se registran en Gastos Generales.
             </p>
           </div>
         </div>
@@ -251,6 +270,7 @@ export function GastosEspecialesTab({
             onClick={() => {
               setOpenNewCharge((v) => !v);
               setOpenNewAbono(false);
+              setOpenEditLimit(false);
             }}
             className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3.5 py-2 text-xs font-semibold text-foreground hover:bg-soft active:scale-95 transition-all shadow-xs"
           >
@@ -263,6 +283,7 @@ export function GastosEspecialesTab({
             onClick={() => {
               setOpenNewAbono((v) => !v);
               setOpenNewCharge(false);
+              setOpenEditLimit(false);
             }}
             className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-accent/90 active:scale-95 transition-all"
           >
@@ -272,35 +293,95 @@ export function GastosEspecialesTab({
         </div>
       </div>
 
-      {/* Tarjetas KPI de Estado de Cuenta de la Tarjeta */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Modal / Formulario para Editar Límite */}
+      {openEditLimit && (
+        <form
+          onSubmit={handleSaveLimit}
+          className="rounded-2xl border border-line bg-card p-4 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-150"
+        >
+          <div>
+            <p className="text-xs font-bold text-foreground">Ajustar Saldo / Límite de la Tarjeta</p>
+            <p className="text-[11px] text-muted">Define el cupo total o saldo base asignado a la tarjeta de José Miguel.</p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <MoneyInput
+              value={newLimitValue}
+              onValueChange={setNewLimitValue}
+              className="w-32 rounded-xl border border-line bg-soft px-3 py-1.5 text-xs outline-none focus:border-accent"
+            />
+            <button
+              type="submit"
+              disabled={isPending}
+              className="rounded-xl bg-accent px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-accent/90 disabled:opacity-50"
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenEditLimit(false)}
+              className="rounded-xl border border-line px-3 py-1.5 text-xs text-muted hover:bg-soft"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Cuadrícula de Tarjetas KPI de Balance de Tarjeta */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Tarjeta 1: Límite / Saldo Base */}
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm relative group">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted font-medium">Límite / Saldo Tarjeta</p>
+            {admin && (
+              <button
+                type="button"
+                onClick={() => setOpenEditLimit((v) => !v)}
+                className="opacity-60 hover:opacity-100 p-1 text-hint hover:text-accent rounded transition-all"
+                title="Editar límite de la tarjeta"
+              >
+                <EditIcon className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <p className="tnum mt-1 text-xl sm:text-2xl font-bold text-foreground">
+            {formatCurrency(cardLimit, "USD")}
+          </p>
+          <p className="text-[11px] text-hint mt-1">
+            Cupo total asignado
+          </p>
+        </div>
+
+        {/* Tarjeta 2: Consumos Acumulados */}
         <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted font-medium">Consumos en Tarjeta JM</p>
-          <p className="tnum mt-1 text-2xl font-bold text-foreground">
+          <p className="text-xs text-muted font-medium">Consumos en Tarjeta</p>
+          <p className="tnum mt-1 text-xl sm:text-2xl font-bold text-overdue">
             {formatCurrency(totalCargosUSD, "USD")}
           </p>
           <p className="text-[11px] text-hint mt-1">
-            {charges.length} servicio(s) acumulado(s)
+            {charges.length} cargo(s) en tarjeta
           </p>
         </div>
 
+        {/* Tarjeta 3: Cupo / Saldo Disponible Restante */}
         <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted font-medium">Abonos / Pagos Realizados</p>
-          <p className="tnum mt-1 text-2xl font-bold text-income">
-            {formatCurrency(totalAbonosUSD, "USD")}
+          <p className="text-xs text-muted font-medium">Cupo Disponible Restante</p>
+          <p className="tnum mt-1 text-xl sm:text-2xl font-bold text-accent">
+            {formatCurrency(saldoDisponibleTarjeta, "USD")}
           </p>
           <p className="text-[11px] text-hint mt-1">
-            {abonos.length} pago(s) debitado(s) de bancos
+            Restante por consumir
           </p>
         </div>
 
-        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-          <p className="text-xs text-muted font-medium">Saldo Neto Pendiente por Pagar</p>
-          <p className="tnum mt-1 text-2xl font-bold text-pending">
-            {formatCurrency(saldoPendienteUSD, "USD")}
+        {/* Tarjeta 4: Deuda Total / Saldo Neto a Pagar */}
+        <div className="rounded-2xl border border-pending/30 bg-pending/5 p-4 shadow-sm">
+          <p className="text-xs text-pending font-bold">Saldo Neto a Pagar</p>
+          <p className="tnum mt-1 text-xl sm:text-2xl font-bold text-pending">
+            {formatCurrency(saldoNetoPagar, "USD")}
           </p>
-          <p className="text-[11px] text-hint mt-1 font-semibold text-pending">
-            Por reembolsar / liquidar
+          <p className="text-[11px] text-muted mt-1">
+            {abonos.length > 0 ? `Descontado ${formatCurrency(totalAbonosUSD, "USD")} en abonos` : "Sin abonos aplicados"}
           </p>
         </div>
       </div>
@@ -316,7 +397,7 @@ export function GastosEspecialesTab({
               Registrar Nuevo Consumo en Tarjeta JM
             </h4>
             <span className="text-[11px] text-muted">
-              Suma a la deuda de tarjeta sin debitar cuentas bancarias
+              Descuenta del cupo disponible de la tarjeta sin debitar cuentas bancarias
             </span>
           </div>
 
@@ -416,11 +497,11 @@ export function GastosEspecialesTab({
                 Registrar Abono / Pago Parcial a la Deuda
               </h4>
               <p className="text-[11px] text-muted">
-                Descuenta la deuda de la tarjeta y genera el egreso real en Gastos Generales.
+                Descuenta el saldo neto a pagar y genera el egreso real en Gastos Generales.
               </p>
             </div>
-            <span className="text-xs font-bold text-income">
-              Saldo Pendiente: {formatCurrency(saldoPendienteUSD, "USD")}
+            <span className="text-xs font-bold text-pending">
+              Deuda Neta: {formatCurrency(saldoNetoPagar, "USD")}
             </span>
           </div>
 

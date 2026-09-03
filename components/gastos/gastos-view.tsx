@@ -15,6 +15,7 @@ interface GastosViewProps {
   expenses: Expense[];
   deferredCharges?: DeferredCharge[];
   deferredAbonos?: DeferredAbono[];
+  cardLimit?: number;
   admin: boolean;
   accounts: CompanyAccount[];
   bcv?: { usd: number; eur: number; date: string };
@@ -26,6 +27,7 @@ export function GastosView({
   expenses,
   deferredCharges = [],
   deferredAbonos = [],
+  cardLimit = 539.12,
   admin,
   accounts,
   bcv,
@@ -146,6 +148,7 @@ export function GastosView({
         <GastosEspecialesTab
           charges={deferredCharges}
           abonos={deferredAbonos}
+          cardLimit={cardLimit}
           accounts={accounts}
           bcv={bcv}
           admin={admin}

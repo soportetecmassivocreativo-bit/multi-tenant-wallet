@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -73,6 +73,7 @@ export interface SettleDeferredChargeInput {
 
 const DEFERRED_CHARGES_COOKIE = "m_wallet_deferred_charges";
 const DEFERRED_ABONOS_COOKIE = "m_wallet_deferred_abonos";
+const DEFERRED_CARD_LIMIT_COOKIE = "m_wallet_deferred_card_limit";
 
 const DEFAULT_CHARGES: DeferredCharge[] = [
   {
@@ -115,6 +116,35 @@ const DEFAULT_ABONOS: DeferredAbono[] = [
     createdAt: "2026-09-03T12:00:00.000Z",
   },
 ];
+
+export async function getDeferredCardLimit(): Promise<number> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEFERRED_CARD_LIMIT_COOKIE)?.value;
+    if (raw) {
+      const parsed = parseFloat(raw);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return 539.12;
+}
+
+export async function updateDeferredCardLimit(limit: number): Promise<MutationResult> {
+  if (isNaN(limit) || limit < 0) {
+    return { ok: false, error: "Ingresa un límite válido." };
+  }
+  const cookieStore = await cookies();
+  cookieStore.set(DEFERRED_CARD_LIMIT_COOKIE, String(limit), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  revalidatePath("/gastos");
+  return { ok: true };
+}
 
 export async function getDeferredCharges(): Promise<DeferredCharge[]> {
   try {
