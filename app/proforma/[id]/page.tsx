@@ -22,262 +22,245 @@ export default async function ProformaPrintPage({
     getBcvRates(),
   ]);
   if (!prof) notFound();
-  const isForeign = prof.currency !== "VES";
 
-  const companyName = config.pdfProformaCompanyName || config.pdfCompanyName || "Massivo Corp";
+  const companyName = config.pdfProformaCompanyName || config.pdfCompanyName || "Massivo Creativo C.A.";
   const companyRif = config.pdfProformaCompanyRif || config.pdfCompanyRif || "J-50000000-0";
-  const subtitle = config.pdfProformaHeaderSubtitle || "Proforma / Presupuesto Comercial";
   const phone = config.pdfProformaContactPhone || config.pdfContactPhone || "+58 412-0000000";
-  const email = config.pdfProformaContactEmail || config.pdfContactEmail || "contacto@massivocorp.com";
-  const terms = config.pdfProformaTermsAndConditions || "Esta proforma / cotización tiene una validez de 15 días continuos.";
-  const footer = config.pdfProformaFooterText || "Massivo Corp · Proforma Preliminar · No válida como factura fiscal";
-
-  const primaryColor = config.pdfProformaPrimaryColor || config.brandPrimaryColor || "#2C21FF";
-  const paperSize = config.pdfProformaPaperSize || config.pdfPaperSize || "letter";
-  const templateUrl = config.pdfProformaTemplateUrl || config.pdfGeneralTemplateUrl;
+  const email = config.pdfProformaContactEmail || config.pdfContactEmail || "info@massivocreativo.com";
+  const website = "www.massivocreativo.com";
 
   const targetAccountId = prof.targetAccountId || config.pdfProformaTargetAccountId;
-  const targetAccount = accounts.find((a) => a.id === targetAccountId) || (prof.targetAccountName ? { name: prof.targetAccountName } : null);
+  const targetAccount = accounts.find((a) => a.id === targetAccountId) || (prof.targetAccountName ? { name: prof.targetAccountName } : accounts[0]);
 
-  const showConditions = prof.hasConditions ?? config.pdfProformaShowConditions ?? true;
-  const conditions = prof.conditions || {
-    payment: config.pdfProformaConditionsPayment,
-    delivery: config.pdfProformaConditionsDelivery,
-    ip: config.pdfProformaConditionsIP,
-    confidentiality: config.pdfProformaConditionsConfidentiality,
-  };
+  const targetHolder = targetAccount?.holderName || targetAccount?.name || companyName;
+  const targetBank = targetAccount?.bankName || targetAccount?.name || "Banesco";
+  const targetNumber = targetAccount?.accountNumber || targetAccount?.phone || "0134-0000-00-0000000000";
+  const targetId = targetAccount?.idNumber || targetAccount?.taxId || companyRif;
 
-  const usdRateFormatted = (prof.vesRate || bcv.usd).toLocaleString("es-VE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
-  const eurRateFormatted = (bcv.eur || (prof.vesRate ? prof.vesRate * 1.16 : 926.5531)).toLocaleString("es-VE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
+  const currentRate = prof.vesRate || bcv.usd || 390.40;
+  const isForeign = prof.currency !== "VES";
+  const vesTotalCalculated = prof.vesTotal ?? (prof.total * currentRate);
+  const paperSize = config.pdfProformaPaperSize || "letter";
 
   return (
-    <div
-      style={{
-        backgroundImage: templateUrl ? `url("${templateUrl}")` : undefined,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-      className="mx-auto min-h-[100dvh] max-w-[680px] bg-white p-6 text-[#14151A] relative"
-    >
+    <div className="min-h-[100dvh] bg-neutral-100 py-6 px-2 sm:px-4 text-[#14151A]">
       <style>{`
         @media print {
           @page {
             size: ${paperSize === "a4" ? "A4" : paperSize === "legal" ? "legal" : "letter"};
-            margin: 8mm;
+            margin: 0;
           }
           body {
+            background-color: #ffffff !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
+          .no-print {
+            display: none !important;
+          }
+          .proforma-sheet {
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 auto !important;
+            min-height: 100vh !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-radius: 0 !important;
+          }
         }
       `}</style>
-      <div className="no-print mb-5 flex items-center justify-between">
-        <Link href={`/proformas/${prof.id}`} className="text-sm text-neutral-500 hover:text-black">
+
+      {/* Controles de Navegación */}
+      <div className="no-print mx-auto mb-4 flex max-w-[760px] items-center justify-between px-2">
+        <Link
+          href={`/proformas/${prof.id}`}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-black transition-colors"
+        >
           ‹ Volver al Sistema
         </Link>
-        <PrintButton />
-      </div>
-
-      {/* Membrete Proforma */}
-      <div className="flex items-start justify-between gap-4 border-b border-neutral-200 pb-4">
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2">
-            {config.pdfLogoUrl || config.systemLogoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={config.pdfLogoUrl || config.systemLogoUrl}
-                alt={companyName}
-                className="h-9 w-auto max-w-[160px] object-contain"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src="/logo-massivo-creativo.png"
-                alt={companyName}
-                className="h-8 w-auto object-contain"
-              />
-            )}
-          </div>
-          <p className="text-xs font-bold text-neutral-800">
-            {companyName} · RIF {companyRif}
-          </p>
-          <p className="text-[11px] text-neutral-500">
-            {subtitle}
-          </p>
-          <p className="text-[11px] text-neutral-500 mt-0.5">
-            {[phone, email].filter(Boolean).join(" · ")}
-          </p>
-          {(config.pdfProformaShowBcvRates ?? true) && config.pdfProformaBcvCurrency !== "none" && (
-            <p className="text-[10px] text-neutral-600 font-medium mt-1">
-              {config.pdfProformaBcvCurrency === "eur"
-                ? `Tasa Ref. BCV: EUR ${eurRateFormatted} Bs.`
-                : config.pdfProformaBcvCurrency === "both"
-                  ? `Tasa Ref. BCV: USD ${usdRateFormatted} Bs. | EUR ${eurRateFormatted} Bs.`
-                  : `Tasa Ref. BCV: USD ${usdRateFormatted} Bs.`}
-            </p>
-          )}
-        </div>
-        <div className="shrink-0 text-right">
-          <span
-            style={{ backgroundColor: `${primaryColor}1a`, color: primaryColor }}
-            className="inline-block rounded-md px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-1"
-          >
-            Proforma / Cotización
-          </span>
-          <p className="font-serif text-xl leading-none font-bold">
-            #{prof.number}
-          </p>
-          {prof.code && (
-            <p className="font-mono text-xs font-semibold text-neutral-600 mt-1">
-              {prof.code}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-neutral-500">
-            Emisión: {formatDate(prof.date)}
-          </p>
-          {prof.validUntil && (
-            <p className="text-xs text-neutral-500">
-              Válida hasta: {formatDate(prof.validUntil)}
-            </p>
-          )}
+        <div className="flex items-center gap-3">
+          <PrintButton />
         </div>
       </div>
 
-      {/* Cliente y Cuenta Prevista */}
-      <div className="py-4 border-b border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <p className="text-xs text-neutral-500 uppercase tracking-wider font-semibold">Destinatario / Cliente</p>
-          <p className="text-base font-bold text-neutral-900 mt-0.5">{prof.clientName}</p>
-        </div>
-        {targetAccount && (
-          <div
-            style={{ backgroundColor: `${primaryColor}0d`, borderColor: `${primaryColor}26` }}
-            className="sm:text-right rounded-lg p-2.5 border"
-          >
-            <p style={{ color: primaryColor }} className="text-[10px] uppercase tracking-wider font-bold">Cuenta de Pago / Anticipo</p>
-            <p className="text-xs font-bold text-neutral-900 mt-0.5">{targetAccount.name}</p>
-            {"bankName" in targetAccount && targetAccount.bankName && (
-              <p className="text-[11px] text-neutral-700 font-mono">
-                {targetAccount.bankName} {targetAccount.accountNumber ? `· ${targetAccount.accountNumber}` : ""}
-              </p>
-            )}
+      {/* HOJA DE PROFORMA OFICIAL */}
+      <div className="proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 min-h-[1050px]">
+        
+        {/* CONTENIDO PRINCIPAL */}
+        <div className="p-8 sm:p-10 space-y-6 flex-1">
+          
+          {/* 1. ENCABEZADO: BLOQUE AZUL + TITULO PROFORMA */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            
+            {/* Bloque Azul con Logo y Contacto */}
+            <div className="bg-[#0050D8] rounded-xl p-4 sm:p-5 text-white flex items-center gap-4 sm:gap-6 shadow-sm min-w-[310px]">
+              <div className="flex items-center gap-2.5">
+                {/* Logo Massivo "M" */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logo-m-mark.svg"
+                  alt="Massivo Creativo"
+                  className="h-10 w-auto brightness-0 invert"
+                />
+                <div className="leading-none">
+                  <span className="block font-sans text-xs font-black tracking-wider uppercase">MASSIVO</span>
+                  <span className="block font-sans text-[11px] font-bold tracking-widest uppercase text-blue-200">CREATIVO</span>
+                </div>
+              </div>
+
+              {/* Píldoras de contacto */}
+              <div className="space-y-1 text-[11px] border-l border-white/20 pl-4">
+                <div className="flex items-center gap-1.5 opacity-95">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                  </svg>
+                  <span className="truncate">{email}</span>
+                </div>
+                <div className="flex items-center gap-1.5 opacity-95">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v.183a1.983 1.983 0 01-.586 1.403 2.012 2.012 0 00-.586 1.414V16a5.986 5.986 0 01-2.993-.807A1.5 1.5 0 017.5 14a2 2 0 00-2-2 2 2 0 01-.892-.211 5.992 5.992 0 01-.276-3.762z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate">{website}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Título Proforma con Acordeón Cyan */}
+            <div className="relative text-right pr-4">
+              <span className="absolute -top-3 -right-2 text-[#00A3FF] text-xl font-bold font-mono">⌝</span>
+              <h1 className="font-sans text-4xl sm:text-5xl font-black text-neutral-900 tracking-tight">
+                Proforma
+              </h1>
+            </div>
           </div>
-        )}
+
+          {/* 2. REJILLA DE DATOS: EMPRESA VS COORDENADAS BANCARIAS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 text-xs">
+            {/* Columna Izquierda: Datos Emisor */}
+            <div className="space-y-1.5 text-neutral-800">
+              <p><strong className="font-bold text-neutral-900">Empresa:</strong> {companyName}</p>
+              <p><strong className="font-bold text-neutral-900">Teléfono:</strong> {phone}</p>
+              <p><strong className="font-bold text-neutral-900">Correo:</strong> {email}</p>
+            </div>
+
+            {/* Columna Derecha: Coordenadas Bancarias */}
+            <div className="space-y-1.5 text-neutral-800 sm:text-left">
+              <p><strong className="font-bold text-neutral-900">Titular Cuenta:</strong> {targetHolder}</p>
+              <p><strong className="font-bold text-neutral-900">Número Cuenta:</strong> <span className="font-mono">{targetNumber}</span></p>
+              <p><strong className="font-bold text-neutral-900">Banco:</strong> {targetBank}</p>
+              <p><strong className="font-bold text-neutral-900">Cedula de identidad:</strong> <span className="font-mono">{targetId}</span></p>
+            </div>
+          </div>
+
+          {/* 3. BARRA DE PROFORMA # Y FECHA */}
+          <div className="pt-2 space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-neutral-900">
+              <p>Proforma # <span className="font-mono text-neutral-700 font-normal">#{prof.number}</span></p>
+              <p>Fecha: <span className="font-mono text-neutral-700 font-normal">{formatDate(prof.date)}</span></p>
+            </div>
+            {/* Franja gris separadora */}
+            <div className="h-6 w-full bg-[#E5E7EB] rounded-sm" />
+          </div>
+
+          {/* 4. FILA DE CLIENTE Y RIF */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
+            <div>
+              <p className="font-bold text-neutral-900">Empresa Cliente:</p>
+              <p className="text-neutral-700 truncate">{prof.clientName}</p>
+            </div>
+            <div>
+              <p className="font-bold text-neutral-900">RIF:</p>
+              <p className="text-neutral-700 font-mono">{prof.clientRif || "J-00000000-0"}</p>
+            </div>
+          </div>
+
+          {/* 5. SECCIÓN DE CONCEPTOS / COTIZACIÓN */}
+          <div className="space-y-2 pt-2">
+            <h2 className="text-xs font-bold text-neutral-900">Conceptos y Presupuesto:</h2>
+
+            <div className="w-full">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b-2 border-neutral-300 text-left font-bold text-neutral-800">
+                    <th className="py-2 pr-4">Descripción del Servicio / Cotización</th>
+                    <th className="py-2 px-2 text-center w-16">Cant.</th>
+                    <th className="py-2 px-2 text-right w-24">Precio Unit.</th>
+                    <th className="py-2 pl-2 text-right w-28">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {prof.items.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-neutral-400">
+                        Conceptos y servicios de la proforma
+                      </td>
+                    </tr>
+                  ) : (
+                    prof.items.map((item) => (
+                      <tr key={item.id} className="text-neutral-800">
+                        <td className="py-3 pr-4 leading-relaxed">{item.description}</td>
+                        <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
+                        <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.unitPrice, prof.currency)}</td>
+                        <td className="py-3 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, prof.currency)}</td>
+                      </tr>
+                    ))
+                  )}
+                  {/* Líneas complementarias de relleno si hay pocos items */}
+                  {prof.items.length < 5 && (
+                    <>
+                      <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
+                      <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
+                      <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 6. RESUMEN DE TOTALES */}
+          <div className="pt-8 flex justify-end">
+            <div className="w-full sm:w-64 space-y-2 text-right text-xs">
+              <div className="flex justify-between items-center py-1 border-b border-neutral-200">
+                <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
+                <span className="font-mono font-bold text-neutral-900">
+                  {formatCurrency(prof.paidAmount || 0, prof.currency)}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center py-1.5 border-b-2 border-neutral-900">
+                <span className="font-black text-neutral-900 text-sm uppercase tracking-wider">TOTAL</span>
+                <span className="font-mono font-black text-neutral-900 text-base">
+                  {formatCurrency(prof.total, prof.currency)}
+                </span>
+              </div>
+
+              {isForeign && (
+                <div className="text-[10px] text-neutral-500 pt-0.5">
+                  Equiv. BCV: <strong className="font-mono text-neutral-800">{formatCurrency(vesTotalCalculated, "VES")}</strong>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* 7. FOOTER CYAN CON REDES SOCIALES */}
+        <footer className="w-full bg-[#00A3FF] text-white py-3 px-6 flex items-center justify-center gap-3 text-xs font-semibold shadow-inner">
+          <div className="flex items-center gap-2">
+            {/* Iconos Sociales */}
+            <span className="inline-flex items-center gap-1.5 opacity-90 text-[11px]">
+              <span>📷</span>
+              <span>📘</span>
+              <span>✖</span>
+              <span>💬</span>
+            </span>
+            <span className="font-bold tracking-wide">@massivocreativos</span>
+          </div>
+        </footer>
+
       </div>
-
-      {/* Conceptos */}
-      <table className="w-full text-sm mt-3">
-        <thead>
-          <tr className="border-b border-neutral-200 text-left text-xs text-neutral-500">
-            <th className="py-2 font-semibold">Descripción</th>
-            <th className="py-2 text-right font-semibold">Cant.</th>
-            <th className="py-2 text-right font-semibold">Precio</th>
-            <th className="py-2 text-right font-semibold">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {prof.items.length === 0 ? (
-            <tr>
-              <td colSpan={4} className="py-3 text-neutral-400">
-                Sin conceptos cotizados.
-              </td>
-            </tr>
-          ) : (
-            prof.items.map((it) => (
-              <tr key={it.id} className="border-b border-neutral-100">
-                <td className="py-2 text-neutral-800">{it.description}</td>
-                <td className="tnum py-2 text-right font-mono">{it.qty}</td>
-                <td className="tnum py-2 text-right font-mono">
-                  {formatCurrency(it.unitPrice, prof.currency)}
-                </td>
-                <td className="tnum py-2 text-right font-mono font-medium">
-                  {formatCurrency(it.qty * it.unitPrice, prof.currency)}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
-      {/* Totales */}
-      <div className="mt-4 space-y-1.5 border-t border-neutral-200 pt-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-neutral-500">Subtotal</span>
-          <span className="font-mono">{formatCurrency(prof.subtotal, prof.currency)}</span>
-        </div>
-        {prof.discount > 0 && (
-          <div className="flex justify-between text-emerald-700">
-            <span>Descuento</span>
-            <span className="font-mono">− {formatCurrency(prof.discount, prof.currency)}</span>
-          </div>
-        )}
-        {prof.tax > 0 && (
-          <div className="flex justify-between text-neutral-500">
-            <span>IVA</span>
-            <span className="font-mono">+{formatCurrency(prof.tax, prof.currency)}</span>
-          </div>
-        )}
-        <div className="flex justify-between border-t border-neutral-200 pt-2 text-base font-bold text-neutral-900">
-          <span>Total Cotizado</span>
-          <span className="font-mono">{formatCurrency(prof.total, prof.currency)}</span>
-        </div>
-        {isForeign && prof.vesTotal && (
-          <div className="flex justify-between text-xs text-neutral-500 pt-1">
-            <span>Equivalente en Bs. (Tasa {prof.vesRateRef || "BCV"})</span>
-            <span className="font-mono">{formatCurrency(prof.vesTotal, "VES")}</span>
-          </div>
-        )}
-      </div>
-
-      {/* BLOQUE DE CONDICIONES ESTRUCTURADAS DEL PROYECTO */}
-      {showConditions && (
-        <div className="mt-6 rounded-xl bg-neutral-50/80 p-4 text-neutral-800 space-y-2.5 text-xs border border-neutral-200">
-          <p className="font-bold text-neutral-900 uppercase tracking-wider text-[11px]">Condiciones del Proyecto</p>
-          {conditions.payment && (
-            <div>
-              <p className="text-neutral-900 font-semibold">1. Forma de Pago:</p>
-              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.payment}</p>
-            </div>
-          )}
-          {conditions.delivery && (
-            <div>
-              <p className="text-neutral-900 font-semibold">2. Tiempo de entrega:</p>
-              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.delivery}</p>
-            </div>
-          )}
-          {conditions.ip && (
-            <div>
-              <p className="text-neutral-900 font-semibold">3. Propiedad Intelectual:</p>
-              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.ip}</p>
-            </div>
-          )}
-          {conditions.confidentiality && (
-            <div>
-              <p className="text-neutral-900 font-semibold">4. Confidencialidad:</p>
-              <p className="text-neutral-600 leading-relaxed text-[11px]">{conditions.confidentiality}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Términos y Notas de la Proforma */}
-      {(!showConditions || prof.notes) && (
-        <div className="mt-4 rounded-xl bg-neutral-50 p-3.5 border border-neutral-200/80 text-xs text-neutral-600 space-y-2">
-          <p className="font-bold text-neutral-700 uppercase tracking-wide text-[10px]">Términos Generales</p>
-          <p>{terms}</p>
-          {prof.notes && <p className="pt-1 border-t border-neutral-200"><strong>Notas específicas:</strong> {prof.notes}</p>}
-        </div>
-      )}
-
-      <p className="mt-6 text-center text-[10px] text-neutral-400">
-        {footer}
-      </p>
     </div>
   );
 }

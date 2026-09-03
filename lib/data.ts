@@ -101,6 +101,7 @@ export interface ProformaDetail {
   code?: string;
   clientId: string;
   clientName: string;
+  clientRif?: string;
   date: string;
   validUntil?: string;
   status: ProformaStatus;
@@ -273,19 +274,21 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       .eq(isFromInvoices ? "invoice_id" : "proforma_id", id),
     supabase
       .from("clients")
-      .select("name")
+      .select("name, tax_id")
       .eq("id", row.clientId as string)
       .maybeSingle(),
   ]);
 
   const items = (itemsRes.data ?? []) as unknown as ProformaItem[];
+  const clientData = clientRes.data as { name?: string; tax_id?: string; rif?: string } | null;
 
   return {
     id: row.id as string,
     number: row.number as string | number,
     code: formatEntityCode(prefix, Number(row.number), digits),
     clientId: row.clientId as string,
-    clientName: (clientRes.data?.name as string) ?? "—",
+    clientName: clientData?.name ?? "—",
+    clientRif: clientData?.tax_id || clientData?.rif || "J-00000000-0",
     date: (row.date as string) || (row.issue_date as string) || new Date().toISOString().slice(0, 10),
     validUntil: (row.validUntil as string) || (row.dueDate as string) || (row.due_date as string),
     status: (row.status as ProformaStatus) || "pendiente",
@@ -354,6 +357,7 @@ export interface InvoiceDetail {
   code?: string;
   clientId: string;
   clientName: string;
+  clientRif?: string;
   date: string;
   dueDate: string;
   status: string;
@@ -431,7 +435,7 @@ export async function getInvoiceDetail(
       .order("paid_on"),
     supabase
       .from("clients")
-      .select("name")
+      .select("name, tax_id")
       .eq("id", row.clientId as string)
       .maybeSingle(),
   ]);
@@ -439,11 +443,13 @@ export async function getInvoiceDetail(
   const items = (itemsRes.data ?? []) as unknown as InvoiceItem[];
   const payments = (paymentsRes.data ?? []) as unknown as Payment[];
   const paidTotal = payments.reduce((s, p) => s + Number(p.amount), 0);
+  const clientData = clientRes.data as { name?: string; tax_id?: string; rif?: string } | null;
 
   return {
     ...(row as unknown as InvoiceDetail),
     code: formatEntityCode(prefix, Number(row.number), digits),
-    clientName: (clientRes.data?.name as string) ?? "—",
+    clientName: clientData?.name ?? "—",
+    clientRif: clientData?.tax_id || clientData?.rif || "J-00000000-0",
     items,
     payments,
     paidTotal,
