@@ -40,13 +40,62 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 /**
- * Genera y descarga un reporte PDF profesional con el branding y personalización de Massivo Corp.
+ * Limpia menciones redundantes de tipo de cuenta bancaria en notas y descripciones de gastos.
+ */
+export function cleanExpenseNote(note: string): string {
+  return (note || "")
+    .replace(/Corriente Nacional/gi, "")
+    .replace(/Cuenta Corriente/gi, "")
+    .replace(/Cuenta Nacional/gi, "")
+    .replace(/\[\s*·\s*/g, "[")
+    .replace(/\s*·\s*\]/g, "]")
+    .replace(/\s*·\s*·\s*/g, " · ")
+    .replace(/\[\s*\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Resuelve la configuración efectiva de branding desde props, localStorage o cookies del cliente.
+ */
+export function resolveEffectiveBranding(passedBranding?: Partial<SystemConfig>): SystemConfig {
+  let clientConfig: Partial<SystemConfig> = {};
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("m_wallet_client_config");
+      if (raw) {
+        clientConfig = JSON.parse(raw);
+      }
+    } catch {}
+
+    if (Object.keys(clientConfig).length === 0) {
+      try {
+        let fullRaw = "";
+        for (let i = 0; i < 8; i++) {
+          const cookieName = i === 0 ? "m_wallet_system_config" : `m_wallet_system_config_${i}`;
+          const match = document.cookie.match(new RegExp(`(^|;\\s*)${cookieName}=([^;]+)`));
+          if (!match) break;
+          fullRaw += decodeURIComponent(match[2]);
+        }
+        if (fullRaw) {
+          clientConfig = JSON.parse(fullRaw);
+        }
+      } catch {}
+    }
+  }
+
+  return {
+    ...DEFAULT_SYSTEM_CONFIG,
+    ...clientConfig,
+    ...(passedBranding ?? {}),
+  };
+}
+
+/**
+ * Genera y descarga un reporte PDF profesional con el branding y personalización corporativa.
  */
 export function exportPdfReport(options: PdfReportOptions): void {
-  const config = {
-    ...DEFAULT_SYSTEM_CONFIG,
-    ...(options.branding ?? {}),
-  };
+  const config = resolveEffectiveBranding(options.branding);
 
   const doc = new jsPDF({
     orientation: "portrait",
@@ -58,19 +107,24 @@ export function exportPdfReport(options: PdfReportOptions): void {
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 14;
 
-  // 1. Encabezado Branding Massivo Corp
+  // 1. Encabezado Branding
   // Fondo de barra superior sutil
   doc.setFillColor(245, 246, 255);
   doc.roundedRect(margin, margin, pageWidth - margin * 2, 26, 3, 3, "F");
 
-  // Logo Imagen Oficial Massivo Creativo
+  // Logo Imagen Oficial
+  const companyTitle = config.pdfCompanyName || "Massivo Creativo";
   try {
-    doc.addImage(MASSIVO_LOGO_BASE64, "PNG", margin + 5, margin + 4, 38, 10);
+    if (config.pdfLogoUrl && config.pdfLogoUrl.startsWith("data:")) {
+      doc.addImage(config.pdfLogoUrl, "PNG", margin + 5, margin + 4, 38, 10);
+    } else {
+      doc.addImage(MASSIVO_LOGO_BASE64, "PNG", margin + 5, margin + 4, 38, 10);
+    }
   } catch {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(prR, prG, prB);
-    doc.text("MASSIVO CREATIVO", margin + 5, margin + 11);
+    doc.text(companyTitle.toUpperCase(), margin + 5, margin + 11);
   }
 
   // Subtítulo y RIF
@@ -78,8 +132,8 @@ export function exportPdfReport(options: PdfReportOptions): void {
   doc.setFontSize(8);
   doc.setTextColor(90, 90, 110);
   const subtitleText = config.pdfShowRif && config.pdfCompanyRif
-    ? `${config.pdfHeaderSubtitle || "Sistema Financiero & Facturación"} · RIF: ${config.pdfCompanyRif}`
-    : (config.pdfHeaderSubtitle || "Sistema Financiero & Facturación");
+    ? `${config.pdfHeaderSubtitle || "Sistema Financiero & Reportes"} · RIF: ${config.pdfCompanyRif}`
+    : (config.pdfHeaderSubtitle || "Sistema Financiero & Reportes");
   doc.text(
     subtitleText,
     margin + 5,
@@ -123,8 +177,10 @@ export function exportPdfReport(options: PdfReportOptions): void {
     );
   }
 
-  if (config.pdfContactPhone || config.pdfContactEmail) {
-    const contact = [config.pdfContactPhone, config.pdfContactEmail].filter(Boolean).join(" · ");
+  const phone = config.pdfContactPhone;
+  const email = config.pdfContactEmail;
+  if (phone || email) {
+    const contact = [phone, email].filter(Boolean).join(" · ");
     doc.text(contact, pageWidth - margin - 5, margin + 20, { align: "right" });
   }
 
@@ -147,7 +203,7 @@ export function exportPdfReport(options: PdfReportOptions): void {
     currentY += 3;
   }
 
-  // 3. Tarjetas Resumen (KPIs) si existen
+  // 3. Tarjetas Resumen (KPIs) con prevención de desborde de texto
   if (options.kpis && options.kpis.length > 0) {
     const kpiCount = options.kpis.length;
     const gap = 3;
@@ -162,14 +218,17 @@ export function exportPdfReport(options: PdfReportOptions): void {
       doc.roundedRect(kpiX, currentY, kpiWidth, kpiHeight, 2, 2, "FD");
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
+      doc.setFontSize(7);
       doc.setTextColor(110, 110, 130);
-      doc.text(kpi.label, kpiX + 3, currentY + 5);
+      doc.text(kpi.label, kpiX + 3, currentY + 4.8);
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10.5);
+      const valStr = String(kpi.value || "");
+      const valLen = valStr.length;
+      const fontSize = valLen > 22 ? 6.5 : valLen > 15 ? 7.5 : valLen > 10 ? 8.5 : 10;
+      doc.setFontSize(fontSize);
       doc.setTextColor(30, 30, 45);
-      doc.text(kpi.value, kpiX + 3, currentY + 12);
+      doc.text(valStr, kpiX + 3, currentY + 11.5, { maxWidth: kpiWidth - 6 });
     });
 
     currentY += kpiHeight + 6;
@@ -317,6 +376,8 @@ export function exportExpenseVoucherPdf(
   branding?: Partial<SystemConfig>
 ): void {
   const code = expense.code || "Mas-Corp-GAS-0001";
+  const noteClean = cleanExpenseNote(expense.note);
+
   exportPdfReport({
     title: "Comprobante de Egreso / Gasto",
     subtitle: `Comprobante Nº: ${code} · Fecha: ${expense.date}`,
@@ -338,7 +399,7 @@ export function exportExpenseVoucherPdf(
     data: [
       {
         code,
-        note: expense.note,
+        note: noteClean || expense.note,
         cat: expense.category,
         date: expense.date,
         amount: `$ ${expense.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,

@@ -2,6 +2,7 @@
 
 import { PdfDownloadButton } from "@/components/ui/pdf-download-button";
 import { formatMoney, formatDate } from "@/lib/format";
+import { cleanExpenseNote } from "@/lib/pdf-export";
 import type { Expense } from "@/lib/mock-data";
 
 interface GastosPdfButtonProps {
@@ -27,7 +28,7 @@ export function GastosPdfButton({ expenses, total }: GastosPdfButtonProps) {
       ],
       data: expenses.map((e) => ({
         date: formatDate(e.date),
-        note: e.note || "Sin descripción",
+        note: cleanExpenseNote(e.note) || "Sin descripción",
         category: e.category || "General",
         amount: `− ${formatMoney(e.amount)}`,
       })),

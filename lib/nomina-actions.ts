@@ -179,16 +179,23 @@ export async function payPayroll(
     return { ok: false, error: "No hay empleados activos." };
 
   const isApproved = options?.status === "pagado";
+  const cleanAccount = (options?.accountName || "")
+    .replace(/Corriente Nacional/gi, "")
+    .replace(/Cuenta Corriente/gi, "")
+    .replace(/Cuenta Nacional/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const rows = emps.map((e) => {
     let note = `Nómina · ${e.full_name}`;
     const metaParts: string[] = [];
     if (isApproved) {
-      if (options?.accountName) metaParts.push(`Pagado desde ${options.accountName}`);
+      if (cleanAccount) metaParts.push(`Pagado desde ${cleanAccount}`);
       else metaParts.push("Pagado");
       if (options?.reference) metaParts.push(`Ref: ${options.reference}`);
     } else {
       metaParts.push("Por Aprobar / Pendiente de Pago");
-      if (options?.accountName) metaParts.push(`Previsto: ${options.accountName}`);
+      if (cleanAccount) metaParts.push(`Previsto: ${cleanAccount}`);
     }
     if (options?.periodLabel) metaParts.push(options.periodLabel);
     if (options?.notes) metaParts.push(`"${options.notes}"`);
@@ -235,15 +242,22 @@ export async function payEmployee(
   if (!emp) return { ok: false, error: "Empleado no encontrado." };
 
   const isApproved = options?.status === "pagado";
+  const cleanAccount = (options?.accountName || "")
+    .replace(/Corriente Nacional/gi, "")
+    .replace(/Cuenta Corriente/gi, "")
+    .replace(/Cuenta Nacional/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
   let note = `Nómina · ${emp.full_name}`;
   const metaParts: string[] = [];
   if (isApproved) {
-    if (options?.accountName) metaParts.push(`Pagado desde ${options.accountName}`);
+    if (cleanAccount) metaParts.push(`Pagado desde ${cleanAccount}`);
     else metaParts.push("Pagado");
     if (options?.reference) metaParts.push(`Ref: ${options.reference}`);
   } else {
     metaParts.push("Por Aprobar / Pendiente de Pago");
-    if (options?.accountName) metaParts.push(`Previsto: ${options.accountName}`);
+    if (cleanAccount) metaParts.push(`Previsto: ${cleanAccount}`);
   }
   if (options?.periodLabel) metaParts.push(options.periodLabel);
   if (options?.notes) metaParts.push(`"${options.notes}"`);
@@ -287,8 +301,15 @@ export async function approvePayrollExpense(
   if (!exp) return { ok: false, error: "Gasto de nómina no encontrado." };
 
   const cleanBaseNote = exp.note.replace(/\s*\[.*?\]\s*$/, "").trim();
+  const cleanAccount = (options?.accountName || "")
+    .replace(/Corriente Nacional/gi, "")
+    .replace(/Cuenta Corriente/gi, "")
+    .replace(/Cuenta Nacional/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
   const metaParts: string[] = [];
-  if (options?.accountName) metaParts.push(`Pagado desde ${options.accountName}`);
+  if (cleanAccount) metaParts.push(`Pagado desde ${cleanAccount}`);
   else metaParts.push("Pagado y Aprobado");
   if (options?.reference?.trim()) metaParts.push(`Ref: ${options.reference.trim()}`);
   if (options?.notes?.trim()) metaParts.push(`"${options.notes.trim()}"`);
