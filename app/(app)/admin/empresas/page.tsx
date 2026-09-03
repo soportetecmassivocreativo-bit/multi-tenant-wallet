@@ -4,15 +4,18 @@ import { redirect } from "next/navigation";
 import { BuildingIcon } from "@/components/ui/icons";
 import { TenantsMasterManager } from "@/components/admin/tenants-master-manager";
 import { getAdminTenants } from "@/lib/tenant-admin-actions";
+import { getMaintenanceStatus } from "@/lib/maintenance-actions";
+import { MaintenanceToggleButton } from "@/components/maintenance/maintenance-toggle-button";
 import { isAdmin } from "@/lib/data";
 import { TENANT_COOKIE_NAME } from "@/lib/supabase/tenants-config";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminEmpresasPage() {
-  const [authorized, tenants, headerList, cookieStore] = await Promise.all([
+  const [authorized, tenants, maintenance, headerList, cookieStore] = await Promise.all([
     isAdmin(),
     getAdminTenants(),
+    getMaintenanceStatus(),
     headers(),
     cookies(),
   ]);
@@ -56,6 +59,12 @@ export default async function AdminEmpresasPage() {
           ‹ Ver Empresa Actual
         </Link>
       </header>
+
+      {/* Control de Modo Mantenimiento Global del Sistema (Exclusivo Administrador) */}
+      <MaintenanceToggleButton
+        isMaintenanceActive={maintenance.active}
+        currentMessage={maintenance.message}
+      />
 
       {/* Métricas y Resumen Global */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">

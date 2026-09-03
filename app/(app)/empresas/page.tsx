@@ -6,21 +6,22 @@ import { headers, cookies } from "next/headers";
 import { BuildingIcon } from "@/components/ui/icons";
 import { CompanyForm } from "@/components/empresas/company-form";
 import { BcvRatesCard } from "@/components/empresas/bcv-rates-card";
-import { TenantSwitcher } from "@/components/empresas/tenant-switcher";
 import { getCompany, getBcvRates, isAdmin } from "@/lib/data";
-import { getAllTenants, TENANT_COOKIE_NAME } from "@/lib/supabase/tenants-config";
+import { getMaintenanceStatus } from "@/lib/maintenance-actions";
+import { MaintenanceToggleButton } from "@/components/maintenance/maintenance-toggle-button";
+import { TENANT_COOKIE_NAME } from "@/lib/supabase/tenants-config";
 
 export default async function EmpresasPage() {
-  const [company, bcv, admin, headerList, cookieStore] = await Promise.all([
+  const [company, bcv, admin, maintenance, headerList, cookieStore] = await Promise.all([
     getCompany(),
     getBcvRates(),
     isAdmin(),
+    getMaintenanceStatus(),
     headers(),
     cookies(),
   ]);
   if (!company) notFound();
 
-  const allTenants = getAllTenants();
   const activeTenantSlug =
     headerList.get("x-tenant-slug") ||
     cookieStore.get(TENANT_COOKIE_NAME)?.value ||
@@ -32,6 +33,14 @@ export default async function EmpresasPage() {
         <Link href="/mas" className="text-sm text-muted active:scale-95">
           ‹ Más
         </Link>
+        {admin && (
+          <Link
+            href="/admin/empresas"
+            className="rounded-xl border border-line bg-card px-3.5 py-1.5 text-xs font-semibold text-accent hover:bg-soft transition-all shadow-2xs"
+          >
+            Panel Master Multi-Tenant →
+          </Link>
+        )}
       </header>
 
       <section className="flex items-center gap-4">
@@ -46,10 +55,17 @@ export default async function EmpresasPage() {
         </div>
       </section>
 
+      {/* Control de Mantenimiento visible solo para Administradores */}
+      {admin && (
+        <MaintenanceToggleButton
+          isMaintenanceActive={maintenance.active}
+          currentMessage={maintenance.message}
+        />
+      )}
+
       <CompanyForm company={company} canEdit={admin} />
 
       <BcvRatesCard initialBcv={bcv} />
     </div>
   );
 }
-
