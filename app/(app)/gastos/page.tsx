@@ -4,13 +4,15 @@ import { GastosView } from "@/components/gastos/gastos-view";
 import { getExpenses, isAdmin, getBcvRates } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { getExpenseBreakdown } from "@/lib/cuentas-helpers";
+import { getDeferredCharges } from "@/lib/gastos-especiales-actions";
 
 export default async function GastosPage() {
-  const [expenses, admin, accounts, bcv] = await Promise.all([
+  const [expenses, admin, accounts, bcv, deferredCharges] = await Promise.all([
     getExpenses(),
     isAdmin(),
     getCompanyAccounts(),
     getBcvRates(),
+    getDeferredCharges(),
   ]);
 
   const totalPagado = expenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
@@ -19,6 +21,7 @@ export default async function GastosPage() {
   return (
     <GastosView
       expenses={expenses}
+      deferredCharges={deferredCharges}
       admin={admin}
       accounts={accounts}
       bcv={bcv}
@@ -27,3 +30,4 @@ export default async function GastosPage() {
     />
   );
 }
+
