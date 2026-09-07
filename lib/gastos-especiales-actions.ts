@@ -146,6 +146,37 @@ export async function updateDeferredCardLimit(limit: number): Promise<MutationRe
   return { ok: true };
 }
 
+export async function increaseDeferredCardDebt(amountToAdd: number, reason?: string): Promise<MutationResult> {
+  if (isNaN(amountToAdd) || amountToAdd <= 0) {
+    return { ok: false, error: "Ingresa un monto válido mayor a 0 para aumentar la deuda." };
+  }
+  const current = await getDeferredCardLimit();
+  const newLimit = Math.round((current + amountToAdd) * 100) / 100;
+  
+  const cookieStore = await cookies();
+  cookieStore.set(DEFERRED_CARD_LIMIT_COOKIE, String(newLimit), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  await logAuditEvent({
+    action: "aumento_deuda_tarjeta_jose_miguel",
+    entityType: "gasto",
+    description: `Aumentó la deuda de Tarjeta José Miguel en +${amountToAdd.toFixed(2)} USD (Nueva deuda: ${newLimit.toFixed(2)} USD)${reason ? ` - ${reason}` : ""}`,
+    details: {
+      amountAdded: amountToAdd,
+      previousDebt: current,
+      newDebt: newLimit,
+      reason,
+    },
+  });
+
+  revalidatePath("/gastos");
+  return { ok: true };
+}
+
 export async function getDeferredCharges(): Promise<DeferredCharge[]> {
   try {
     const cookieStore = await cookies();
