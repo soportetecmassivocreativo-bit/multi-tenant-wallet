@@ -38,7 +38,9 @@ export default async function FacturaPage({
   const targetNumber = targetAccount?.accountNumber || targetAccount?.phone || "0134-0000-00-0000000000";
   const targetId = targetAccount?.idNumber || targetAccount?.taxId || companyRif;
 
-  const currentRate = inv.vesRate || bcv.usd || 390.40;
+  const rateRefLabel = (inv.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
+  const defaultBcvRate = rateRefLabel === "EUR" ? bcv.eur : bcv.usd;
+  const currentRate = inv.vesRate || defaultBcvRate || (rateRefLabel === "EUR" ? 450 : 390.40);
   const rateFormatted = currentRate.toLocaleString("es-VE", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
@@ -318,20 +320,6 @@ export default async function FacturaPage({
           </div>
 
         </div>
-
-        {/* 8. FOOTER CYAN CON REDES SOCIALES */}
-        <footer className="w-full bg-[#00A3FF] text-white py-3 px-6 flex items-center justify-center gap-3 text-xs font-semibold shadow-inner">
-          <div className="flex items-center gap-2">
-            {/* Iconos Sociales */}
-            <span className="inline-flex items-center gap-1.5 opacity-90 text-[11px]">
-              <span>📷</span>
-              <span>📘</span>
-              <span>✖</span>
-              <span>💬</span>
-            </span>
-            <span className="font-bold tracking-wide">@massivocreativo</span>
-          </div>
-        </footer>
 
       </div>
     </div>

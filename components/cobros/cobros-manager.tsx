@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteInvoice, deletePayment, updateInvoiceStatus, registerPayment, updateInvoice } from "@/lib/mutations";
@@ -37,6 +38,7 @@ export function CobrosManager({
   bcv,
   admin,
 }: CobrosManagerProps) {
+  const router = useRouter();
   const [tab, setTab] = useState<"facturas" | "historial">("facturas");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todas");
@@ -179,6 +181,7 @@ export function CobrosManager({
 
       if (res.ok) {
         setAbonoInvoice(null);
+        router.refresh();
       } else {
         setAbonoError(res.error || "No se pudo registrar el cobro.");
       }
@@ -207,6 +210,7 @@ export function CobrosManager({
 
       if (res.ok) {
         setEditingInvoice(null);
+        router.refresh();
       } else {
         setEditError(res.error || "No se pudo actualizar la factura.");
       }

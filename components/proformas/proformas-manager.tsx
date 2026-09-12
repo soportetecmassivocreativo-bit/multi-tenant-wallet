@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteProforma, convertProformaToInvoiceAndPay, updateProforma } from "@/lib/mutations";
@@ -33,6 +34,7 @@ export function ProformasManager({
   bcv,
   admin,
 }: ProformasManagerProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todas");
 
@@ -163,6 +165,7 @@ export function ProformasManager({
 
       if (res.ok) {
         setPayingProforma(null);
+        router.refresh();
       } else {
         setPayError(res.error || "No se pudo registrar el cobro de la proforma.");
       }
@@ -193,6 +196,7 @@ export function ProformasManager({
 
       if (res.ok) {
         setEditingProforma(null);
+        router.refresh();
       } else {
         setEditError(res.error || "No se pudo actualizar la proforma.");
       }

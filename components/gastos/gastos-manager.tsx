@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { formatMoney, formatDate } from "@/lib/format";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteExpense, updateExpense } from "@/lib/mutations";
@@ -19,6 +20,7 @@ interface GastosManagerProps {
 }
 
 export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosManagerProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
   const [activeExpense, setActiveExpense] = useState<Expense | null>(null);
@@ -127,6 +129,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
 
       if (res.ok) {
         setEditingExpense(null);
+        router.refresh();
       } else {
         setEditError(res.error || "No se pudo actualizar el gasto.");
       }
@@ -191,6 +194,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
 
       if (res.ok) {
         setPayingExpense(null);
+        router.refresh();
       } else {
         setPayError(res.error || "No se pudo registrar el pago del gasto.");
       }

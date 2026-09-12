@@ -87,10 +87,15 @@ export interface Invoice {
   dueDate: string;
   total: number;
   status: InvoiceStatus;
+  currency?: CurrencyCode;
+  notes?: string;
   proformaId?: string;
   targetAccountId?: string;
   targetAccountName?: string;
   paidAmount?: number;
+  vesRate?: number | null;
+  vesRateRef?: string | null;
+  vesTotal?: number | null;
 }
 
 export const invoices: Invoice[] = [
@@ -123,6 +128,7 @@ export interface Proforma {
   paidAmount?: number;
   hasConditions?: boolean;
   vesRate?: number | null;
+  vesRateRef?: string | null;
   vesTotal?: number | null;
   conditions?: {
     payment?: string;
@@ -151,6 +157,7 @@ export interface Expense {
   refId?: string;
   created_at?: string;
   vesRate?: number | null;
+  vesRateRef?: string | null;
   vesTotal?: number | null;
 }
 

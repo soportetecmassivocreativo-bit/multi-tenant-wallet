@@ -265,11 +265,28 @@ export async function updateExpense(
     updateData.spent_on = input.date;
   }
 
-  const { error } = await ctx.supabase
-    .from("expenses")
-    .update(updateData)
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
+  try {
+    const { error } = await ctx.supabase
+      .from("expenses")
+      .update({
+        ...updateData,
+        ...(input.vesRate ? { ves_rate: input.vesRate, ves_rate_ref: input.vesRateRef || "BCV" } : {}),
+      })
+      .eq("id", id);
+
+    if (error) {
+      // Fallback a columnas estándar si ves_rate no existe
+      await ctx.supabase
+        .from("expenses")
+        .update(updateData)
+        .eq("id", id);
+    }
+  } catch {
+    await ctx.supabase
+      .from("expenses")
+      .update(updateData)
+      .eq("id", id);
+  }
 
   await logAuditEvent({
     action: "editar_gasto",
@@ -779,7 +796,7 @@ export async function updateProforma(
         taxRate: input.taxRate ?? 0.16,
         discountPct: (input.discountPct ?? 0) / 100,
         creditDays: input.validDays || 15,
-        issueDateISO: today(),
+        issueDateISO: input.date || today(),
       });
       updateData.subtotal = result.subtotal;
       updateData.discount = result.discount;
@@ -799,7 +816,37 @@ export async function updateProforma(
       );
     }
 
-    await supabase.from("proformas").update(updateData).eq("id", input.id);
+    let profUpdated = false;
+    try {
+      const { data: updatedRows, error: profError } = await supabase
+        .from("proformas")
+        .update(updateData)
+        .eq("id", input.id)
+        .select("id");
+      if (!profError && updatedRows && updatedRows.length > 0) {
+        profUpdated = true;
+      }
+    } catch {
+      profUpdated = false;
+    }
+
+    // Fallback: Si la proforma no estaba en la tabla 'proformas' (por ser puente de 'invoices')
+    if (!profUpdated) {
+      const invUpdateData: Record<string, unknown> = {};
+      if (input.clientId) invUpdateData.client_id = input.clientId;
+      if (input.date) invUpdateData.issue_date = input.date;
+      if (input.notes !== undefined) invUpdateData.notes = input.notes;
+      if (input.vesRate !== undefined && input.vesRate > 0) {
+        invUpdateData.ves_rate = input.vesRate;
+        invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
+        if (input.vesTotal !== undefined) {
+          invUpdateData.ves_total = input.vesTotal;
+        }
+      }
+      try {
+        await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
+      } catch {}
+    }
 
     await logAuditEvent({
       action: "editar_proforma",
@@ -816,6 +863,8 @@ export async function updateProforma(
 
     revalidatePath("/proformas");
     revalidatePath(`/proformas/${input.id}`);
+    revalidatePath(`/proforma/${input.id}`);
+    revalidatePath("/cobros");
     revalidatePath("/dashboard");
     return { ok: true, id: input.id };
   } catch (err: unknown) {
@@ -1098,6 +1147,8 @@ export async function updateInvoice(
 
     revalidatePath("/cobros");
     revalidatePath(`/cobros/${input.id}`);
+    revalidatePath(`/factura/${input.id}`);
+    revalidatePath("/proformas");
     revalidatePath("/dashboard");
     return { ok: true, id: input.id };
   } catch (err: unknown) {

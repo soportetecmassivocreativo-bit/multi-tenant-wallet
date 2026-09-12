@@ -73,7 +73,7 @@ export async function getInvoices(): Promise<Invoice[]> {
   const { data } = await supabase
     .from("invoices")
     .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, created_at",
+      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, notes, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at",
     )
     .order("number", { ascending: false });
 
@@ -149,7 +149,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data, error } = await supabase
       .from("proformas")
       .select(
-        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesTotal:ves_total",
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
       )
       .order("number", { ascending: false });
 
@@ -545,7 +545,7 @@ export async function getExpenses(): Promise<Expense[]> {
   // Ordenamos por created_at ASC para fijar el número único permanente de cada gasto
   const { data } = await supabase
     .from("expenses")
-    .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
+    .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at")
     .order("created_at", { ascending: true });
 
   // Excluir consumos directos de la tarjeta de José Miguel (que son diferidos y viven en Gastos Especiales)
