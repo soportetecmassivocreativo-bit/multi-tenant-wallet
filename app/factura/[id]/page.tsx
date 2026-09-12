@@ -294,7 +294,14 @@ export default async function FacturaPage({
 
               {isForeign && (
                 <div className="flex justify-between items-center py-1.5 border-b border-neutral-300">
-                  <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL BS</span>
+                  <div className="flex flex-col text-left">
+                    <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL BS</span>
+                    {currentRate > 0 && (
+                      <span className="text-[10px] text-neutral-500 font-mono">
+                        Tasa {inv.vesRateRef || "BCV"}: {currentRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Bs.
+                      </span>
+                    )}
+                  </div>
                   <span className="font-mono font-black text-neutral-900 text-sm">
                     {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
                   </span>

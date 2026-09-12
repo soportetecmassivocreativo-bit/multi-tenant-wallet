@@ -174,6 +174,7 @@ export interface CreateExpenseInput {
   reference?: string; // Últimos 8 dígitos
   date?: string; // Fecha del gasto YYYY-MM-DD
   vesRate?: number; // Tasa referencial BCV
+  vesRateRef?: string; // "BCV USD" | "BCV EUR"
 }
 
 export async function createExpense(
@@ -739,8 +740,10 @@ export interface UpdateProformaInput {
   hasConditions?: boolean;
   /** Fecha de emisión de la proforma (YYYY-MM-DD) */
   date?: string;
-  /** Tasa BCV referencial al momento de emitir/actualizar (Bs./USD) */
+  /** Tasa BCV referencial al momento de emitir/actualizar (Bs./USD o Bs./EUR) */
   vesRate?: number;
+  /** Referencia de moneda: "BCV USD" | "BCV EUR" | "USD" | "EUR" */
+  vesRateRef?: string;
   /** Equivalente en bolívares (total * vesRate) */
   vesTotal?: number;
 }
@@ -763,7 +766,7 @@ export async function updateProforma(
     if (input.date) updateData.issue_date = input.date;
     if (input.vesRate !== undefined && input.vesRate > 0) {
       updateData.ves_rate = input.vesRate;
-      updateData.ves_rate_ref = "BCV";
+      updateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
       // Si se proporciona vesTotal explícito úsalo, sino recalcula
       if (input.vesTotal !== undefined) {
         updateData.ves_total = input.vesTotal;
@@ -1028,6 +1031,7 @@ export interface UpdateInvoiceInput {
   status?: InvoiceStatus;
   date?: string;
   vesRate?: number;
+  vesRateRef?: string;
   vesTotal?: number;
 }
 
@@ -1046,7 +1050,7 @@ export async function updateInvoice(
     if (input.date) updateData.issue_date = input.date;
     if (input.vesRate !== undefined && input.vesRate > 0) {
       updateData.ves_rate = input.vesRate;
-      updateData.ves_rate_ref = "BCV";
+      updateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
       if (input.vesTotal !== undefined) {
         updateData.ves_total = input.vesTotal;
       }
