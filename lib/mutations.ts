@@ -57,6 +57,50 @@ export interface CreateInvoiceInput {
   paymentReference?: string;
 }
 
+export async function getNextCorrelativeNumber(supabase: any, companyId: string): Promise<number> {
+  let maxNum = 0;
+
+  try {
+    const { data: invRows } = await supabase
+      .from("invoices")
+      .select("number")
+      .eq("company_id", companyId)
+      .order("number", { ascending: false })
+      .limit(1);
+    if (invRows && invRows.length > 0) {
+      const n = Number(invRows[0].number);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    }
+  } catch {}
+
+  try {
+    const { data: profRows } = await supabase
+      .from("proformas")
+      .select("number")
+      .eq("company_id", companyId)
+      .order("number", { ascending: false })
+      .limit(1);
+    if (profRows && profRows.length > 0) {
+      const n = Number(profRows[0].number);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    }
+  } catch {}
+
+  try {
+    const { data: company } = await supabase
+      .from("companies")
+      .select("next_invoice_number")
+      .eq("id", companyId)
+      .single();
+    if (company?.next_invoice_number) {
+      const n = Number(company.next_invoice_number);
+      if (!isNaN(n) && n - 1 > maxNum) maxNum = n - 1;
+    }
+  } catch {}
+
+  return Math.max(maxNum + 1, 1);
+}
+
 export async function createInvoice(
   input: CreateInvoiceInput,
 ): Promise<MutationResult> {
@@ -76,12 +120,7 @@ export async function createInvoice(
   const isForeign = input.currency !== "VES";
   const isCash = input.creditDays === 0;
 
-  const { data: company } = await supabase
-    .from("companies")
-    .select("next_invoice_number")
-    .eq("id", companyId)
-    .single();
-  const number = company?.next_invoice_number ?? 1;
+  const number = await getNextCorrelativeNumber(supabase, companyId);
 
   const initialStatus = isCash && input.accountId ? "pagada" : "pendiente";
 
@@ -613,8 +652,8 @@ export async function createProforma(
   });
   const isForeign = input.currency !== "VES";
 
-  // Obtener contador de proformas
-  const nextNum = await getNextCode("proformaCounter", 1);
+  // Obtener correlativo exacto consecutivo del sistema
+  const number = await getNextCorrelativeNumber(supabase, companyId);
   const validUntilISO = result.dueDateISO;
 
   // Intentar guardar en tabla proformas
@@ -624,7 +663,7 @@ export async function createProforma(
       .insert({
         company_id: companyId,
         client_id: input.clientId,
-        number: nextNum,
+        number,
         currency: input.currency,
         subtotal: result.subtotal,
         discount: result.discount,
@@ -659,12 +698,17 @@ export async function createProforma(
         );
       }
 
+      await supabase
+        .from("companies")
+        .update({ next_invoice_number: number + 1 })
+        .eq("id", companyId);
+
       await logAuditEvent({
         action: "crear_proforma",
         entityType: "proforma",
         entityId: prof.id as string,
-        description: `Creó la Proforma #${nextNum} por ${result.total.toFixed(2)} ${input.currency} (Validez: ${input.validDays} días, Cuenta Prevista: ${input.targetAccountName || "General"})`,
-        details: { number: nextNum, total: result.total, currency: input.currency, targetAccountName: input.targetAccountName },
+        description: `Creó la Proforma #${number} por ${result.total.toFixed(2)} ${input.currency} (Validez: ${input.validDays} días, Cuenta Prevista: ${input.targetAccountName || "General"})`,
+        details: { number, total: result.total, currency: input.currency, targetAccountName: input.targetAccountName },
         customUser: {
           id: ctx.userId,
           name: ctx.userName,
@@ -682,13 +726,6 @@ export async function createProforma(
   }
 
   // Fallback: crear en invoices como pendiente
-  const { data: company } = await supabase
-    .from("companies")
-    .select("next_invoice_number")
-    .eq("id", companyId)
-    .single();
-  const number = company?.next_invoice_number ?? 1;
-
   let notePayload = input.notes || "";
   if (input.targetAccountName) {
     notePayload = `${notePayload} [Cuenta Prevista: ${input.targetAccountName}]`.trim();

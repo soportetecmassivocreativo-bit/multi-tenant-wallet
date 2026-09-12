@@ -143,28 +143,12 @@ export async function getProformas(): Promise<Proforma[]> {
   }
 
   const supabase = await createClient();
+  const combinedMap = new Map<string, Proforma>();
+  let maxInvNumber = 0;
+  const usedNumbers = new Set<number>();
+  const invMap = new Map<string, any>();
 
-  // 1. Intentar consultar tabla proformas
-  try {
-    const { data, error } = await supabase
-      .from("proformas")
-      .select(
-        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
-      )
-      .order("number", { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      const list = data.map((p) => ({
-        ...p,
-        code: formatEntityCode(prefix, Number(p.number), digits),
-      })) as unknown as Proforma[];
-      return list.sort((a, b) => Number(b.number) - Number(a.number));
-    }
-  } catch (err) {
-    // Si la tabla no existe aún, seguimos al puente de facturas pendientes
-  }
-
-  // 2. Puente / Migración de facturas pendientes existentes
+  // 1. Obtener todas las facturas de invoices para conocer los correlativos existentes
   try {
     const { data: invData, error: invErr } = await supabase
       .from("invoices")
@@ -174,7 +158,6 @@ export async function getProformas(): Promise<Proforma[]> {
       .order("number", { ascending: false });
 
     if (!invErr && invData && invData.length > 0) {
-      // Buscar descripciones de ítems para mostrar notas reales
       const invIds = invData.map((i) => i.id);
       const { data: itemsData } = await supabase
         .from("invoice_items")
@@ -188,11 +171,21 @@ export async function getProformas(): Promise<Proforma[]> {
         }
       });
 
-      return invData
+      invData.forEach((inv) => {
+        const num = Number(inv.number);
+        if (!isNaN(num)) {
+          usedNumbers.add(num);
+          if (num > maxInvNumber) maxInvNumber = num;
+        }
+        invMap.set(inv.id, { inv, desc: descMap.get(inv.id) || "Proforma de servicios" });
+      });
+
+      // Incluir facturas pendientes existentes como proformas puente
+      invData
         .filter((inv) => inv.status !== "pagada")
-        .map((inv) => {
+        .forEach((inv) => {
           const rawInv = inv as Record<string, unknown>;
-          return {
+          combinedMap.set(inv.id, {
             id: inv.id,
             number: inv.number,
             code: formatEntityCode(prefix, Number(inv.number), digits),
@@ -207,13 +200,46 @@ export async function getProformas(): Promise<Proforma[]> {
             vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
             vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
             invoiceId: inv.id,
-          };
-        })
-        .sort((a, b) => Number(b.number) - Number(a.number));
+          } as unknown as Proforma);
+        });
     }
   } catch (err) {}
 
-  return [];
+  // 2. Consultar tabla proformas reales
+  try {
+    const { data: profData, error } = await supabase
+      .from("proformas")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+      )
+      .order("created_at", { ascending: true });
+
+    if (!error && profData && profData.length > 0) {
+      for (const p of profData) {
+        let actualNumber = Number(p.number);
+        // Si hay colisión de correlativo con facturas previas o número reiniciado a 1
+        if (isNaN(actualNumber) || (actualNumber <= maxInvNumber && usedNumbers.has(actualNumber) && !invMap.has(p.id))) {
+          maxInvNumber++;
+          actualNumber = maxInvNumber;
+          usedNumbers.add(actualNumber);
+          // Persistir actualización en Supabase
+          supabase.from("proformas").update({ number: actualNumber }).eq("id", p.id).then(() => {});
+        } else {
+          usedNumbers.add(actualNumber);
+          if (actualNumber > maxInvNumber) maxInvNumber = actualNumber;
+        }
+
+        combinedMap.set(p.id, {
+          ...p,
+          number: actualNumber,
+          code: formatEntityCode(prefix, actualNumber, digits),
+        } as unknown as Proforma);
+      }
+    }
+  } catch (err) {}
+
+  const list = Array.from(combinedMap.values());
+  return list.sort((a, b) => Number(b.number) - Number(a.number));
 }
 
 export async function getProformaDetail(id: string): Promise<ProformaDetail | null> {
@@ -289,6 +315,26 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     } catch (err) {}
   }
 
+  if (!row) return null;
+
+  let resolvedNumber = Number(row.number);
+  if (!isFromInvoices && (isNaN(resolvedNumber) || resolvedNumber <= 1)) {
+    try {
+      const { data: invMax } = await supabase
+        .from("invoices")
+        .select("number")
+        .order("number", { ascending: false })
+        .limit(1);
+      if (invMax && invMax.length > 0) {
+        const maxN = Number(invMax[0].number);
+        if (!isNaN(maxN) && maxN >= resolvedNumber) {
+          resolvedNumber = maxN + 1;
+          supabase.from("proformas").update({ number: resolvedNumber }).eq("id", id).then(() => {});
+        }
+      }
+    } catch {}
+  }
+
   const clientId = (row.clientId || (row as any).client_id) as string;
 
   const [itemsRes, clientRes] = await Promise.all([
@@ -329,8 +375,8 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
 
   return {
     id: row.id as string,
-    number: row.number as string | number,
-    code: formatEntityCode(prefix, Number(row.number), digits),
+    number: resolvedNumber,
+    code: formatEntityCode(prefix, resolvedNumber, digits),
     clientId,
     clientName: clientName || "—",
     clientRif: clientRif || "J-00000000-0",
