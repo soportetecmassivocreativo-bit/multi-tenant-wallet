@@ -306,7 +306,25 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
   ]);
 
   const items = (itemsRes.data ?? []) as unknown as ProformaItem[];
-  const clientData = clientRes.data as { name?: string; rif?: string } | null;
+  let clientName = clientRes.data?.name;
+  let clientRif = clientRes.data?.rif;
+
+  if (!clientName || clientName === "—") {
+    try {
+      const allClients = await getClients();
+      if (allClients && allClients.length > 0) {
+        const found = clientId ? allClients.find((c) => c.id === clientId || String(c.id) === String(clientId)) : null;
+        if (found) {
+          clientName = found.name;
+          clientRif = found.rif;
+        } else if (allClients.length === 1) {
+          clientName = allClients[0].name;
+          clientRif = allClients[0].rif;
+        }
+      }
+    } catch {}
+  }
+
   const rawDate = (row.date as string) || (row.issue_date as string);
 
   return {
@@ -314,8 +332,8 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     number: row.number as string | number,
     code: formatEntityCode(prefix, Number(row.number), digits),
     clientId,
-    clientName: clientData?.name || "—",
-    clientRif: clientData?.rif || "J-00000000-0",
+    clientName: clientName || "—",
+    clientRif: clientRif || "J-00000000-0",
     date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     validUntil: (row.validUntil as string) || (row.dueDate as string) || (row.due_date as string),
     status: (row.status as ProformaStatus) || "pendiente",
@@ -474,14 +492,31 @@ export async function getInvoiceDetail(
   const items = (itemsRes.data ?? []) as unknown as InvoiceItem[];
   const payments = (paymentsRes.data ?? []) as unknown as Payment[];
   const paidTotal = payments.reduce((s, p) => s + Number(p.amount), 0);
-  const clientData = clientRes.data as { name?: string; rif?: string } | null;
+  let clientName = clientRes.data?.name;
+  let clientRif = clientRes.data?.rif;
+
+  if (!clientName || clientName === "—") {
+    try {
+      const allClients = await getClients();
+      if (allClients && allClients.length > 0) {
+        const found = clientId ? allClients.find((c) => c.id === clientId || String(c.id) === String(clientId)) : null;
+        if (found) {
+          clientName = found.name;
+          clientRif = found.rif;
+        } else if (allClients.length === 1) {
+          clientName = allClients[0].name;
+          clientRif = allClients[0].rif;
+        }
+      }
+    } catch {}
+  }
 
   return {
     ...(row as unknown as InvoiceDetail),
     code: formatEntityCode(prefix, Number(row.number), digits),
     clientId,
-    clientName: clientData?.name || "—",
-    clientRif: clientData?.rif || "J-00000000-0",
+    clientName: clientName || "—",
+    clientRif: clientRif || "J-00000000-0",
     items,
     payments,
     paidTotal,

@@ -168,6 +168,7 @@ export default async function ProformaPrintPage({
             {/* Columna Izquierda: Datos Emisor */}
             <div className="space-y-1.5 text-neutral-800">
               <p><strong className="font-bold text-neutral-900">Empresa:</strong> {companyName}</p>
+              {companyRif && <p><strong className="font-bold text-neutral-900">RIF:</strong> <span className="font-mono">{companyRif}</span></p>}
               <p><strong className="font-bold text-neutral-900">Teléfono:</strong> {phone}</p>
               <p><strong className="font-bold text-neutral-900">Correo:</strong> {email}</p>
             </div>
@@ -175,11 +176,11 @@ export default async function ProformaPrintPage({
             {/* Columna Derecha: Coordenadas Bancarias */}
             <div className="space-y-1.5 text-neutral-800 sm:text-left">
               <p><strong className="font-bold text-neutral-900">Titular Cuenta:</strong> {targetHolder}</p>
+              {(targetId || companyRif) && (
+                <p><strong className="font-bold text-neutral-900">Cédula / RIF:</strong> <span className="font-mono">{targetId || companyRif}</span></p>
+              )}
               <p><strong className="font-bold text-neutral-900">Número Cuenta:</strong> <span className="font-mono">{targetNumber}</span></p>
               <p><strong className="font-bold text-neutral-900">Banco:</strong> {targetBank}</p>
-              {showRif && targetId && (
-                <p><strong className="font-bold text-neutral-900">Cedula de identidad:</strong> <span className="font-mono">{targetId}</span></p>
-              )}
             </div>
           </div>
 
@@ -194,23 +195,16 @@ export default async function ProformaPrintPage({
           </div>
 
           {/* 4. FILA DE CLIENTE Y RIF */}
-          {showRif ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
-              <div>
-                <p className="font-bold text-neutral-900">Empresa Cliente:</p>
-                <p className="text-neutral-700 truncate">{prof.clientName}</p>
-              </div>
-              <div>
-                <p className="font-bold text-neutral-900">RIF:</p>
-                <p className="text-neutral-700 font-mono">{prof.clientRif || "J-00000000-0"}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs pt-1 pb-2 border-b border-neutral-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
+            <div>
               <p className="font-bold text-neutral-900">Empresa Cliente:</p>
-              <p className="text-neutral-700 font-semibold text-sm">{prof.clientName}</p>
+              <p className="text-neutral-700 font-semibold text-sm truncate">{prof.clientName && prof.clientName !== "—" ? prof.clientName : "Cliente General"}</p>
             </div>
-          )}
+            <div>
+              <p className="font-bold text-neutral-900">RIF Cliente:</p>
+              <p className="text-neutral-700 font-mono font-medium">{prof.clientRif && prof.clientRif !== "—" ? prof.clientRif : "J-00000000-0"}</p>
+            </div>
+          </div>
 
           {/* 5. SECCIÓN DE CONCEPTOS / COTIZACIÓN */}
           <div className="space-y-2 pt-2">
