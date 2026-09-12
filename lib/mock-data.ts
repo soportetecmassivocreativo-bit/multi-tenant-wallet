@@ -150,6 +150,8 @@ export interface Expense {
   source?: string;
   refId?: string;
   created_at?: string;
+  vesRate?: number | null;
+  vesTotal?: number | null;
 }
 
 export const expenses: Expense[] = [

@@ -14,10 +14,11 @@ import { getPaymentMethodsForAccount, getExpenseBreakdown } from "@/lib/cuentas-
 interface GastosManagerProps {
   expenses: Expense[];
   accounts?: CompanyAccount[];
+  bcv?: { usd: number; eur: number; date?: string };
   admin: boolean;
 }
 
-export function GastosManager({ expenses, accounts = [], admin }: GastosManagerProps) {
+export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosManagerProps) {
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
   const [activeExpense, setActiveExpense] = useState<Expense | null>(null);
@@ -29,6 +30,8 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
   const [editCategory, setEditCategory] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
   const [editReference, setEditReference] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editVesRate, setEditVesRate] = useState<number | "">("");
   const [editError, setEditError] = useState<string | null>(null);
 
   // Estado para modal de Registrar Abono / Pago a Gasto
@@ -89,6 +92,8 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
     setEditCategory(e.category || "General");
     setEditAccountId(foundAccId);
     setEditReference(refVal);
+    setEditDate(e.date ? e.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setEditVesRate((e as any).vesRate || bcv?.usd || "");
     setEditError(null);
   }
 
@@ -98,6 +103,7 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
     setEditError(null);
 
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
+    const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
 
     startTransition(async () => {
       const res = await updateExpense(editingExpense.id, {
@@ -108,6 +114,8 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
         accountId: editAccountId || undefined,
         accountName: selectedAcc ? selectedAcc.name : undefined,
         reference: editReference.trim() ? editReference.trim() : undefined,
+        date: editDate || undefined,
+        vesRate: vesRateNum,
       });
 
       if (res.ok) {
@@ -444,6 +452,89 @@ export function GastosManager({ expenses, accounts = [], admin }: GastosManagerP
                     placeholder="General, Servicios, etc."
                   />
                 </div>
+              </div>
+
+              {/* Fecha y Tasa BCV del Gasto */}
+              <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV del Gasto</p>
+                  {bcv?.usd && (
+                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent font-mono">
+                      BCV Hoy: {bcv.usd.toFixed(2)} Bs.
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-muted font-medium mb-1">Fecha del Gasto / Egreso</label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        setEditDate(newDate);
+                        // Al actualizar la fecha, toma automáticamente la tasa BCV del sistema
+                        if (bcv?.usd) {
+                          setEditVesRate(bcv.usd);
+                        }
+                      }}
+                      className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-muted font-medium mb-1">
+                      Tasa BCV Referencial (Bs./USD)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Ej. 45.50"
+                        value={editVesRate}
+                        onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                        className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
+                      />
+                      {bcv?.usd && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditVesRate(bcv.usd);
+                            setEditDate(new Date().toISOString().slice(0, 10));
+                          }}
+                          className="rounded-xl border border-line bg-card px-2.5 py-2 text-[10px] font-semibold text-accent hover:bg-soft active:scale-95 transition-all whitespace-nowrap shadow-xs"
+                          title="Tomar fecha de hoy y tasa actual del BCV"
+                        >
+                          🔄 Hoy
+                        </button>
+                      )}
+                    </div>
+                    {editVesRate && typeof editVesRate === "number" && editAmount > 0 && (
+                      <p className="text-[11px] text-income font-medium mt-1">
+                        ≈ {(editAmount * editVesRate).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {bcv?.usd && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditDate(new Date().toISOString().slice(0, 10));
+                      setEditVesRate(bcv.usd);
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 py-1.5 px-3 text-xs font-semibold text-accent hover:bg-accent/20 active:scale-95 transition-all"
+                  >
+                    <span>🔄 Actualizar Fecha a Hoy y Tasa BCV Actual ({bcv.usd.toFixed(2)} Bs.)</span>
+                  </button>
+                )}
+
+                <p className="text-[11px] text-hint">
+                  Al cambiar la fecha o hacer clic en actualizar, el sistema toma la tasa oficial del BCV vigente ({bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : 'sincronizada'}) para reflejar el monto en bolívares en los reportes y comprobantes.
+                </p>
               </div>
 
               {editError && (

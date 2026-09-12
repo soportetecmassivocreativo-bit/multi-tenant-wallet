@@ -139,7 +139,7 @@ export function GastosView({
           </div>
 
           {/* Historial y Gestor de Gastos */}
-          <GastosManager expenses={expenses} accounts={accounts} admin={admin} />
+          <GastosManager expenses={expenses} accounts={accounts} bcv={bcv} admin={admin} />
         </div>
       )}
 

@@ -45,7 +45,9 @@ export default async function FacturaPage({
   });
 
   const isForeign = inv.currency !== "VES";
-  const vesTotalCalculated = inv.vesTotal ?? (inv.total * currentRate);
+  const vesTotalCalculated = (inv.vesRate && inv.vesRate > 0)
+    ? (inv.total * inv.vesRate)
+    : (inv.vesTotal ?? (inv.total * currentRate));
   const paperSize = config.pdfInvoicePaperSize || "letter";
   const showRif = config.pdfInvoiceShowRif ?? false;
 

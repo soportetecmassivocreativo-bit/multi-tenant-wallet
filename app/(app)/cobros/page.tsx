@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { PlusIcon } from "@/components/ui/icons";
 import { formatMoney } from "@/lib/format";
-import { getInvoices, getClients, getPayments, isAdmin } from "@/lib/data";
+import { getInvoices, getClients, getPayments, isAdmin, getBcvRates } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { CobrosPdfButton } from "@/components/cobros/cobros-pdf-button";
 import { CobrosManager } from "@/components/cobros/cobros-manager";
@@ -11,12 +11,13 @@ import { CobrosManager } from "@/components/cobros/cobros-manager";
 const OPEN = ["pendiente", "parcial", "vencida"];
 
 export default async function CobrosPage() {
-  const [invoices, clients, payments, admin, accounts] = await Promise.all([
+  const [invoices, clients, payments, admin, accounts, bcv] = await Promise.all([
     getInvoices(),
     getClients(),
     getPayments(),
     isAdmin(),
     getCompanyAccounts(),
+    getBcvRates(),
   ]);
 
   const totalCobrado = payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -77,6 +78,7 @@ export default async function CobrosPage() {
         clients={clients}
         payments={payments}
         accounts={accounts}
+        bcv={bcv}
         admin={admin}
       />
     </div>

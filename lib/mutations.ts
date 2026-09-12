@@ -172,6 +172,8 @@ export interface CreateExpenseInput {
   accountId?: string;
   accountName?: string;
   reference?: string; // Últimos 8 dígitos
+  date?: string; // Fecha del gasto YYYY-MM-DD
+  vesRate?: number; // Tasa referencial BCV
 }
 
 export async function createExpense(
@@ -200,7 +202,7 @@ export async function createExpense(
       note: finalNote,
       amount: input.amount,
       currency,
-      spent_on: today(),
+      spent_on: input.date || today(),
       source: "manual",
     })
     .select("id")
@@ -252,14 +254,19 @@ export async function updateExpense(
     finalNote = cleanBaseNote;
   }
 
+  const updateData: Record<string, unknown> = {
+    category: input.category || "General",
+    note: finalNote,
+    amount: input.amount,
+    currency: input.currency ?? "USD",
+  };
+  if (input.date) {
+    updateData.spent_on = input.date;
+  }
+
   const { error } = await ctx.supabase
     .from("expenses")
-    .update({
-      category: input.category || "General",
-      note: finalNote,
-      amount: input.amount,
-      currency: input.currency ?? "USD",
-    })
+    .update(updateData)
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
 
@@ -1019,6 +1026,9 @@ export interface UpdateInvoiceInput {
   rate?: number;
   note?: string;
   status?: InvoiceStatus;
+  date?: string;
+  vesRate?: number;
+  vesTotal?: number;
 }
 
 export async function updateInvoice(
@@ -1033,6 +1043,14 @@ export async function updateInvoice(
     const updateData: Record<string, unknown> = {};
     if (input.clientId) updateData.client_id = input.clientId;
     if (input.status) updateData.status = input.status;
+    if (input.date) updateData.issue_date = input.date;
+    if (input.vesRate !== undefined && input.vesRate > 0) {
+      updateData.ves_rate = input.vesRate;
+      updateData.ves_rate_ref = "BCV";
+      if (input.vesTotal !== undefined) {
+        updateData.ves_total = input.vesTotal;
+      }
+    }
 
     if (input.lines && input.lines.length > 0) {
       const result = computeInvoice({
