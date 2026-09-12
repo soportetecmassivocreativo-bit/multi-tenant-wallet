@@ -150,55 +150,71 @@ export async function getSystemConfig(tenantSlug?: string): Promise<SystemConfig
     ...cookieConfig,
   };
 
-  // Si ya tenemos la configuración en cookie o no hay Supabase, retornar de inmediato (0ms latencia)
-  if (hasCookie || !isSupabaseConfigured) {
-    return merged;
-  }
+  // Si Supabase está configurado, consultar datos de la empresa para sincronizar nombre, RIF, teléfono y correo
+  if (isSupabaseConfigured) {
+    try {
+      const dbPromise = (async () => {
+        const supabase = await createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return merged;
 
-  // Si no hay cookie aún, intentar leer de DB con timeout estricto de 1s para jamás colgar la app
-  try {
-    const dbPromise = (async () => {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return merged;
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user.id)
+          .single();
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user.id)
-        .single();
+        if (!profile?.company_id) return merged;
 
-      if (!profile?.company_id) return merged;
+        const { data: company } = await supabase
+          .from("companies")
+          .select("name, rif, email, phone, next_invoice_number")
+          .eq("id", profile.company_id)
+          .single();
 
-      const { data: company } = await supabase
-        .from("companies")
-        .select("name, rif, email, phone, next_invoice_number")
-        .eq("id", profile.company_id)
-        .single();
+        if (company) {
+          const finalMerged = { ...merged };
+          if (company.name) {
+            finalMerged.pdfCompanyName = company.name;
+            if (!cookieConfig.pdfInvoiceCompanyName) finalMerged.pdfInvoiceCompanyName = company.name;
+            if (!cookieConfig.pdfProformaCompanyName) finalMerged.pdfProformaCompanyName = company.name;
+          }
+          if (company.rif) {
+            finalMerged.pdfCompanyRif = company.rif;
+            if (!cookieConfig.pdfInvoiceCompanyRif) finalMerged.pdfInvoiceCompanyRif = company.rif;
+            if (!cookieConfig.pdfProformaCompanyRif) finalMerged.pdfProformaCompanyRif = company.rif;
+          }
+          if (company.email) {
+            finalMerged.pdfContactEmail = company.email;
+            if (!cookieConfig.pdfInvoiceContactEmail) finalMerged.pdfInvoiceContactEmail = company.email;
+            if (!cookieConfig.pdfProformaContactEmail) finalMerged.pdfProformaContactEmail = company.email;
+          }
+          if (company.phone) {
+            finalMerged.pdfContactPhone = company.phone;
+            if (!cookieConfig.pdfInvoiceContactPhone) finalMerged.pdfInvoiceContactPhone = company.phone;
+            if (!cookieConfig.pdfProformaContactPhone) finalMerged.pdfProformaContactPhone = company.phone;
+          }
+          if (company.next_invoice_number) {
+            finalMerged.invoiceCounter = company.next_invoice_number;
+          }
+          return finalMerged;
+        }
+        return merged;
+      })();
 
-      if (company) {
-        return {
-          ...merged,
-          pdfCompanyName: company.name || merged.pdfCompanyName,
-          pdfCompanyRif: company.rif || merged.pdfCompanyRif,
-          pdfContactEmail: company.email || merged.pdfContactEmail,
-          pdfContactPhone: company.phone || merged.pdfContactPhone,
-          invoiceCounter: company.next_invoice_number || merged.invoiceCounter,
-        };
-      }
+      const timeoutPromise = new Promise<SystemConfig>((resolve) =>
+        setTimeout(() => resolve(merged), 800)
+      );
+
+      return await Promise.race([dbPromise, timeoutPromise]);
+    } catch {
       return merged;
-    })();
-
-    const timeoutPromise = new Promise<SystemConfig>((resolve) =>
-      setTimeout(() => resolve(merged), 1000)
-    );
-
-    return await Promise.race([dbPromise, timeoutPromise]);
-  } catch {
-    return merged;
+    }
   }
+
+  return merged;
 }
 
 /**
@@ -283,10 +299,18 @@ export async function saveSystemConfig(
     const ctx = await getContext();
     if (ctx?.companyId) {
       const updatePayload: Record<string, any> = {};
-      if (newConfig.pdfCompanyName !== undefined) updatePayload.name = newConfig.pdfCompanyName;
-      if (newConfig.pdfCompanyRif !== undefined) updatePayload.rif = newConfig.pdfCompanyRif;
-      if (newConfig.pdfContactEmail !== undefined) updatePayload.email = newConfig.pdfContactEmail;
-      if (newConfig.pdfContactPhone !== undefined) updatePayload.phone = newConfig.pdfContactPhone;
+      const companyName = newConfig.pdfProformaCompanyName || newConfig.pdfInvoiceCompanyName || newConfig.pdfCompanyName;
+      if (companyName) updatePayload.name = companyName;
+
+      const companyRif = newConfig.pdfProformaCompanyRif || newConfig.pdfInvoiceCompanyRif || newConfig.pdfCompanyRif;
+      if (companyRif) updatePayload.rif = companyRif;
+
+      const companyEmail = newConfig.pdfProformaContactEmail || newConfig.pdfInvoiceContactEmail || newConfig.pdfContactEmail;
+      if (companyEmail) updatePayload.email = companyEmail;
+
+      const companyPhone = newConfig.pdfProformaContactPhone || newConfig.pdfInvoiceContactPhone || newConfig.pdfContactPhone;
+      if (companyPhone) updatePayload.phone = companyPhone;
+
       if (newConfig.invoiceCounter !== undefined) updatePayload.next_invoice_number = newConfig.invoiceCounter;
 
       if (Object.keys(updatePayload).length > 0) {

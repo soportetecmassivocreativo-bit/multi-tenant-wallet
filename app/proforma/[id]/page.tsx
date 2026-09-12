@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/factura/print-button";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
-import { getProformaDetail, getBcvRates } from "@/lib/data";
+import { getProformaDetail, getBcvRates, getCompany } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 
@@ -15,18 +15,41 @@ export default async function ProformaPrintPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [prof, config, accounts, bcv] = await Promise.all([
+  const [prof, company, config, accounts, bcv] = await Promise.all([
     getProformaDetail(id),
+    getCompany(),
     getSystemConfig(),
     getCompanyAccounts(),
     getBcvRates(),
   ]);
   if (!prof) notFound();
 
-  const companyName = config.pdfProformaCompanyName || config.pdfCompanyName || "Massivo Creativo C.A.";
-  const companyRif = config.pdfProformaCompanyRif || config.pdfCompanyRif || "J-50000000-0";
-  const phone = config.pdfProformaContactPhone || config.pdfContactPhone || "+58 412-0000000";
-  const email = config.pdfProformaContactEmail || config.pdfContactEmail || "info@massivocreativo.com";
+  const companyName =
+    config.pdfProformaCompanyName ||
+    config.pdfCompanyName ||
+    company?.name ||
+    "Massivo Creativo C.A.";
+
+  const companyRif =
+    config.pdfProformaCompanyRif ||
+    config.pdfCompanyRif ||
+    company?.rif ||
+    "J-50000000-0";
+
+  const phone =
+    (config.pdfProformaContactPhone && config.pdfProformaContactPhone !== "+58 412-0000000")
+      ? config.pdfProformaContactPhone
+      : (config.pdfContactPhone && config.pdfContactPhone !== "+58 412-0000000")
+        ? config.pdfContactPhone
+        : company?.phone || config.pdfProformaContactPhone || config.pdfContactPhone || "+58 412-0000000";
+
+  const email =
+    (config.pdfProformaContactEmail && config.pdfProformaContactEmail !== "contacto@massivocorp.com" && config.pdfProformaContactEmail !== "info@massivocreativo.com")
+      ? config.pdfProformaContactEmail
+      : (config.pdfContactEmail && config.pdfContactEmail !== "contacto@massivocorp.com" && config.pdfContactEmail !== "info@massivocreativo.com")
+        ? config.pdfContactEmail
+        : company?.email || config.pdfProformaContactEmail || config.pdfContactEmail || "info@massivocreativo.com";
+
   const website = "www.massivocreativo.com";
 
   const targetAccountId = prof.targetAccountId || config.pdfProformaTargetAccountId;
@@ -37,7 +60,9 @@ export default async function ProformaPrintPage({
   const targetNumber = targetAccount?.accountNumber || targetAccount?.phone || "0134-0000-00-0000000000";
   const targetId = targetAccount?.idNumber || targetAccount?.taxId || companyRif;
 
-  const currentRate = prof.vesRate || bcv.usd || 390.40;
+  const rateRefLabel = (prof.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
+  const defaultBcvRate = rateRefLabel === "EUR" ? bcv.eur : bcv.usd;
+  const currentRate = prof.vesRate || defaultBcvRate || (rateRefLabel === "EUR" ? 450 : 390.40);
   const isForeign = prof.currency !== "VES";
   const vesTotalCalculated = (prof.vesRate && prof.vesRate > 0)
     ? (prof.total * prof.vesRate)

@@ -26,8 +26,19 @@ export default async function FacturaPage({
 
   const companyName = config.pdfInvoiceCompanyName || config.pdfCompanyName || company?.name || "Massivo Creativo C.A.";
   const companyRif = config.pdfInvoiceCompanyRif || config.pdfCompanyRif || company?.rif || "J-50000000-0";
-  const phone = config.pdfInvoiceContactPhone || config.pdfContactPhone || company?.phone || "+58 412-0000000";
-  const email = config.pdfInvoiceContactEmail || config.pdfContactEmail || company?.email || "info@massivocreativo.com";
+  const phone =
+    (config.pdfInvoiceContactPhone && config.pdfInvoiceContactPhone !== "+58 412-0000000")
+      ? config.pdfInvoiceContactPhone
+      : (config.pdfContactPhone && config.pdfContactPhone !== "+58 412-0000000")
+        ? config.pdfContactPhone
+        : company?.phone || config.pdfInvoiceContactPhone || config.pdfContactPhone || "+58 412-0000000";
+
+  const email =
+    (config.pdfInvoiceContactEmail && config.pdfInvoiceContactEmail !== "contacto@massivocorp.com" && config.pdfInvoiceContactEmail !== "info@massivocreativo.com")
+      ? config.pdfInvoiceContactEmail
+      : (config.pdfContactEmail && config.pdfContactEmail !== "contacto@massivocorp.com" && config.pdfContactEmail !== "info@massivocreativo.com")
+        ? config.pdfContactEmail
+        : company?.email || config.pdfInvoiceContactEmail || config.pdfContactEmail || "info@massivocreativo.com";
   const website = "www.massivocreativo.com";
 
   const targetAccountId = inv.targetAccountId || config.pdfInvoiceTargetAccountId;
