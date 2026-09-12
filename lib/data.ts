@@ -149,7 +149,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data, error } = await supabase
       .from("proformas")
       .select(
-        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at",
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesTotal:ves_total",
       )
       .order("number", { ascending: false });
 

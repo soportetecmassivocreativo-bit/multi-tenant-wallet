@@ -730,6 +730,12 @@ export interface UpdateProformaInput {
   targetAccountId?: string;
   targetAccountName?: string;
   hasConditions?: boolean;
+  /** Fecha de emisión de la proforma (YYYY-MM-DD) */
+  date?: string;
+  /** Tasa BCV referencial al momento de emitir/actualizar (Bs./USD) */
+  vesRate?: number;
+  /** Equivalente en bolívares (total * vesRate) */
+  vesTotal?: number;
 }
 
 export async function updateProforma(
@@ -747,6 +753,15 @@ export async function updateProforma(
     if (input.targetAccountId !== undefined) updateData.target_account_id = input.targetAccountId;
     if (input.targetAccountName !== undefined) updateData.target_account_name = input.targetAccountName;
     if (input.hasConditions !== undefined) updateData.has_conditions = input.hasConditions;
+    if (input.date) updateData.issue_date = input.date;
+    if (input.vesRate !== undefined && input.vesRate > 0) {
+      updateData.ves_rate = input.vesRate;
+      updateData.ves_rate_ref = "BCV";
+      // Si se proporciona vesTotal explícito úsalo, sino recalcula
+      if (input.vesTotal !== undefined) {
+        updateData.ves_total = input.vesTotal;
+      }
+    }
 
     if (input.lines && input.lines.length > 0) {
       const result = computeInvoice({

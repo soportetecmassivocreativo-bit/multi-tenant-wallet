@@ -52,6 +52,8 @@ export function ProformasManager({
   const [editClientId, setEditClientId] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editVesRate, setEditVesRate] = useState<number | "">("");
   const [editError, setEditError] = useState<string | null>(null);
 
   const [pending, startTransition] = useTransition();
@@ -116,6 +118,8 @@ export function ProformasManager({
     setEditClientId(p.clientId);
     setEditNotes(p.notes || "");
     setEditAccountId(p.targetAccountId || accounts[0]?.id || "");
+    setEditDate(p.date ? p.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setEditVesRate(p.vesRate || "");
     setEditError(null);
   }
 
@@ -163,6 +167,8 @@ export function ProformasManager({
     setEditError(null);
 
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
+    const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
+    const vesTotal = vesRateNum ? editingProforma.total * vesRateNum : undefined;
 
     startTransition(async () => {
       const res = await updateProforma({
@@ -171,6 +177,9 @@ export function ProformasManager({
         notes: editNotes.trim() || undefined,
         targetAccountId: editAccountId,
         targetAccountName: selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined,
+        date: editDate || undefined,
+        vesRate: vesRateNum,
+        vesTotal,
       });
 
       if (res.ok) {
@@ -221,7 +230,7 @@ export function ProformasManager({
       </div>
 
       {/* Lista de Proformas */}
-      <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-line bg-card shadow-sm">
         <div className="p-4 border-b border-line flex items-center justify-between bg-soft/20">
           <p className="text-xs font-bold uppercase tracking-wider text-hint">
             Historial de Proformas & Presupuestos ({filteredProformas.length})
@@ -606,6 +615,49 @@ export function ProformasManager({
                   placeholder="Detalles de la cotización..."
                   className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                 />
+              </div>
+
+              {/* Fecha y Tasa BCV */}
+              <div className="rounded-xl border border-line bg-soft/30 p-3 space-y-3">
+                <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV de la Proforma</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-muted font-medium mb-1">Fecha de Emisión</label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-muted font-medium mb-1">
+                      Tasa BCV Referencial (Bs./USD)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Ej. 45.50"
+                        value={editVesRate}
+                        onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                        className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono"
+                      />
+                    </div>
+                    {editVesRate && typeof editVesRate === "number" && editingProforma && (
+                      <p className="text-[11px] text-muted mt-1">
+                        ≈ {(editingProforma.total * editVesRate).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-hint">
+                  Actualiza la fecha y/o la tasa del BCV para reflejar el valor en bolívares al día de hoy en el PDF.
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t border-line pt-4">

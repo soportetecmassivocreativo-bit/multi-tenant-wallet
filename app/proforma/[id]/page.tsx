@@ -267,20 +267,6 @@ export default async function ProformaPrintPage({
 
         </div>
 
-        {/* 7. FOOTER CYAN CON REDES SOCIALES */}
-        <footer className="w-full bg-[#00A3FF] text-white py-3 px-6 flex items-center justify-center gap-3 text-xs font-semibold shadow-inner">
-          <div className="flex items-center gap-2">
-            {/* Iconos Sociales */}
-            <span className="inline-flex items-center gap-1.5 opacity-90 text-[11px]">
-              <span>📷</span>
-              <span>📘</span>
-              <span>✖</span>
-              <span>💬</span>
-            </span>
-            <span className="font-bold tracking-wide">@massivocreativo</span>
-          </div>
-        </footer>
-
       </div>
     </div>
   );

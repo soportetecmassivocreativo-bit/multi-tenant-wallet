@@ -122,6 +122,8 @@ export interface Proforma {
   targetAccountName?: string;
   paidAmount?: number;
   hasConditions?: boolean;
+  vesRate?: number | null;
+  vesTotal?: number | null;
   conditions?: {
     payment?: string;
     delivery?: string;
