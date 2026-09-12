@@ -191,20 +191,20 @@ export default async function FacturaPage({
           {/* 4. FILA DE CLIENTE, RIF, LA SUMA DE, TASA */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
             <div>
-              <p className="font-bold text-neutral-900">Empresa Cliente:</p>
-              <p className="text-neutral-700 truncate font-semibold">{inv.clientName && inv.clientName !== "—" ? inv.clientName : "Cliente General"}</p>
+              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Empresa Cliente:</p>
+              <p className="text-neutral-900 font-bold text-sm truncate mt-0.5">{inv.clientName && inv.clientName !== "—" ? inv.clientName : "Cliente General"}</p>
             </div>
             <div>
-              <p className="font-bold text-neutral-900">RIF Cliente:</p>
-              <p className="text-neutral-700 font-mono font-medium">{inv.clientRif && inv.clientRif !== "—" ? inv.clientRif : "J-00000000-0"}</p>
+              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">RIF del Cliente:</p>
+              <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{inv.clientRif && inv.clientRif !== "—" ? inv.clientRif : "J-00000000-0"}</p>
             </div>
             <div>
-              <p className="font-bold text-neutral-900">La suma de:</p>
-              <p className="text-neutral-700 font-semibold">{formatCurrency(inv.total, inv.currency)}</p>
+              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">La suma de:</p>
+              <p className="text-neutral-900 font-bold text-sm mt-0.5">{formatCurrency(inv.total, inv.currency)}</p>
             </div>
             <div>
-              <p className="font-bold text-neutral-900">Tasa:</p>
-              <p className="text-neutral-700 font-mono font-medium">{rateFormatted} Bs.</p>
+              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Tasa:</p>
+              <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{rateFormatted} Bs.</p>
             </div>
           </div>
 

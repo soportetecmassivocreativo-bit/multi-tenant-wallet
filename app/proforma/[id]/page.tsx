@@ -195,14 +195,14 @@ export default async function ProformaPrintPage({
           </div>
 
           {/* 4. FILA DE CLIENTE Y RIF */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
+          <div className="flex flex-wrap items-center justify-between gap-4 text-xs pt-1 pb-2 border-b border-neutral-200">
             <div>
-              <p className="font-bold text-neutral-900">Empresa Cliente:</p>
-              <p className="text-neutral-700 font-semibold text-sm truncate">{prof.clientName && prof.clientName !== "—" ? prof.clientName : "Cliente General"}</p>
+              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Empresa Cliente:</p>
+              <p className="text-neutral-900 font-bold text-sm mt-0.5">{prof.clientName && prof.clientName !== "—" ? prof.clientName : "Cliente General"}</p>
             </div>
-            <div>
-              <p className="font-bold text-neutral-900">RIF Cliente:</p>
-              <p className="text-neutral-700 font-mono font-medium">{prof.clientRif && prof.clientRif !== "—" ? prof.clientRif : "J-00000000-0"}</p>
+            <div className="text-left sm:text-right">
+              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">RIF del Cliente:</p>
+              <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{prof.clientRif && prof.clientRif !== "—" ? prof.clientRif : "J-00000000-0"}</p>
             </div>
           </div>
 
