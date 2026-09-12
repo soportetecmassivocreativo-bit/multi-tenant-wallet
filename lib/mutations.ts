@@ -835,17 +835,41 @@ export async function updateProforma(
       const invUpdateData: Record<string, unknown> = {};
       if (input.clientId) invUpdateData.client_id = input.clientId;
       if (input.date) invUpdateData.issue_date = input.date;
-      if (input.notes !== undefined) invUpdateData.notes = input.notes;
       if (input.vesRate !== undefined && input.vesRate > 0) {
         invUpdateData.ves_rate = input.vesRate;
-        invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
+        invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "USD");
         if (input.vesTotal !== undefined) {
           invUpdateData.ves_total = input.vesTotal;
         }
       }
-      try {
-        await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
-      } catch {}
+
+      // 1. Intentar actualizar tabla invoices con datos completos
+      const { error: invErr } = await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
+      if (invErr) {
+        // Fallback sin ves_rate_ref por si esa columna tuviese restricción
+        const minimalData: Record<string, unknown> = {};
+        if (input.clientId) minimalData.client_id = input.clientId;
+        if (input.date) minimalData.issue_date = input.date;
+        if (input.vesRate) minimalData.ves_rate = input.vesRate;
+        await supabase.from("invoices").update(minimalData).eq("id", input.id);
+      }
+
+      // 2. Si se editó la nota, actualizar la descripción del ítem en invoice_items
+      if (input.notes && input.notes.trim()) {
+        try {
+          const { data: items } = await supabase
+            .from("invoice_items")
+            .select("id")
+            .eq("invoice_id", input.id)
+            .limit(1);
+          if (items && items.length > 0) {
+            await supabase
+              .from("invoice_items")
+              .update({ description: input.notes.trim() })
+              .eq("id", items[0].id);
+          }
+        } catch {}
+      }
     }
 
     await logAuditEvent({

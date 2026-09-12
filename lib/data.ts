@@ -165,31 +165,53 @@ export async function getProformas(): Promise<Proforma[]> {
   }
 
   // 2. Puente / Migración de facturas pendientes existentes
-  const { data: invData } = await supabase
-    .from("invoices")
-    .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, created_at",
-    )
-    .order("number", { ascending: false });
+  try {
+    const { data: invData, error: invErr } = await supabase
+      .from("invoices")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at",
+      )
+      .order("number", { ascending: false });
 
-  if (invData && invData.length > 0) {
-    return invData
-      .filter((inv) => inv.status !== "pagada")
-      .map((inv) => ({
-        id: inv.id,
-        number: inv.number,
-        code: formatEntityCode(prefix, Number(inv.number), digits),
-        clientId: inv.clientId,
-        date: inv.date,
-        validUntil: inv.dueDate,
-        total: inv.total,
-        currency: (inv.currency as CurrencyCode) || "USD",
-        status: "pendiente" as ProformaStatus,
-        notes: "Proforma derivada de cuenta por cobrar",
-        invoiceId: inv.id,
-      }))
-      .sort((a, b) => Number(b.number) - Number(a.number));
-  }
+    if (!invErr && invData && invData.length > 0) {
+      // Buscar descripciones de ítems para mostrar notas reales
+      const invIds = invData.map((i) => i.id);
+      const { data: itemsData } = await supabase
+        .from("invoice_items")
+        .select("invoice_id, description")
+        .in("invoice_id", invIds);
+
+      const descMap = new Map<string, string>();
+      (itemsData ?? []).forEach((item) => {
+        if (item.invoice_id && !descMap.has(item.invoice_id) && item.description) {
+          descMap.set(item.invoice_id, item.description);
+        }
+      });
+
+      return invData
+        .filter((inv) => inv.status !== "pagada")
+        .map((inv) => {
+          const rawInv = inv as Record<string, unknown>;
+          return {
+            id: inv.id,
+            number: inv.number,
+            code: formatEntityCode(prefix, Number(inv.number), digits),
+            clientId: inv.clientId,
+            date: (rawInv.date as string) || (rawInv.issue_date as string) || (rawInv.created_at ? String(rawInv.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10)),
+            validUntil: inv.dueDate,
+            total: inv.total,
+            currency: (inv.currency as CurrencyCode) || "USD",
+            status: "pendiente" as ProformaStatus,
+            notes: descMap.get(inv.id) || "Proforma de servicios",
+            vesRate: (rawInv.vesRate as number) ?? (rawInv.ves_rate as number) ?? null,
+            vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
+            vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
+            invoiceId: inv.id,
+          };
+        })
+        .sort((a, b) => Number(b.number) - Number(a.number));
+    }
+  } catch (err) {}
 
   return [];
 }
@@ -240,29 +262,31 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
   let isFromInvoices = false;
 
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("proformas")
       .select(
         "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, notes, invoiceId:invoice_id",
       )
       .eq("id", id)
-      .single();
-    if (data) row = data as Record<string, unknown>;
+      .maybeSingle();
+    if (!error && data) row = data as Record<string, unknown>;
   } catch (err) {}
 
   if (!row) {
     // Buscar en invoices
-    const { data: inv } = await supabase
-      .from("invoices")
-      .select(
-        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
-      )
-      .eq("id", id)
-      .single();
-    if (inv) {
-      row = inv as Record<string, unknown>;
-      isFromInvoices = true;
-    }
+    try {
+      const { data: inv, error: invErr } = await supabase
+        .from("invoices")
+        .select(
+          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (!invErr && inv) {
+        row = inv as Record<string, unknown>;
+        isFromInvoices = true;
+      }
+    } catch (err) {}
   }
 
   if (!row) return null;
@@ -281,6 +305,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
 
   const items = (itemsRes.data ?? []) as unknown as ProformaItem[];
   const clientData = clientRes.data as { name?: string; tax_id?: string; rif?: string } | null;
+  const rawDate = (row.date as string) || (row.issue_date as string);
 
   return {
     id: row.id as string,
@@ -289,7 +314,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     clientId: row.clientId as string,
     clientName: clientData?.name ?? "—",
     clientRif: clientData?.tax_id || clientData?.rif || "J-00000000-0",
-    date: (row.date as string) || (row.issue_date as string) || new Date().toISOString().slice(0, 10),
+    date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     validUntil: (row.validUntil as string) || (row.dueDate as string) || (row.due_date as string),
     status: (row.status as ProformaStatus) || "pendiente",
     currency: (row.currency as CurrencyCode) || "USD",
@@ -297,10 +322,10 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     discount: Number(row.discount) || 0,
     tax: Number(row.tax) || 0,
     total: Number(row.total) || 0,
-    vesRate: (row.vesRate as number) || null,
-    vesRateRef: (row.vesRateRef as string) || null,
-    vesTotal: (row.vesTotal as number) || null,
-    notes: (row.notes as string) || undefined,
+    vesRate: (row.vesRate as number) ?? (row.ves_rate as number) ?? null,
+    vesRateRef: (row.vesRateRef as string) ?? (row.ves_rate_ref as string) ?? null,
+    vesTotal: (row.vesTotal as number) ?? (row.ves_total as number) ?? null,
+    notes: (row.notes as string) || (items[0]?.description) || undefined,
     items,
     invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
   };
