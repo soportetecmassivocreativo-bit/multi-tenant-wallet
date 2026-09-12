@@ -75,15 +75,34 @@ export async function getInvoices(): Promise<Invoice[]> {
     .select(
       "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, notes, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at",
     )
-    .order("number", { ascending: false });
+    .order("created_at", { ascending: true });
 
-  const invoices = (data ?? []).map((inv) => ({
-    ...inv,
-    code: formatEntityCode(prefix, Number(inv.number), digits),
-  })) as unknown as Invoice[];
+  const rows = data ?? [];
+  const seenNumbers = new Set<number>();
+  let maxNum = 0;
+  const processed: Invoice[] = [];
 
-  // Garantizar siempre el orden numérico correlativo descendente (#10, #9, #8... #1)
-  return invoices.sort((a, b) => Number(b.number) - Number(a.number));
+  for (const inv of rows) {
+    let num = Number(inv.number);
+    if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
+      maxNum++;
+      num = maxNum;
+      seenNumbers.add(num);
+      supabase.from("invoices").update({ number: num }).eq("id", inv.id).then(() => {});
+    } else {
+      seenNumbers.add(num);
+      if (num > maxNum) maxNum = num;
+    }
+
+    processed.push({
+      ...inv,
+      number: num,
+      code: formatEntityCode(prefix, num, digits),
+    } as unknown as Invoice);
+  }
+
+  // Garantizar siempre el orden numérico correlativo descendente (#13, #12, ... #1)
+  return processed.sort((a, b) => Number(b.number) - Number(a.number));
 }
 
 /* ----------------------------- Proformas ---------------------------- */
@@ -144,18 +163,17 @@ export async function getProformas(): Promise<Proforma[]> {
 
   const supabase = await createClient();
   const combinedMap = new Map<string, Proforma>();
-  let maxInvNumber = 0;
-  const usedNumbers = new Set<number>();
-  const invMap = new Map<string, any>();
+  const seenNumbers = new Set<number>();
+  let maxNum = 0;
 
-  // 1. Obtener todas las facturas de invoices para conocer los correlativos existentes
+  // 1. Obtener facturas de invoices ordenadas cronológicamente para detectar correlativos
   try {
     const { data: invData, error: invErr } = await supabase
       .from("invoices")
       .select(
         "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at",
       )
-      .order("number", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (!invErr && invData && invData.length > 0) {
       const invIds = invData.map((i) => i.id);
@@ -171,24 +189,24 @@ export async function getProformas(): Promise<Proforma[]> {
         }
       });
 
-      invData.forEach((inv) => {
-        const num = Number(inv.number);
-        if (!isNaN(num)) {
-          usedNumbers.add(num);
-          if (num > maxInvNumber) maxInvNumber = num;
+      for (const inv of invData) {
+        let num = Number(inv.number);
+        if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
+          maxNum++;
+          num = maxNum;
+          seenNumbers.add(num);
+          supabase.from("invoices").update({ number: num }).eq("id", inv.id).then(() => {});
+        } else {
+          seenNumbers.add(num);
+          if (num > maxNum) maxNum = num;
         }
-        invMap.set(inv.id, { inv, desc: descMap.get(inv.id) || "Proforma de servicios" });
-      });
 
-      // Incluir facturas pendientes existentes como proformas puente
-      invData
-        .filter((inv) => inv.status !== "pagada")
-        .forEach((inv) => {
+        if (inv.status !== "pagada") {
           const rawInv = inv as Record<string, unknown>;
           combinedMap.set(inv.id, {
             id: inv.id,
-            number: inv.number,
-            code: formatEntityCode(prefix, Number(inv.number), digits),
+            number: num,
+            code: formatEntityCode(prefix, num, digits),
             clientId: inv.clientId,
             date: (rawInv.date as string) || (rawInv.issue_date as string) || (rawInv.created_at ? String(rawInv.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10)),
             validUntil: inv.dueDate,
@@ -201,7 +219,8 @@ export async function getProformas(): Promise<Proforma[]> {
             vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
             invoiceId: inv.id,
           } as unknown as Proforma);
-        });
+        }
+      }
     }
   } catch (err) {}
 
@@ -216,23 +235,21 @@ export async function getProformas(): Promise<Proforma[]> {
 
     if (!error && profData && profData.length > 0) {
       for (const p of profData) {
-        let actualNumber = Number(p.number);
-        // Si hay colisión de correlativo con facturas previas o número reiniciado a 1
-        if (isNaN(actualNumber) || (actualNumber <= maxInvNumber && usedNumbers.has(actualNumber) && !invMap.has(p.id))) {
-          maxInvNumber++;
-          actualNumber = maxInvNumber;
-          usedNumbers.add(actualNumber);
-          // Persistir actualización en Supabase
-          supabase.from("proformas").update({ number: actualNumber }).eq("id", p.id).then(() => {});
+        let num = Number(p.number);
+        if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
+          maxNum++;
+          num = maxNum;
+          seenNumbers.add(num);
+          supabase.from("proformas").update({ number: num }).eq("id", p.id).then(() => {});
         } else {
-          usedNumbers.add(actualNumber);
-          if (actualNumber > maxInvNumber) maxInvNumber = actualNumber;
+          seenNumbers.add(num);
+          if (num > maxNum) maxNum = num;
         }
 
         combinedMap.set(p.id, {
           ...p,
-          number: actualNumber,
-          code: formatEntityCode(prefix, actualNumber, digits),
+          number: num,
+          code: formatEntityCode(prefix, num, digits),
         } as unknown as Proforma);
       }
     }
