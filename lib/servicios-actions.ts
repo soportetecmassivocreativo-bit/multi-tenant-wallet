@@ -125,15 +125,37 @@ export interface PayServiceOptions {
   paymentDate?: string;
 }
 
+import {
+  addDeferredCharge,
+  increaseDeferredCardDebt,
+} from "@/lib/gastos-especiales-actions";
+
 /**
- * Registra el pago del servicio recurrente en el módulo de Gastos & Egresos
+ * Registra el pago del servicio recurrente en el módulo de Gastos & Egresos,
+ * lo refleja en Gastos Especiales · Tarjeta de José Miguel,
  * y avanza su próxima fecha de vencimiento/cobro.
  */
 export async function payService(
   serviceId: string,
   options?: PayServiceOptions
 ): Promise<MutationResult> {
-  if (!isSupabaseConfigured) return { ok: true, demo: true };
+  if (!isSupabaseConfigured) {
+    try {
+      await addDeferredCharge({
+        description: `Servicio · Servicio Recurrente`,
+        category: "Servicios",
+        amount: 50,
+        currency: "USD",
+        chargedOn: new Date().toISOString().slice(0, 10),
+        notes: "Pago registrado",
+      });
+    } catch {}
+    revalidatePath("/servicios");
+    revalidatePath("/gastos");
+    revalidatePath("/dashboard");
+    return { ok: true, demo: true };
+  }
+
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
@@ -157,7 +179,7 @@ export async function payService(
   const metaParts: string[] = [];
   if (isApproved) {
     if (cleanAccount) metaParts.push(`Pagado desde ${cleanAccount}`);
-    else metaParts.push("Pagado y Aprobado");
+    else metaParts.push("Pagado y Aprobado · Tarjeta José Miguel");
     if (options?.reference?.trim()) metaParts.push(`Ref: ${options.reference.trim()}`);
   } else {
     metaParts.push("Por Aprobar / Pendiente de Pago");
@@ -169,6 +191,7 @@ export async function payService(
     note = `${note} [${metaParts.join(" · ")}]`;
   }
 
+  // 1. Insertar en expenses general
   const { error: expError } = await ctx.supabase.from("expenses").insert({
     company_id: ctx.companyId,
     category: svc.category || "Servicios",
@@ -182,7 +205,21 @@ export async function payService(
 
   if (expError) return { ok: false, error: expError.message };
 
-  // Avanzar fecha de próximo cobro según ciclo
+  // 2. Reflejar automáticamente en Gastos Especiales · Tarjeta de José Miguel
+  try {
+    await addDeferredCharge({
+      description: `Servicio · ${svc.name}`,
+      category: svc.category || "Servicios",
+      amount: svc.amount,
+      currency: svc.currency,
+      chargedOn: payDate,
+      notes: options?.notes || `Pago de servicio recurrente ${svc.name}`,
+    });
+  } catch (err) {
+    console.error("Error al registrar cargo diferido en Tarjeta JM:", err);
+  }
+
+  // 3. Avanzar fecha de próximo cobro según ciclo
   const nextDate = addCycle(svc.next_charge_date || payDate, svc.cycle);
   await ctx.supabase
     .from("services")

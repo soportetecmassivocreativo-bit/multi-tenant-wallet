@@ -56,6 +56,8 @@ export async function payPayroll(periodId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+import { addDeferredCharge } from "@/lib/gastos-especiales-actions";
+
 /** Registra el pago de un servicio recurrente y avanza su próxima fecha de cobro. */
 export async function payService(serviceId: string): Promise<ActionResult> {
   if (!isSupabaseConfigured) return { ok: true, demo: true };
@@ -74,7 +76,7 @@ export async function payService(serviceId: string): Promise<ActionResult> {
   await supabase.from("expenses").insert({
     company_id: svc.company_id,
     category: svc.category,
-    note: `${svc.name} [Servicio Recurrente · Por Aprobar]`,
+    note: `Servicio · ${svc.name} [Pagado y Aprobado · Tarjeta José Miguel]`,
     amount: svc.amount,
     currency: svc.currency,
     spent_on: today,
@@ -82,12 +84,27 @@ export async function payService(serviceId: string): Promise<ActionResult> {
     ref_id: serviceId,
     code,
   });
+
+  try {
+    await addDeferredCharge({
+      description: `Servicio · ${svc.name}`,
+      category: svc.category || "Servicios",
+      amount: svc.amount,
+      currency: svc.currency,
+      chargedOn: today,
+      notes: `Pago recurrente de ${svc.name}`,
+    });
+  } catch (err) {
+    console.error("Error al registrar cargo diferido:", err);
+  }
+
   await supabase
     .from("services")
     .update({ next_charge_date: addCycle(svc.next_charge_date, svc.cycle) })
     .eq("id", serviceId);
 
   revalidatePath("/servicios");
+  revalidatePath("/gastos");
   revalidatePath("/dashboard");
   return { ok: true };
 }

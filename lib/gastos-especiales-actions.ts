@@ -178,17 +178,72 @@ export async function increaseDeferredCardDebt(amountToAdd: number, reason?: str
 }
 
 export async function getDeferredCharges(): Promise<DeferredCharge[]> {
+  let charges: DeferredCharge[] = [];
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(DEFERRED_CHARGES_COOKIE)?.value;
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        charges = parsed;
       }
     }
   } catch {}
-  return DEFAULT_CHARGES;
+
+  if (charges.length === 0) {
+    charges = [...DEFAULT_CHARGES];
+  }
+
+  // Sincronizar automáticamente con gastos de servicios registrados en Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: svcExpenses } = await supabase
+        .from("expenses")
+        .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id, code")
+        .or("source.eq.servicio,source.eq.tarjeta_jm_consumo,source.eq.tarjeta_jm")
+        .order("created_at", { ascending: false });
+
+      if (svcExpenses && svcExpenses.length > 0) {
+        for (const exp of svcExpenses) {
+          const rawNote = exp.note || "Servicio";
+          const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*/g, "").trim();
+
+          const alreadyExists = charges.some(
+            (c) =>
+              c.expenseId === exp.id ||
+              c.id === `tjm_exp_${exp.id}` ||
+              (c.amount === Number(exp.amount) &&
+                c.chargedOn === (exp.spent_on || exp.created_at?.slice(0, 10)) &&
+                (c.description.toLowerCase().includes(cleanDesc.toLowerCase()) ||
+                  cleanDesc.toLowerCase().includes(c.description.toLowerCase())))
+          );
+
+          if (!alreadyExists) {
+            const nextNum = charges.length + 1;
+            const code = exp.code || formatEntityCode("Mas-Corp-TJM-", nextNum, 4);
+            charges.unshift({
+              id: `tjm_exp_${exp.id}`,
+              code,
+              description: cleanDesc.startsWith("Servicio") ? cleanDesc : `Servicio · ${cleanDesc}`,
+              category: exp.category || "Servicios",
+              amount: Number(exp.amount),
+              currency: exp.currency || "USD",
+              chargedOn: exp.spent_on || (exp.created_at ? exp.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
+              status: "pendiente",
+              expenseId: exp.id,
+              notes: rawNote,
+              createdAt: exp.created_at || new Date().toISOString(),
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error al sincronizar cargos de servicios en Tarjeta José Miguel:", e);
+    }
+  }
+
+  return charges;
 }
 
 export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
@@ -251,6 +306,11 @@ export async function addDeferredCharge(
 
   charges.unshift(newCharge);
   await saveDeferredCharges(charges);
+
+  // Incrementar automáticamente la deuda total de la tarjeta
+  try {
+    await increaseDeferredCardDebt(newCharge.amount, `Consumo: ${newCharge.description}`);
+  } catch {}
 
   await logAuditEvent({
     action: "cargo_tarjeta_jose_miguel",
