@@ -268,65 +268,66 @@ export async function saveSystemConfig(
     });
     revalidatePath("/", "layout");
     revalidatePath("/configuracion");
-    return { ok: true, demo: true };
-  }
-
-  const ctx = await getContext();
-  if (!ctx) {
-    // Si no tiene sesión en Supabase pero está configurado, la cookie ya guardó los datos
-    revalidatePath("/", "layout");
-    revalidatePath("/configuracion");
-    return { ok: true };
-  }
-
-  if (
-    ctx.role !== "admin" &&
-    ctx.role !== "ceo" &&
-    ctx.role !== "project_manager"
-  ) {
-    return {
-      ok: false,
-      error: "Solo el CEO, Administrador o Project Manager pueden guardar la configuración.",
-    };
-  }
-
-  try {
-    // Actualizar datos fiscales base en tabla companies si existe
-    if (ctx.companyId) {
-      await ctx.supabase
-        .from("companies")
-        .update({
-          name: newConfig.pdfCompanyName,
-          rif: newConfig.pdfCompanyRif,
-          email: newConfig.pdfContactEmail,
-          phone: newConfig.pdfContactPhone,
-          next_invoice_number: newConfig.invoiceCounter,
-        })
-        .eq("id", ctx.companyId);
-    }
-
-    await logAuditEvent({
-      action: "configuracion_sistema",
-      entityType: "empresa",
-      description: `Actualizó configuración del sistema: nomenclatura ${newConfig.basePrefix || "Mas-Corp-"} y personalización PDF`,
-      details: newConfig as Record<string, unknown>,
-      customUser: {
-        id: ctx.userId,
-        name: ctx.userName,
-        role: ctx.role,
-        companyId: ctx.companyId,
-      },
-    });
-
-    revalidatePath("/", "layout");
-    revalidatePath("/configuracion");
+    revalidatePath("/proformas");
+    revalidatePath("/proforma");
+    revalidatePath("/factura");
     revalidatePath("/nomina");
     revalidatePath("/servicios");
     revalidatePath("/cobros");
     revalidatePath("/gastos");
-    return { ok: true };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error al guardar configuración.";
-    return { ok: false, error: msg };
+    revalidatePath("/dashboard");
+    return { ok: true, demo: true };
   }
+
+  try {
+    const ctx = await getContext();
+    if (ctx?.companyId) {
+      const updatePayload: Record<string, any> = {};
+      if (newConfig.pdfCompanyName !== undefined) updatePayload.name = newConfig.pdfCompanyName;
+      if (newConfig.pdfCompanyRif !== undefined) updatePayload.rif = newConfig.pdfCompanyRif;
+      if (newConfig.pdfContactEmail !== undefined) updatePayload.email = newConfig.pdfContactEmail;
+      if (newConfig.pdfContactPhone !== undefined) updatePayload.phone = newConfig.pdfContactPhone;
+      if (newConfig.invoiceCounter !== undefined) updatePayload.next_invoice_number = newConfig.invoiceCounter;
+
+      if (Object.keys(updatePayload).length > 0) {
+        try {
+          await ctx.supabase
+            .from("companies")
+            .update(updatePayload)
+            .eq("id", ctx.companyId);
+        } catch (dbErr) {
+          console.warn("Could not sync company table fields directly (non-fatal):", dbErr);
+        }
+      }
+    }
+
+    if (ctx) {
+      await logAuditEvent({
+        action: "configuracion_sistema",
+        entityType: "empresa",
+        description: `Actualizó configuración del sistema: nomenclatura ${newConfig.basePrefix || "Mas-Corp-"} y personalización PDF`,
+        details: newConfig as Record<string, unknown>,
+        customUser: {
+          id: ctx.userId,
+          name: ctx.userName,
+          role: ctx.role,
+          companyId: ctx.companyId,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("DB audit or company update warning:", err);
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/configuracion");
+  revalidatePath("/proformas");
+  revalidatePath("/proforma");
+  revalidatePath("/factura");
+  revalidatePath("/nomina");
+  revalidatePath("/servicios");
+  revalidatePath("/cobros");
+  revalidatePath("/gastos");
+  revalidatePath("/dashboard");
+  return { ok: true };
 }

@@ -22,6 +22,7 @@ interface ProformasManagerProps {
   proformas: Proforma[];
   clients: Client[];
   accounts?: CompanyAccount[];
+  bcv?: { usd: number; eur: number; date?: string };
   admin: boolean;
 }
 
@@ -29,6 +30,7 @@ export function ProformasManager({
   proformas,
   clients,
   accounts = [],
+  bcv,
   admin,
 }: ProformasManagerProps) {
   const [query, setQuery] = useState("");
@@ -119,7 +121,7 @@ export function ProformasManager({
     setEditNotes(p.notes || "");
     setEditAccountId(p.targetAccountId || accounts[0]?.id || "");
     setEditDate(p.date ? p.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
-    setEditVesRate(p.vesRate || "");
+    setEditVesRate(p.vesRate || bcv?.usd || "");
     setEditError(null);
   }
 
@@ -618,8 +620,15 @@ export function ProformasManager({
               </div>
 
               {/* Fecha y Tasa BCV */}
-              <div className="rounded-xl border border-line bg-soft/30 p-3 space-y-3">
-                <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV de la Proforma</p>
+              <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV de la Proforma</p>
+                  {bcv?.usd && (
+                    <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold text-accent font-mono">
+                      BCV Hoy: {bcv.usd.toFixed(2)} Bs.
+                    </span>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -627,7 +636,14 @@ export function ProformasManager({
                     <input
                       type="date"
                       value={editDate}
-                      onChange={(e) => setEditDate(e.target.value)}
+                      onChange={(e) => {
+                        const newDate = e.target.value;
+                        setEditDate(newDate);
+                        // Al actualizar la fecha, toma automáticamente la tasa BCV del sistema
+                        if (bcv?.usd) {
+                          setEditVesRate(bcv.usd);
+                        }
+                      }}
                       className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   </div>
@@ -644,19 +660,45 @@ export function ProformasManager({
                         placeholder="Ej. 45.50"
                         value={editVesRate}
                         onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
-                        className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono"
+                        className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
                       />
+                      {bcv?.usd && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditVesRate(bcv.usd);
+                            setEditDate(new Date().toISOString().slice(0, 10));
+                          }}
+                          className="rounded-xl border border-line bg-card px-2.5 py-2 text-[10px] font-semibold text-accent hover:bg-soft active:scale-95 transition-all whitespace-nowrap shadow-xs"
+                          title="Tomar fecha de hoy y tasa actual del BCV"
+                        >
+                          🔄 Hoy
+                        </button>
+                      )}
                     </div>
                     {editVesRate && typeof editVesRate === "number" && editingProforma && (
-                      <p className="text-[11px] text-muted mt-1">
+                      <p className="text-[11px] text-income font-medium mt-1">
                         ≈ {(editingProforma.total * editVesRate).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
                       </p>
                     )}
                   </div>
                 </div>
 
+                {bcv?.usd && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditDate(new Date().toISOString().slice(0, 10));
+                      setEditVesRate(bcv.usd);
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 py-1.5 px-3 text-xs font-semibold text-accent hover:bg-accent/20 active:scale-95 transition-all"
+                  >
+                    <span>🔄 Actualizar Fecha a Hoy y Tasa BCV Actual ({bcv.usd.toFixed(2)} Bs.)</span>
+                  </button>
+                )}
+
                 <p className="text-[11px] text-hint">
-                  Actualiza la fecha y/o la tasa del BCV para reflejar el valor en bolívares al día de hoy en el PDF.
+                  Al cambiar la fecha o hacer clic en actualizar, el sistema toma la tasa oficial del BCV vigente ({bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : 'sincronizada'}) para reflejar el total en bolívares en el PDF.
                 </p>
               </div>
 

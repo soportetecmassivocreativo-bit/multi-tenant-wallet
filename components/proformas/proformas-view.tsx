@@ -12,6 +12,7 @@ interface ProformasViewProps {
   proformas: Proforma[];
   clients: Client[];
   accounts?: CompanyAccount[];
+  bcv?: { usd: number; eur: number; date?: string };
   admin: boolean;
 }
 
@@ -19,6 +20,7 @@ export function ProformasView({
   proformas,
   clients,
   accounts = [],
+  bcv,
   admin,
 }: ProformasViewProps) {
   const pendientes = proformas.filter((p) => p.status !== "pagada");
@@ -80,6 +82,7 @@ export function ProformasView({
         proformas={proformas}
         clients={clients}
         accounts={accounts}
+        bcv={bcv}
         admin={admin}
       />
     </div>

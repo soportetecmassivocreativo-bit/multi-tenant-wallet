@@ -39,7 +39,9 @@ export default async function ProformaPrintPage({
 
   const currentRate = prof.vesRate || bcv.usd || 390.40;
   const isForeign = prof.currency !== "VES";
-  const vesTotalCalculated = prof.vesTotal ?? (prof.total * currentRate);
+  const vesTotalCalculated = (prof.vesRate && prof.vesRate > 0)
+    ? (prof.total * prof.vesRate)
+    : (prof.vesTotal ?? (prof.total * currentRate));
   const paperSize = config.pdfProformaPaperSize || "letter";
   const showRif = config.pdfProformaShowRif ?? false;
 
