@@ -289,31 +289,33 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     } catch (err) {}
   }
 
-  if (!row) return null;
+  const clientId = (row.clientId || (row as any).client_id) as string;
 
   const [itemsRes, clientRes] = await Promise.all([
     supabase
       .from(isFromInvoices ? "invoice_items" : "proforma_items")
       .select("id, description, qty, unitPrice:unit_price")
       .eq(isFromInvoices ? "invoice_id" : "proforma_id", id),
-    supabase
-      .from("clients")
-      .select("name, tax_id")
-      .eq("id", row.clientId as string)
-      .maybeSingle(),
+    clientId
+      ? supabase
+          .from("clients")
+          .select("name, rif")
+          .eq("id", clientId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const items = (itemsRes.data ?? []) as unknown as ProformaItem[];
-  const clientData = clientRes.data as { name?: string; tax_id?: string; rif?: string } | null;
+  const clientData = clientRes.data as { name?: string; rif?: string } | null;
   const rawDate = (row.date as string) || (row.issue_date as string);
 
   return {
     id: row.id as string,
     number: row.number as string | number,
     code: formatEntityCode(prefix, Number(row.number), digits),
-    clientId: row.clientId as string,
-    clientName: clientData?.name ?? "—",
-    clientRif: clientData?.tax_id || clientData?.rif || "J-00000000-0",
+    clientId,
+    clientName: clientData?.name || "—",
+    clientRif: clientData?.rif || "J-00000000-0",
     date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     validUntil: (row.validUntil as string) || (row.dueDate as string) || (row.due_date as string),
     status: (row.status as ProformaStatus) || "pendiente",
@@ -448,6 +450,8 @@ export async function getInvoiceDetail(
   if (!inv) return null;
   const row = inv as Record<string, unknown>;
 
+  const clientId = (row.clientId || (row as any).client_id) as string;
+
   const [itemsRes, paymentsRes, clientRes] = await Promise.all([
     supabase
       .from("invoice_items")
@@ -458,23 +462,26 @@ export async function getInvoiceDetail(
       .select("id, amount, paidOn:paid_on, method")
       .eq("invoice_id", id)
       .order("paid_on"),
-    supabase
-      .from("clients")
-      .select("name, tax_id")
-      .eq("id", row.clientId as string)
-      .maybeSingle(),
+    clientId
+      ? supabase
+          .from("clients")
+          .select("name, rif")
+          .eq("id", clientId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const items = (itemsRes.data ?? []) as unknown as InvoiceItem[];
   const payments = (paymentsRes.data ?? []) as unknown as Payment[];
   const paidTotal = payments.reduce((s, p) => s + Number(p.amount), 0);
-  const clientData = clientRes.data as { name?: string; tax_id?: string; rif?: string } | null;
+  const clientData = clientRes.data as { name?: string; rif?: string } | null;
 
   return {
     ...(row as unknown as InvoiceDetail),
     code: formatEntityCode(prefix, Number(row.number), digits),
-    clientName: clientData?.name ?? "—",
-    clientRif: clientData?.tax_id || clientData?.rif || "J-00000000-0",
+    clientId,
+    clientName: clientData?.name || "—",
+    clientRif: clientData?.rif || "J-00000000-0",
     items,
     payments,
     paidTotal,
