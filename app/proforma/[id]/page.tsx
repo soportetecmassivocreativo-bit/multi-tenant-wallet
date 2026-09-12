@@ -30,11 +30,15 @@ export default async function ProformaPrintPage({
     company?.name ||
     "Massivo Creativo C.A.";
 
-  const companyRif =
+  const rawCompanyRif =
     config.pdfProformaCompanyRif ||
     config.pdfCompanyRif ||
     company?.rif ||
-    "J-50000000-0";
+    "";
+  const companyRif =
+    rawCompanyRif && rawCompanyRif !== "J-50000000-0" && rawCompanyRif !== "J-00000000-0"
+      ? rawCompanyRif
+      : "";
 
   const phone =
     (config.pdfProformaContactPhone && config.pdfProformaContactPhone !== "+58 412-0000000")
@@ -58,7 +62,7 @@ export default async function ProformaPrintPage({
   const targetHolder = targetAccount?.holderName || targetAccount?.name || companyName;
   const targetBank = targetAccount?.bankName || targetAccount?.name || "Banesco";
   const targetNumber = targetAccount?.accountNumber || targetAccount?.phone || "0134-0000-00-0000000000";
-  const targetId = targetAccount?.idNumber || targetAccount?.taxId || companyRif;
+  const targetId = targetAccount?.holderId || (targetAccount as any)?.idNumber || (targetAccount as any)?.taxId || "";
 
   const rateRefLabel = (prof.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
   const defaultBcvRate = rateRefLabel === "EUR" ? bcv.eur : bcv.usd;
@@ -176,8 +180,8 @@ export default async function ProformaPrintPage({
             {/* Columna Derecha: Coordenadas Bancarias */}
             <div className="space-y-1.5 text-neutral-800 sm:text-left">
               <p><strong className="font-bold text-neutral-900">Titular Cuenta:</strong> {targetHolder}</p>
-              {(targetId || companyRif) && (
-                <p><strong className="font-bold text-neutral-900">Cédula / RIF:</strong> <span className="font-mono">{targetId || companyRif}</span></p>
+              {targetId && (
+                <p><strong className="font-bold text-neutral-900">Cédula / RIF:</strong> <span className="font-mono font-bold">{targetId}</span></p>
               )}
               <p><strong className="font-bold text-neutral-900">Número Cuenta:</strong> <span className="font-mono">{targetNumber}</span></p>
               <p><strong className="font-bold text-neutral-900">Banco:</strong> {targetBank}</p>
