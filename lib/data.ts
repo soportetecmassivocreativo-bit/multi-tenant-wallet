@@ -796,15 +796,12 @@ export async function getExpenses(): Promise<Expense[]> {
     .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
     .order("created_at", { ascending: true });
 
-  // Excluir consumos directos de la tarjeta de José Miguel (que son diferidos y viven en Gastos Especiales)
-  // para que no sumen como egresos corrientes duplicados:
+  // Excluir de gastos generales:
+  // 1. Servicios recurrentes (se pagan con la tarjeta de JM y se gestionan en Gastos Especiales / Servicios)
+  // 2. Consumos directos o cargos diferidos de la tarjeta de José Miguel
+  // SÍ INCLUIR: Gastos directos y Pagos/Abonos hechos a la tarjeta de José Miguel
   const filtered = (data ?? []).filter((e) => {
-    const note = (e.note || "").toLowerCase();
-    const isDirectCardCharge =
-      note.includes("[tarjeta josé miguel]") ||
-      note.includes("[tarjeta jose miguel]") ||
-      e.source === "tarjeta_jm_consumo";
-    return !isDirectCardCharge;
+    return !isExcludedFromExpenseTotals(e);
   });
 
   const withPermanentCodes = filtered.map((e, idx) => ({
@@ -830,13 +827,21 @@ export async function getPayrollExpenses(): Promise<Expense[]> {
 
 /** Egresos registrados desde pagos de Servicios Recurrentes, ordenados más recientes primero. */
 export async function getServiceExpenses(): Promise<Expense[]> {
-  const allExpenses = await getExpenses();
-  return allExpenses.filter(
-    (e) =>
-      (e.source || "").toLowerCase() === "servicio" ||
-      ((e.note || "").toLowerCase().includes("servicio") &&
-        !(e.note || "").toLowerCase().includes("nomina"))
-  );
+  if (!isSupabaseConfigured) {
+    return mock.expenses.filter((e) => (e.source || "").toLowerCase() === "servicio");
+  }
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("expenses")
+    .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
+    .or("source.eq.servicio,note.ilike.%servicio%")
+    .order("created_at", { ascending: false });
+
+  return (data ?? []).filter((e) => {
+    const src = (e.source || "").toLowerCase();
+    const note = (e.note || "").toLowerCase();
+    return src === "servicio" || (note.includes("servicio") && !note.includes("nomina") && !note.includes("nómina"));
+  }) as unknown as Expense[];
 }
 
 export async function getEmployees(): Promise<Employee[]> {

@@ -201,12 +201,17 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
       const { data: svcExpenses } = await supabase
         .from("expenses")
         .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id, code")
-        .or("source.eq.servicio,source.eq.tarjeta_jm_consumo,source.eq.tarjeta_jm")
+        .or("source.eq.servicio,source.eq.tarjeta_jm_consumo,source.eq.tarjeta_jm,note.ilike.%servicio%")
         .order("created_at", { ascending: false });
 
       if (svcExpenses && svcExpenses.length > 0) {
         for (const exp of svcExpenses) {
           const rawNote = exp.note || "Servicio";
+          const lowerNote = rawNote.toLowerCase();
+          // Excluir abonos/pagos de nómina o abonos a tarjeta
+          if (lowerNote.includes("nomina") || lowerNote.includes("nómina") || lowerNote.includes("abono a tarjeta") || lowerNote.includes("abono a la deuda")) {
+            continue;
+          }
           const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*/g, "").trim();
 
           const alreadyExists = charges.some(
