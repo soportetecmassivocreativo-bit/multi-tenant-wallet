@@ -68,6 +68,7 @@ export function NuevaProformaForm({
   const [taxRate, setTaxRate] = useState(0.16);
   const [discountPct, setDiscountPct] = useState(0);
   const [validDays, setValidDays] = useState(15);
+  const [projectTitle, setProjectTitle] = useState("");
   const [notes, setNotes] = useState("");
 
   // Condiciones Estructuradas (según requerimiento)
@@ -222,6 +223,8 @@ export function NuevaProformaForm({
       return;
     }
 
+    const combinedNotes = [projectTitle.trim(), notes.trim()].filter(Boolean).join("\n\n");
+
     setError(null);
     startSaving(async () => {
       const res = await createProforma({
@@ -233,7 +236,7 @@ export function NuevaProformaForm({
         validDays,
         rateRef,
         rate,
-        notes: notes.trim() || undefined,
+        notes: combinedNotes || undefined,
         targetAccountId: selectedAccount?.id,
         targetAccountName: selectedAccount ? `${selectedAccount.name} (${selectedAccount.bankName || selectedAccount.accountType})` : undefined,
         hasConditions,
@@ -285,6 +288,8 @@ export function NuevaProformaForm({
             onClick={() => {
               setSaved(false);
               setSavedId(null);
+              setProjectTitle("");
+              setNotes("");
               setLines([{ id: nextId++, description: "", qty: 1, unitPrice: 0 }]);
             }}
             className="rounded-full border border-line bg-card px-5 py-2.5 text-xs font-medium text-muted hover:text-foreground"
@@ -471,12 +476,33 @@ export function NuevaProformaForm({
         </section>
       )}
 
-      {/* Conceptos / Ítems */}
+      {/* Conceptos & Desglose Modular */}
       <section className="rounded-2xl border border-line bg-card p-4 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-hint">
-            Conceptos & Servicios a Cotizar
-          </h3>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-hint mb-1">
+            Concepto General del Proyecto / Título Principal
+          </label>
+          <input
+            type="text"
+            value={projectTitle}
+            onChange={(e) => setProjectTitle(e.target.value)}
+            placeholder="Ej: Desarrollo de Sistema Web Oslo / Servicios de Consultoría Integral"
+            className={inputClass}
+          />
+          <p className="text-[11px] text-muted mt-1">
+            Concepto macro del proyecto que aparecerá como título destacado en el presupuesto y PDF.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-line/60">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-hint">
+              Desglose Modular / Módulos y Conceptos
+            </h3>
+            <p className="text-[11px] text-muted">
+              Especifica los módulos o ítems individuales que componen el proyecto.
+            </p>
+          </div>
           {products.length > 0 && (
             <select
               onChange={(e) => {

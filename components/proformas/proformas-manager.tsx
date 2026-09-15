@@ -62,6 +62,7 @@ export function ProformasManager({
   // Modal para Editar Proforma
   const [editingProforma, setEditingProforma] = useState<Proforma | null>(null);
   const [editClientId, setEditClientId] = useState("");
+  const [editProjectTitle, setEditProjectTitle] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
   const [editDate, setEditDate] = useState("");
@@ -130,7 +131,6 @@ export function ProformasManager({
     setOpenMenuId(null);
     setEditingProforma(p);
     setEditClientId(p.clientId);
-    setEditNotes(p.notes || "");
     setEditAccountId(p.targetAccountId || accounts[0]?.id || "");
     setEditDate(p.date ? p.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
     
@@ -140,6 +140,28 @@ export function ProformasManager({
     const defaultRate = p.vesRate || (isEur ? bcv?.eur : bcv?.usd) || "";
     setEditVesRate(defaultRate);
     setEditError(null);
+
+    // Separar Concepto General del Proyecto de las notas / coordenadas bancarias
+    const rawNotes = p.notes || "";
+    const cleanNotes = rawNotes
+      .replace(/\[\[.*?\]\]/g, "")
+      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+      .replace(/\[Cuenta:.*?\]/gi, "")
+      .trim();
+
+    const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+    let initialProjectTitle = "";
+    let initialExtraNotes = "";
+
+    if (noteLines.length > 0) {
+      initialProjectTitle = noteLines[0];
+      if (noteLines.length > 1) {
+        initialExtraNotes = noteLines.slice(1).join("\n");
+      }
+    }
+
+    setEditProjectTitle(initialProjectTitle);
+    setEditNotes(initialExtraNotes);
 
     // Cargar ítems existentes de la proforma
     const existingItems = (p as any).items as Array<{ id: string; description: string; qty: number; unitPrice: number }> | undefined;
@@ -153,11 +175,10 @@ export function ProformasManager({
         }))
       );
     } else {
-      const cleanNoteDesc = (p.notes || "").replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim();
       setEditLines([
         {
           id: `line_1_${Date.now()}`,
-          description: cleanNoteDesc || "Servicio / Cotización",
+          description: "Módulo Principal",
           qty: 1,
           unitPrice: p.total || 0,
         },
@@ -245,7 +266,7 @@ export function ProformasManager({
       }));
 
     if (validLines.length === 0) {
-      setEditError("Debes incluir al menos un concepto de cobro con descripción.");
+      setEditError("Debes incluir al menos un módulo o concepto de cobro con descripción.");
       return;
     }
 
@@ -254,11 +275,13 @@ export function ProformasManager({
     const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
     const vesTotal = vesRateNum ? computedTotal * vesRateNum : undefined;
 
+    const combinedNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
+
     startTransition(async () => {
       const res = await updateProforma({
         id: editingProforma.id,
         clientId: editClientId,
-        notes: editNotes.trim() || undefined,
+        notes: combinedNotes || undefined,
         targetAccountId: editAccountId,
         targetAccountName: selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined,
         date: editDate || undefined,
@@ -680,7 +703,7 @@ export function ProformasManager({
                       <select
                         value={editClientId}
                         onChange={(e) => setEditClientId(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-medium"
                       >
                         {clients.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -698,7 +721,7 @@ export function ProformasManager({
                         <select
                           value={editAccountId}
                           onChange={(e) => setEditAccountId(e.target.value)}
-                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-medium"
                         >
                           {accounts.map((acc) => (
                             <option key={acc.id} value={acc.id}>
@@ -710,12 +733,35 @@ export function ProformasManager({
                     )}
                   </div>
 
-                  {/* SECCIÓN CONCEPTOS DE COBRO / COTIZACIÓN */}
+                  {/* 1. CONCEPTO GENERAL DEL PROYECTO */}
+                  <div className="rounded-xl border border-accent/20 bg-accent/5 p-3.5 space-y-1.5 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-accent uppercase tracking-wider">
+                        🏷️ Concepto General del Proyecto / Título
+                      </label>
+                      <span className="text-[10px] text-muted">Aparece destacado en el PDF</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={editProjectTitle}
+                      onChange={(e) => setEditProjectTitle(e.target.value)}
+                      placeholder="Ej. Desarrollo Oslo System, Plataforma Web Corporativa, etc."
+                      className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs font-semibold text-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    <p className="text-[10px] text-muted">
+                      Define el alcance global del proyecto. Abajo puedes desglosar cada uno de los módulos o componentes con su costo individual.
+                    </p>
+                  </div>
+
+                  {/* 2. SECCIÓN DESGLOSE MODULAR / MÓDULOS */}
                   <div className="rounded-xl border border-line bg-card p-3.5 space-y-3 shadow-xs">
                     <div className="flex items-center justify-between border-b border-line pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground text-xs">
-                          📦 Conceptos de Cobro y Presupuesto ({editLines.length})
+                      <div>
+                        <span className="font-semibold text-foreground text-xs block">
+                          🧩 Desglose Modular / Módulos del Proyecto ({editLines.length})
+                        </span>
+                        <span className="text-[10px] text-muted">
+                          Especifica cada módulo o componente con su costo individual
                         </span>
                       </div>
                       <button
@@ -724,7 +770,7 @@ export function ProformasManager({
                         className="inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline"
                       >
                         <PlusIcon className="h-3.5 w-3.5" />
-                        <span>Agregar Concepto</span>
+                        <span>+ Agregar Módulo</span>
                       </button>
                     </div>
 
@@ -737,15 +783,15 @@ export function ProformasManager({
                             className="rounded-xl border border-line/80 bg-soft/30 p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
                           >
                             <div className="flex-1">
-                              <label className="block text-[10px] text-muted mb-0.5">
-                                Descripción del Concepto / Cotización #{idx + 1}
+                              <label className="block text-[10px] text-muted mb-0.5 font-medium">
+                                Módulo / Concepto #{idx + 1}
                               </label>
                               <input
                                 type="text"
                                 required
                                 value={line.description}
                                 onChange={(e) => handleUpdateEditLine(idx, "description", e.target.value)}
-                                placeholder="Ej. Desarrollo de Software, Diseño Web, etc."
+                                placeholder="Ej. Requisiciones, Bitácora Digital, Inventario..."
                                 className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent font-medium"
                               />
                             </div>
@@ -774,7 +820,7 @@ export function ProformasManager({
                             </div>
 
                             <div className="w-28 text-right self-end sm:self-center pr-1">
-                              <span className="text-[10px] text-muted block sm:hidden">Total Ítem:</span>
+                              <span className="text-[10px] text-muted block sm:hidden">Total Módulo:</span>
                               <span className="font-mono font-bold text-xs text-foreground">
                                 {formatMoney(lineTotal, editingProforma.currency || "USD")}
                               </span>
@@ -785,7 +831,7 @@ export function ProformasManager({
                               onClick={() => handleRemoveEditLine(idx)}
                               disabled={editLines.length <= 1}
                               className="self-end sm:self-center p-1.5 rounded-lg text-hint hover:text-overdue hover:bg-overdue/10 disabled:opacity-30 transition-all"
-                              title="Eliminar concepto"
+                              title="Eliminar módulo"
                             >
                               <TrashIcon className="h-4 w-4" />
                             </button>
@@ -801,7 +847,7 @@ export function ProformasManager({
                         className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-soft transition-all shadow-xs"
                       >
                         <PlusIcon className="h-3.5 w-3.5 text-accent" />
-                        <span>+ Agregar Otro Concepto</span>
+                        <span>+ Agregar Otro Módulo</span>
                       </button>
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 text-xs bg-soft/50 px-3 py-1.5 rounded-xl border border-line">

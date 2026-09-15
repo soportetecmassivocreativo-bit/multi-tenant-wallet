@@ -71,6 +71,23 @@ export default async function ProformaPrintPage({
   const vesTotalCalculated = (prof.vesRate && prof.vesRate > 0)
     ? (prof.total * prof.vesRate)
     : (prof.vesTotal ?? (prof.total * currentRate));
+  const rawNotes = prof.notes || "";
+  const cleanNotes = rawNotes
+    .replace(/\[\[.*?\]\]/g, "")
+    .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+    .replace(/\[Cuenta:.*?\]/gi, "")
+    .trim();
+
+  const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+  let generalProjectConcept = "";
+  let extraNotes = "";
+  if (noteLines.length > 0) {
+    generalProjectConcept = noteLines[0];
+    if (noteLines.length > 1) {
+      extraNotes = noteLines.slice(1).join("\n");
+    }
+  }
+
   const paperSize = config.pdfProformaPaperSize || "letter";
   const showRif = config.pdfProformaShowRif ?? false;
 
@@ -213,14 +230,35 @@ export default async function ProformaPrintPage({
           </div>
 
           {/* 5. SECCIÓN DE CONCEPTOS / COTIZACIÓN */}
-          <div className="space-y-2 pt-2">
-            <h2 className="text-xs font-bold text-neutral-900">Conceptos y Presupuesto:</h2>
+          <div className="space-y-3 pt-2">
+            {/* Banner / Título de Concepto General del Proyecto */}
+            {generalProjectConcept && (
+              <div className="rounded-xl bg-neutral-50 border border-neutral-200/90 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-[10px] font-black tracking-wider uppercase text-neutral-500 block">
+                    Concepto General del Proyecto:
+                  </span>
+                  <span className="text-sm font-black text-neutral-900 leading-tight">
+                    {generalProjectConcept}
+                  </span>
+                </div>
+                <div className="text-[11px] font-bold text-neutral-700 bg-neutral-200/70 px-2.5 py-1 rounded-md self-start sm:self-auto shrink-0 font-mono">
+                  {prof.items.length} {prof.items.length === 1 ? "Módulo" : "Módulos"}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold text-neutral-900">
+                {generalProjectConcept ? "Desglose de Módulos & Presupuesto:" : "Conceptos y Presupuesto:"}
+              </h2>
+            </div>
 
             <div className="w-full">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b-2 border-neutral-300 text-left font-bold text-neutral-800">
-                    <th className="py-2 pr-4">Descripción del Servicio / Cotización</th>
+                    <th className="py-2 pr-4">Descripción del Módulo / Servicio</th>
                     <th className="py-2 px-2 text-center w-16">Cant.</th>
                     <th className="py-2 px-2 text-right w-24">Precio Unit.</th>
                     <th className="py-2 pl-2 text-right w-28">Total</th>
@@ -252,9 +290,8 @@ export default async function ProformaPrintPage({
                     })
                   )}
                   {/* Líneas complementarias de relleno si hay pocos items */}
-                  {prof.items.length < 5 && (
+                  {prof.items.length < 4 && (
                     <>
-                      <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
                       <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
                       <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
                     </>
@@ -262,6 +299,16 @@ export default async function ProformaPrintPage({
                 </tbody>
               </table>
             </div>
+
+            {/* Observaciones / Notas extra */}
+            {extraNotes && (
+              <div className="pt-2 text-xs space-y-1">
+                <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Notas / Observaciones:</p>
+                <div className="whitespace-pre-line text-neutral-700 bg-neutral-50/80 p-3 rounded-xl border border-neutral-200/80 text-[11px] leading-relaxed">
+                  {extraNotes}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 6. RESUMEN DE TOTALES */}
