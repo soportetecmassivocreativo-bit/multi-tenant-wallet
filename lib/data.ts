@@ -73,7 +73,7 @@ export async function getInvoices(): Promise<Invoice[]> {
   const { data } = await supabase
     .from("invoices")
     .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, notes, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at",
+      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at",
     )
     .order("created_at", { ascending: true });
 
@@ -116,15 +116,31 @@ export async function getInvoices(): Promise<Invoice[]> {
       if (num > maxNum) maxNum = num;
     }
 
-    const items = itemsByInv.get(inv.id) || [];
-    const notes = inv.notes || (items[0]?.description) || undefined;
+    const rawItems = itemsByInv.get(inv.id) || [];
+    let extractedNote: string | undefined = undefined;
+    const cleanItems = rawItems.map((it, idx) => {
+      let desc = it.description || "";
+      if (idx === 0) {
+        const metaMatch = desc.match(/\s*\[(.*?)\]$/);
+        if (metaMatch) {
+          extractedNote = metaMatch[1];
+          desc = desc.replace(/\s*\[.*?\]$/, "").trim();
+        } else {
+          extractedNote = desc;
+        }
+      }
+      return {
+        ...it,
+        description: desc,
+      };
+    });
 
     processed.push({
       ...inv,
       number: num,
       code: formatEntityCode(prefix, num, digits),
-      notes,
-      items,
+      notes: extractedNote,
+      items: cleanItems,
     } as unknown as Invoice);
   }
 
@@ -198,7 +214,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data: invData, error: invErr } = await supabase
       .from("invoices")
       .select(
-        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at, notes",
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at",
       )
       .order("created_at", { ascending: true });
 
@@ -230,6 +246,13 @@ export async function getProformas(): Promise<Proforma[]> {
 
         if (inv.status !== "pagada") {
           const rawInv = inv as Record<string, unknown>;
+          const rawDesc = descMap.get(inv.id) || "Proforma de servicios";
+          let profNotes = rawDesc;
+          const metaMatch = rawDesc.match(/\s*\[(.*?)\]$/);
+          if (metaMatch) {
+            profNotes = metaMatch[1];
+          }
+
           combinedMap.set(inv.id, {
             id: inv.id,
             number: num,
@@ -240,7 +263,7 @@ export async function getProformas(): Promise<Proforma[]> {
             total: inv.total,
             currency: (inv.currency as CurrencyCode) || "USD",
             status: "pendiente" as ProformaStatus,
-            notes: (rawInv.notes as string) || descMap.get(inv.id) || "Proforma de servicios",
+            notes: profNotes,
             vesRate: (rawInv.vesRate as number) ?? (rawInv.ves_rate as number) ?? null,
             vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
             vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
@@ -389,7 +412,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
         .select(
-          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, notes",
+          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
         )
         .eq("id", id)
         .maybeSingle();
@@ -436,7 +459,27 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       : Promise.resolve({ data: null, error: null }),
   ]);
 
-  const items = (itemsRes.data ?? []) as unknown as ProformaItem[];
+  const rawItems = (itemsRes.data ?? []) as unknown as ProformaItem[];
+  let extractedNote: string | undefined = (row.notes as string) || undefined;
+  const cleanItems = rawItems.map((it, idx) => {
+    let desc = it.description || "";
+    if (idx === 0 && !extractedNote) {
+      const metaMatch = desc.match(/\s*\[(.*?)\]$/);
+      if (metaMatch) {
+        extractedNote = metaMatch[1];
+        desc = desc.replace(/\s*\[.*?\]$/, "").trim();
+      } else {
+        extractedNote = desc;
+      }
+    } else {
+      desc = desc.replace(/\s*\[.*?\]$/, "").trim();
+    }
+    return {
+      ...it,
+      description: desc,
+    };
+  });
+
   let clientName = clientRes.data?.name;
   let clientRif = clientRes.data?.rif;
 
@@ -476,8 +519,8 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     vesRate: (row.vesRate as number) ?? (row.ves_rate as number) ?? null,
     vesRateRef: (row.vesRateRef as string) ?? (row.ves_rate_ref as string) ?? null,
     vesTotal: (row.vesTotal as number) ?? (row.ves_total as number) ?? null,
-    notes: (row.notes as string) || (items[0]?.description) || undefined,
-    items,
+    notes: extractedNote,
+    items: cleanItems,
     invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
   };
 }

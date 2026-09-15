@@ -143,7 +143,6 @@ export async function createInvoice(
       status: initialStatus,
       issue_date: issueDateISO,
       due_date: result.dueDateISO,
-      notes: input.notes || null,
     })
     .select("id")
     .single();
@@ -151,10 +150,10 @@ export async function createInvoice(
 
   if (input.lines.length) {
     await supabase.from("invoice_items").insert(
-      input.lines.map((l) => ({
+      input.lines.map((l, idx) => ({
         company_id: companyId,
         invoice_id: inv.id,
-        description: l.description,
+        description: idx === 0 && input.notes?.trim() ? `${l.description} [${input.notes.trim()}]` : l.description,
         qty: l.qty,
         unit_price: l.unitPrice,
       })),
@@ -873,7 +872,6 @@ export async function updateProforma(
     const invUpdateData: Record<string, unknown> = {};
     if (input.clientId) invUpdateData.client_id = input.clientId;
     if (input.date) invUpdateData.issue_date = input.date;
-    if (input.notes !== undefined) invUpdateData.notes = input.notes;
     if (input.vesRate !== undefined && input.vesRate > 0) {
       invUpdateData.ves_rate = input.vesRate;
       invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "USD");
@@ -898,10 +896,10 @@ export async function updateProforma(
       try {
         await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
         await supabase.from("invoice_items").insert(
-          input.lines.map((l) => ({
+          input.lines.map((l, idx) => ({
             company_id: companyId,
             invoice_id: input.id,
-            description: l.description,
+            description: idx === 0 && input.notes?.trim() ? `${l.description} [${input.notes.trim()}]` : l.description,
             qty: l.qty,
             unit_price: l.unitPrice,
           }))
@@ -912,11 +910,10 @@ export async function updateProforma(
     // 1. Intentar actualizar tabla invoices con datos completos
     const { error: invErr } = await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
     if (invErr) {
-      // Fallback sin ves_rate_ref por si esa columna tuviese restricción pero preservando notes
+      // Fallback sin ves_rate_ref por si esa columna tuviese restricción
       const minimalData: Record<string, unknown> = {};
       if (input.clientId) minimalData.client_id = input.clientId;
       if (input.date) minimalData.issue_date = input.date;
-      if (input.notes !== undefined) minimalData.notes = input.notes;
       if (input.vesRate) minimalData.ves_rate = input.vesRate;
       if (invUpdateData.total !== undefined) minimalData.total = invUpdateData.total;
       await supabase.from("invoices").update(minimalData).eq("id", input.id);
@@ -1172,9 +1169,6 @@ export async function updateInvoice(
     if (input.clientId) updateData.client_id = input.clientId;
     if (input.status) updateData.status = input.status;
     if (input.date) updateData.issue_date = input.date;
-    if (input.note !== undefined || input.notes !== undefined) {
-      updateData.notes = input.note ?? input.notes;
-    }
     if (input.vesRate !== undefined && input.vesRate > 0) {
       updateData.ves_rate = input.vesRate;
       updateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
@@ -1198,10 +1192,10 @@ export async function updateInvoice(
 
       await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
       await supabase.from("invoice_items").insert(
-        input.lines.map((l) => ({
+        input.lines.map((l, idx) => ({
           company_id: companyId,
           invoice_id: input.id,
-          description: l.description,
+          description: idx === 0 && (input.note || input.notes)?.trim() ? `${l.description} [${(input.note || input.notes)!.trim()}]` : l.description,
           qty: l.qty,
           unit_price: l.unitPrice,
         })),
