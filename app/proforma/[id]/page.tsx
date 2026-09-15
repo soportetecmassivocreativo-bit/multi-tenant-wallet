@@ -204,10 +204,12 @@ export default async function ProformaPrintPage({
               <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Empresa Cliente:</p>
               <p className="text-neutral-900 font-bold text-sm mt-0.5">{prof.clientName && prof.clientName !== "—" ? prof.clientName : "Cliente General"}</p>
             </div>
-            <div className="text-left sm:text-right">
-              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">RIF del Cliente:</p>
-              <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{prof.clientRif && prof.clientRif !== "—" ? prof.clientRif : "J-00000000-0"}</p>
-            </div>
+            {Boolean(prof.clientRif && prof.clientRif.trim() !== "" && prof.clientRif !== "—" && prof.clientRif !== "J-00000000-0" && prof.clientRif !== "J-0000000-0") && (
+              <div className="text-left sm:text-right">
+                <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">RIF del Cliente:</p>
+                <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{prof.clientRif}</p>
+              </div>
+            )}
           </div>
 
           {/* 5. SECCIÓN DE CONCEPTOS / COTIZACIÓN */}

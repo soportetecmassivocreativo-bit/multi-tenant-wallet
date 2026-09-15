@@ -193,24 +193,38 @@ export default async function FacturaPage({
           </div>
 
           {/* 4. FILA DE CLIENTE, RIF, LA SUMA DE, TASA */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1 pb-2 border-b border-neutral-200">
-            <div>
-              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Empresa Cliente:</p>
-              <p className="text-neutral-900 font-bold text-sm truncate mt-0.5">{inv.clientName && inv.clientName !== "—" ? inv.clientName : "Cliente General"}</p>
-            </div>
-            <div>
-              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">RIF del Cliente:</p>
-              <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{inv.clientRif && inv.clientRif !== "—" ? inv.clientRif : "J-00000000-0"}</p>
-            </div>
-            <div>
-              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">La suma de:</p>
-              <p className="text-neutral-900 font-bold text-sm mt-0.5">{formatCurrency(inv.total, inv.currency)}</p>
-            </div>
-            <div>
-              <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Tasa:</p>
-              <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{rateFormatted} Bs.</p>
-            </div>
-          </div>
+          {(() => {
+            const hasClientRif = Boolean(
+              inv.clientRif &&
+              inv.clientRif.trim() !== "" &&
+              inv.clientRif !== "—" &&
+              inv.clientRif !== "J-00000000-0" &&
+              inv.clientRif !== "J-0000000-0"
+            );
+
+            return (
+              <div className={`grid ${hasClientRif ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"} gap-3 text-xs pt-1 pb-2 border-b border-neutral-200`}>
+                <div>
+                  <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Empresa Cliente:</p>
+                  <p className="text-neutral-900 font-bold text-sm truncate mt-0.5">{inv.clientName && inv.clientName !== "—" ? inv.clientName : "Cliente General"}</p>
+                </div>
+                {hasClientRif && (
+                  <div>
+                    <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">RIF del Cliente:</p>
+                    <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{inv.clientRif}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">La suma de:</p>
+                  <p className="text-neutral-900 font-bold text-sm mt-0.5">{formatCurrency(inv.total, inv.currency)}</p>
+                </div>
+                <div>
+                  <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Tasa:</p>
+                  <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{rateFormatted} Bs.</p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* 5. SECCIÓN DE CONCEPTOS DE LA FACTURA */}
           <div className="space-y-2 pt-2">
