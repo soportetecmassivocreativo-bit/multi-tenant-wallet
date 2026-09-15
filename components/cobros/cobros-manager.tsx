@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteInvoice, deletePayment, updateInvoiceStatus, registerPayment, updateInvoice } from "@/lib/mutations";
-import { formatMoney, formatDate } from "@/lib/format";
+import { formatMoney, formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
 import { formatEntityCode } from "@/lib/config";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
@@ -163,26 +163,9 @@ export function CobrosManager({
     setEditError(null);
 
     // Separar Concepto General del Proyecto de las notas / coordenadas
-    const rawNotes = inv.notes || "";
-    const cleanNotes = rawNotes
-      .replace(/\[\[.*?\]\]/g, "")
-      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-      .replace(/\[Cuenta:.*?\]/gi, "")
-      .trim();
-
-    const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
-    let initialProjectTitle = "";
-    let initialExtraNotes = "";
-
-    if (noteLines.length > 0) {
-      initialProjectTitle = noteLines[0];
-      if (noteLines.length > 1) {
-        initialExtraNotes = noteLines.slice(1).join("\n");
-      }
-    }
-
-    setEditProjectTitle(initialProjectTitle);
-    setEditNote(initialExtraNotes);
+    const parsed = cleanConceptAndNotes(inv.notes || "");
+    setEditProjectTitle(parsed.title);
+    setEditNote(parsed.notes);
 
     // Cargar ítems existentes de la factura
     const existingItems = inv.items;
@@ -190,7 +173,7 @@ export function CobrosManager({
       setEditLines(
         existingItems.map((it, idx) => ({
           id: it.id || `line_${idx}_${Date.now()}`,
-          description: (it.description || "").replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim(),
+          description: cleanItemDescription(it.description) || (it.description || "").trim(),
           qty: Number(it.qty) || 1,
           unitPrice: Number(it.unitPrice) || 0,
         }))
@@ -424,8 +407,8 @@ export function CobrosManager({
                           {formatDate(inv.date)}
                           {inv.targetAccountName && ` · 🏦 Acreditar en: ${inv.targetAccountName}`}
                           {inv.notes && (() => {
-                            const clean = inv.notes.replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim();
-                            const firstLine = clean.split("\n")[0]?.trim();
+                            const parsed = cleanConceptAndNotes(inv.notes);
+                            const firstLine = parsed.title || parsed.cleanText;
                             return firstLine ? ` · "${firstLine}"` : "";
                           })()}
                         </p>

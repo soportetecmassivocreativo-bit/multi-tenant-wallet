@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteProforma } from "@/lib/mutations";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate } from "@/lib/format";
+import { formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
 import { getProformaDetail, isAdmin } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { ProformasManager } from "@/components/proformas/proformas-manager";
@@ -27,15 +27,9 @@ export default async function ProformaDetailPage({
   const isForeign = prof.currency !== "VES";
   const isPaid = prof.status === "pagada";
 
-  const rawNotes = prof.notes || "";
-  const cleanNotes = rawNotes
-    .replace(/\[\[.*?\]\]/g, "")
-    .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-    .replace(/\[Cuenta:.*?\]/gi, "")
-    .trim();
-  const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
-  const generalProjectConcept = noteLines[0] || "";
-  const extraNotes = noteLines.slice(1).join("\n");
+  const parsedNotes = cleanConceptAndNotes(prof.notes);
+  const generalProjectConcept = parsedNotes.title;
+  const extraNotes = parsedNotes.notes;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">

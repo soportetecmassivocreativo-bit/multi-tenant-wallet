@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteProforma, convertProformaToInvoiceAndPay, updateProforma } from "@/lib/mutations";
-import { formatMoney, formatDate } from "@/lib/format";
+import { formatMoney, formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
 import { formatEntityCode } from "@/lib/config";
 import { MoneyInput } from "@/components/ui/money-input";
 import {
@@ -142,26 +142,9 @@ export function ProformasManager({
     setEditError(null);
 
     // Separar Concepto General del Proyecto de las notas / coordenadas bancarias
-    const rawNotes = p.notes || "";
-    const cleanNotes = rawNotes
-      .replace(/\[\[.*?\]\]/g, "")
-      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-      .replace(/\[Cuenta:.*?\]/gi, "")
-      .trim();
-
-    const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
-    let initialProjectTitle = "";
-    let initialExtraNotes = "";
-
-    if (noteLines.length > 0) {
-      initialProjectTitle = noteLines[0];
-      if (noteLines.length > 1) {
-        initialExtraNotes = noteLines.slice(1).join("\n");
-      }
-    }
-
-    setEditProjectTitle(initialProjectTitle);
-    setEditNotes(initialExtraNotes);
+    const parsed = cleanConceptAndNotes(p.notes);
+    setEditProjectTitle(parsed.title);
+    setEditNotes(parsed.notes);
 
     // Cargar ítems existentes de la proforma
     const existingItems = (p as any).items as Array<{ id: string; description: string; qty: number; unitPrice: number }> | undefined;
@@ -169,7 +152,7 @@ export function ProformasManager({
       setEditLines(
         existingItems.map((it, idx) => ({
           id: it.id || `line_${idx}_${Date.now()}`,
-          description: (it.description || "").replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim(),
+          description: cleanItemDescription(it.description) || it.description.trim(),
           qty: Number(it.qty) || 1,
           unitPrice: Number(it.unitPrice) || 0,
         }))
@@ -384,8 +367,8 @@ export function ProformasManager({
                       {formatDate(p.date)}
                       {p.targetAccountName && ` · 🏦 Prevista: ${p.targetAccountName}`}
                       {p.notes && (() => {
-                        const clean = p.notes.replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").replace(/\[Cuenta:.*?\]/gi, "").trim();
-                        const firstLine = clean.split("\n")[0]?.trim();
+                        const parsed = cleanConceptAndNotes(p.notes);
+                        const firstLine = parsed.title || parsed.cleanText;
                         return firstLine ? ` · "${firstLine}"` : "";
                       })()}
                     </p>

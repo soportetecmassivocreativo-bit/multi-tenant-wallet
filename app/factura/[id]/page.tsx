@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/factura/print-button";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate } from "@/lib/format";
+import { formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
 import { getInvoiceDetail, getCompany, getBcvRates } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
@@ -65,22 +65,9 @@ export default async function FacturaPage({
   const vesTotalCalculated = (inv.vesRate && inv.vesRate > 0)
     ? (inv.total * inv.vesRate)
     : (inv.vesTotal ?? (inv.total * currentRate));
-  const rawNotes = inv.notes || "";
-  const cleanNotes = rawNotes
-    .replace(/\[\[.*?\]\]/g, "")
-    .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-    .replace(/\[Cuenta:.*?\]/gi, "")
-    .trim();
-
-  const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
-  let generalProjectConcept = "";
-  let extraNotes = "";
-  if (noteLines.length > 0) {
-    generalProjectConcept = noteLines[0];
-    if (noteLines.length > 1) {
-      extraNotes = noteLines.slice(1).join("\n");
-    }
-  }
+  const parsedNotes = cleanConceptAndNotes(inv.notes);
+  const generalProjectConcept = parsedNotes.title;
+  const extraNotes = parsedNotes.notes;
 
   const paperSize = config.pdfInvoicePaperSize || "letter";
   const showRif = config.pdfInvoiceShowRif ?? false;
@@ -287,11 +274,7 @@ export default async function FacturaPage({
                     </tr>
                   ) : (
                     inv.items.map((item) => {
-                      const cleanDescription = (item.description || "")
-                        .replace(/\[\[.*?\]\]/g, "")
-                        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-                        .replace(/\[Cuenta:.*?\]/gi, "")
-                        .trim();
+                      const cleanDescription = cleanItemDescription(item.description);
 
                       return (
                         <tr key={item.id} className="text-neutral-800">

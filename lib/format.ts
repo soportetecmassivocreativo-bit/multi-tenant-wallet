@@ -44,3 +44,77 @@ export function formatDate(iso?: string | null): string {
     return iso || "";
   }
 }
+
+/**
+ * Extrae y limpia el concepto general / título del proyecto y las notas adicionales,
+ * eliminando cualquier repetición de corchetes anidados o duplicados.
+ */
+export function cleanConceptAndNotes(raw?: string | null): {
+  title: string;
+  notes: string;
+  cleanText: string;
+} {
+  if (!raw || typeof raw !== "string") {
+    return { title: "", notes: "", cleanText: "" };
+  }
+
+  // 1. Quitar metadatos de cuentas
+  let text = raw
+    .replace(/\[\[.*?\]\]/g, "")
+    .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+    .replace(/\[Cuenta:.*?\]/gi, "")
+    .trim();
+
+  // 2. Extraer todos los fragmentos entre corchetes
+  const bracketMatches = Array.from(text.matchAll(/\[(.*?)\]/g))
+    .map((m) => m[1].replace(/[\[\]]/g, "").trim())
+    .filter(Boolean);
+
+  // 3. Obtener el texto base sin corchetes
+  const cleanBase = text
+    .replace(/\[.*?\]/g, "")
+    .replace(/[\[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // 4. Deduplicar los bloques
+  const uniqueBrackets = Array.from(new Set(bracketMatches));
+
+  let title = "";
+  let extraNotes = "";
+
+  if (uniqueBrackets.length > 0) {
+    title = uniqueBrackets[0];
+    if (uniqueBrackets.length > 1) {
+      extraNotes = uniqueBrackets.slice(1).join("\n");
+    }
+  } else if (cleanBase) {
+    const lines = cleanBase.split("\n").map((l) => l.trim()).filter(Boolean);
+    title = lines[0] || "";
+    if (lines.length > 1) {
+      extraNotes = lines.slice(1).join("\n");
+    }
+  }
+
+  return {
+    title: title.replace(/[\[\]]/g, "").trim(),
+    notes: extraNotes.replace(/[\[\]]/g, "").trim(),
+    cleanText: cleanBase || title,
+  };
+}
+
+/**
+ * Limpia la descripción de un ítem removiendo cualquier corchete o metadato anidado.
+ */
+export function cleanItemDescription(raw?: string | null): string {
+  if (!raw || typeof raw !== "string") return "";
+  return raw
+    .replace(/\[\[.*?\]\]/g, "")
+    .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+    .replace(/\[Cuenta:.*?\]/gi, "")
+    .replace(/\[.*?\]/g, "")
+    .replace(/[\[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+

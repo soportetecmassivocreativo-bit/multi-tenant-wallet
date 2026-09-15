@@ -7,6 +7,7 @@ import { computeInvoice } from "@/lib/calc";
 import { logAuditEvent } from "@/lib/audit";
 import type { CurrencyCode, RateRef } from "@/lib/currency";
 import { getNextCode } from "@/lib/config-actions";
+import { cleanItemDescription, cleanConceptAndNotes } from "@/lib/format";
 
 export interface MutationResult {
   ok: boolean;
@@ -149,14 +150,28 @@ export async function createInvoice(
   if (error || !inv) return { ok: false, error: error?.message ?? "Error al crear la factura." };
 
   if (input.lines.length) {
+    const rawNote = input.notes?.trim() || "";
+    const cleanNote = rawNote
+      .replace(/\[\[.*?\]\]/g, "")
+      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+      .replace(/\[Cuenta:.*?\]/gi, "")
+      .replace(/[\[\]]/g, "")
+      .trim();
+
     await supabase.from("invoice_items").insert(
-      input.lines.map((l, idx) => ({
-        company_id: companyId,
-        invoice_id: inv.id,
-        description: idx === 0 && input.notes?.trim() ? `${l.description} [${input.notes.trim()}]` : l.description,
-        qty: l.qty,
-        unit_price: l.unitPrice,
-      })),
+      input.lines.map((l, idx) => {
+        const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
+        const finalDesc = idx === 0 && cleanNote
+          ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
+          : cleanDesc;
+        return {
+          company_id: companyId,
+          invoice_id: inv.id,
+          description: finalDesc,
+          qty: l.qty,
+          unit_price: l.unitPrice,
+        };
+      }),
     );
   }
 
@@ -757,14 +772,28 @@ export async function createProforma(
   if (invErr || !inv) return { ok: false, error: invErr?.message ?? "Error al emitir la proforma." };
 
   if (input.lines.length) {
+    const rawNote = notePayload || "";
+    const cleanNote = rawNote
+      .replace(/\[\[.*?\]\]/g, "")
+      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+      .replace(/\[Cuenta:.*?\]/gi, "")
+      .replace(/[\[\]]/g, "")
+      .trim();
+
     await supabase.from("invoice_items").insert(
-      input.lines.map((l, idx) => ({
-        company_id: companyId,
-        invoice_id: inv.id,
-        description: idx === 0 && notePayload ? `${l.description} [${notePayload}]` : l.description,
-        qty: l.qty,
-        unit_price: l.unitPrice,
-      })),
+      input.lines.map((l, idx) => {
+        const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
+        const finalDesc = idx === 0 && cleanNote
+          ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
+          : cleanDesc;
+        return {
+          company_id: companyId,
+          invoice_id: inv.id,
+          description: finalDesc,
+          qty: l.qty,
+          unit_price: l.unitPrice,
+        };
+      }),
     );
   }
 
@@ -841,16 +870,30 @@ export async function updateProforma(
       updateData.tax = result.tax;
       updateData.total = result.total;
 
-      // Actualizar items
+      const rawNote = input.notes?.trim() || "";
+      const cleanNote = rawNote
+        .replace(/\[\[.*?\]\]/g, "")
+        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+        .replace(/\[Cuenta:.*?\]/gi, "")
+        .replace(/[\[\]]/g, "")
+        .trim();
+
+      // Actualizar items en proforma_items
       await supabase.from("proforma_items").delete().eq("proforma_id", input.id);
       await supabase.from("proforma_items").insert(
-        input.lines.map((l) => ({
-          company_id: companyId,
-          proforma_id: input.id,
-          description: l.description,
-          qty: l.qty,
-          unit_price: l.unitPrice,
-        })),
+        input.lines.map((l, idx) => {
+          const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
+          const finalDesc = idx === 0 && cleanNote
+            ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
+            : cleanDesc;
+          return {
+            company_id: companyId,
+            proforma_id: input.id,
+            description: finalDesc,
+            qty: l.qty,
+            unit_price: l.unitPrice,
+          };
+        }),
       );
     }
 
@@ -893,16 +936,30 @@ export async function updateProforma(
       invUpdateData.tax = result.tax;
       invUpdateData.total = result.total;
 
+      const rawNote = input.notes?.trim() || "";
+      const cleanNote = rawNote
+        .replace(/\[\[.*?\]\]/g, "")
+        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+        .replace(/\[Cuenta:.*?\]/gi, "")
+        .replace(/[\[\]]/g, "")
+        .trim();
+
       try {
         await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
         await supabase.from("invoice_items").insert(
-          input.lines.map((l, idx) => ({
-            company_id: companyId,
-            invoice_id: input.id,
-            description: idx === 0 && input.notes?.trim() ? `${l.description} [${input.notes.trim()}]` : l.description,
-            qty: l.qty,
-            unit_price: l.unitPrice,
-          }))
+          input.lines.map((l, idx) => {
+            const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
+            const finalDesc = idx === 0 && cleanNote
+              ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
+              : cleanDesc;
+            return {
+              company_id: companyId,
+              invoice_id: input.id,
+              description: finalDesc,
+              qty: l.qty,
+              unit_price: l.unitPrice,
+            };
+          }),
         );
       } catch {}
     }
@@ -1190,15 +1247,29 @@ export async function updateInvoice(
       updateData.tax = result.tax;
       updateData.total = result.total;
 
+      const rawNote = (input.note || input.notes)?.trim() || "";
+      const cleanNote = rawNote
+        .replace(/\[\[.*?\]\]/g, "")
+        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+        .replace(/\[Cuenta:.*?\]/gi, "")
+        .replace(/[\[\]]/g, "")
+        .trim();
+
       await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
       await supabase.from("invoice_items").insert(
-        input.lines.map((l, idx) => ({
-          company_id: companyId,
-          invoice_id: input.id,
-          description: idx === 0 && (input.note || input.notes)?.trim() ? `${l.description} [${(input.note || input.notes)!.trim()}]` : l.description,
-          qty: l.qty,
-          unit_price: l.unitPrice,
-        })),
+        input.lines.map((l, idx) => {
+          const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
+          const finalDesc = idx === 0 && cleanNote
+            ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
+            : cleanDesc;
+          return {
+            company_id: companyId,
+            invoice_id: input.id,
+            description: finalDesc,
+            qty: l.qty,
+            unit_price: l.unitPrice,
+          };
+        }),
       );
     }
 

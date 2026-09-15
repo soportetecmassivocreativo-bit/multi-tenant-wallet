@@ -2,6 +2,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { getSystemConfig } from "@/lib/config-actions";
 import { formatEntityCode } from "@/lib/config";
+import { cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
 import * as mock from "@/lib/mock-data";
 import type { CurrencyCode } from "@/lib/currency";
 import type {
@@ -119,19 +120,14 @@ export async function getInvoices(): Promise<Invoice[]> {
     const rawItems = itemsByInv.get(inv.id) || [];
     let extractedNote: string | undefined = undefined;
     const cleanItems = rawItems.map((it, idx) => {
-      let desc = it.description || "";
-      if (idx === 0) {
-        const metaMatch = desc.match(/\s*\[(.*?)\]$/);
-        if (metaMatch) {
-          extractedNote = metaMatch[1];
-          desc = desc.replace(/\s*\[.*?\]$/, "").trim();
-        } else {
-          extractedNote = desc;
-        }
+      const rawDesc = it.description || "";
+      const parsed = cleanConceptAndNotes(rawDesc);
+      if (idx === 0 && !extractedNote) {
+        extractedNote = parsed.title || parsed.cleanText;
       }
       return {
         ...it,
-        description: desc,
+        description: cleanItemDescription(rawDesc) || rawDesc,
       };
     });
 
@@ -247,11 +243,8 @@ export async function getProformas(): Promise<Proforma[]> {
         if (inv.status !== "pagada") {
           const rawInv = inv as Record<string, unknown>;
           const rawDesc = descMap.get(inv.id) || "Proforma de servicios";
-          let profNotes = rawDesc;
-          const metaMatch = rawDesc.match(/\s*\[(.*?)\]$/);
-          if (metaMatch) {
-            profNotes = metaMatch[1];
-          }
+          const parsed = cleanConceptAndNotes(rawDesc);
+          const profNotes = parsed.title || parsed.cleanText || "Proforma de servicios";
 
           combinedMap.set(inv.id, {
             id: inv.id,
@@ -461,22 +454,19 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
 
   const rawItems = (itemsRes.data ?? []) as unknown as ProformaItem[];
   let extractedNote: string | undefined = (row.notes as string) || undefined;
+  if (extractedNote) {
+    const parsedNote = cleanConceptAndNotes(extractedNote);
+    extractedNote = parsedNote.title || parsedNote.cleanText;
+  }
   const cleanItems = rawItems.map((it, idx) => {
-    let desc = it.description || "";
+    const rawDesc = it.description || "";
+    const parsed = cleanConceptAndNotes(rawDesc);
     if (idx === 0 && !extractedNote) {
-      const metaMatch = desc.match(/\s*\[(.*?)\]$/);
-      if (metaMatch) {
-        extractedNote = metaMatch[1];
-        desc = desc.replace(/\s*\[.*?\]$/, "").trim();
-      } else {
-        extractedNote = desc;
-      }
-    } else {
-      desc = desc.replace(/\s*\[.*?\]$/, "").trim();
+      extractedNote = parsed.title || parsed.cleanText;
     }
     return {
       ...it,
-      description: desc,
+      description: cleanItemDescription(rawDesc) || rawDesc,
     };
   });
 
@@ -589,6 +579,7 @@ export interface InvoiceDetail {
   vesRateRef: string | null;
   vesTotal: number | null;
   items: InvoiceItem[];
+  notes?: string;
   payments: Payment[];
   paidTotal: number;
   balance: number;
@@ -685,13 +676,27 @@ export async function getInvoiceDetail(
     } catch {}
   }
 
+  let extractedNote: string | undefined = undefined;
+  const cleanItems = items.map((it, idx) => {
+    const rawDesc = it.description || "";
+    const parsed = cleanConceptAndNotes(rawDesc);
+    if (idx === 0 && !extractedNote) {
+      extractedNote = parsed.title || parsed.cleanText;
+    }
+    return {
+      ...it,
+      description: cleanItemDescription(rawDesc) || rawDesc,
+    };
+  });
+
   return {
     ...(row as unknown as InvoiceDetail),
     code: formatEntityCode(prefix, Number(row.number), digits),
     clientId,
     clientName: clientName || "—",
     clientRif: (clientRif && clientRif !== "J-00000000-0" && clientRif !== "J-0000000-0") ? clientRif.trim() : "",
-    items,
+    notes: extractedNote,
+    items: cleanItems,
     payments,
     paidTotal,
     balance: Number(row.total) - paidTotal,
