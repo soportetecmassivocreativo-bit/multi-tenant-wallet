@@ -616,37 +616,7 @@ export async function deleteInvoice(id: string): Promise<MutationResult> {
 }
 
 export async function deleteExpense(id: string): Promise<MutationResult> {
-  return deleteRow("expenses", id, ["/gastos", "/dashboard", "/reportes"]);
-}
-
-export async function clearSettledExpenses(expenseIds?: string[]): Promise<MutationResult> {
-  if (!isSupabaseConfigured) return { ok: true, demo: true };
-  const ctx = await getContext();
-  if (!ctx) return { ok: false, error: "No autenticado." };
-
-  try {
-    if (expenseIds && expenseIds.length > 0) {
-      const { error } = await ctx.supabase
-        .from("expenses")
-        .delete()
-        .in("id", expenseIds);
-      if (error) return { ok: false, error: error.message };
-    } else {
-      const { error } = await ctx.supabase
-        .from("expenses")
-        .delete()
-        .or("category.ilike.%abono%,category.ilike.%tarjeta%,note.ilike.%pago miguel%,note.ilike.%pago jose miguel%,note.ilike.%abono%,source.ilike.%tarjeta%");
-      if (error) return { ok: false, error: error.message };
-    }
-
-    revalidatePath("/gastos");
-    revalidatePath("/dashboard");
-    revalidatePath("/reportes");
-    return { ok: true };
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : "Error al eliminar gastos saldados";
-    return { ok: false, error: errorMsg };
-  }
+  return deleteRow("expenses", id, ["/gastos", "/dashboard"]);
 }
 
 export async function deleteClient(id: string): Promise<MutationResult> {
