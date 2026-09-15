@@ -786,7 +786,7 @@ export async function getExpenses(): Promise<Expense[]> {
   // Ordenamos por created_at ASC para fijar el número único permanente de cada gasto
   const { data } = await supabase
     .from("expenses")
-    .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at")
+    .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
     .order("created_at", { ascending: true });
 
   // Excluir consumos directos de la tarjeta de José Miguel (que son diferidos y viven en Gastos Especiales)
