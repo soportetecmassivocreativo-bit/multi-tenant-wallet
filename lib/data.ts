@@ -765,8 +765,8 @@ export async function getRecentMovements(limit = 8): Promise<Movement[]> {
     .slice(0, limit);
 }
 
-import { getExpenseBreakdown } from "./cuentas-helpers";
-export { getExpenseBreakdown };
+import { getExpenseBreakdown, isExcludedFromExpenseTotals } from "./cuentas-helpers";
+export { getExpenseBreakdown, isExcludedFromExpenseTotals };
 
 export async function getExpenses(): Promise<Expense[]> {
   const config = await getSystemConfig();
@@ -1068,7 +1068,7 @@ export async function getReport(): Promise<ReportData> {
   const ingresos = payments
     .filter((p) => inMonth(p.paidOn))
     .reduce((s, p) => s + Number(p.amount), 0);
-  const monthExpenses = expenses.filter((e) => inMonth(e.date));
+  const monthExpenses = expenses.filter((e) => inMonth(e.date) && !isExcludedFromExpenseTotals(e));
   const egresos = monthExpenses.reduce((s, e) => s + e.amount, 0);
 
   const catMap = new Map<string, number>();
@@ -1167,9 +1167,10 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     0,
   );
 
-  // Contabilidad real: ingresos (pagos cobrados) − egresos pagados (gastos pagados).
+  // Contabilidad real: ingresos (pagos cobrados) − egresos operativos pagados (excluye servicios recurrentes y tarjeta JM ya contabilizados aparte).
   const cobrado = payments.reduce((s, p) => s + Number(p.amount), 0);
-  const gastos = expenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
+  const operationalExpenses = expenses.filter((e) => !isExcludedFromExpenseTotals(e));
+  const gastos = operationalExpenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
   const balance = isSupabaseConfigured ? cobrado - gastos : mock.balance;
   const cobradoMes = isSupabaseConfigured ? cobrado : mock.stats.cobradoMes;
 
@@ -1177,7 +1178,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     ? payments.length + expenses.length > 0
     : true;
   const chartSeries = isSupabaseConfigured
-    ? buildBalanceSeries(payments, expenses, 12)
+    ? buildBalanceSeries(payments, operationalExpenses, 12)
     : mock.chart.actual;
 
   return {

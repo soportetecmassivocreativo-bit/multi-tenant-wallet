@@ -116,3 +116,46 @@ export function getExpenseBreakdown(e: { note?: string; amount: number }): Expen
   };
 }
 
+/**
+ * Determina si un gasto debe excluirse de los totales de gastos corrientes / operativos.
+ * Excluye:
+ * 1. Pagos de Servicios Recurrentes (gestionados en su módulo y cargos especiales).
+ * 2. Consumos, cargos o abonos de la Tarjeta de José Miguel (Gastos Especiales).
+ */
+export function isExcludedFromExpenseTotals(e: {
+  note?: string;
+  category?: string;
+  source?: string;
+}): boolean {
+  const src = (e.source || "").toLowerCase().trim();
+  const note = (e.note || "").toLowerCase().trim();
+  const cat = (e.category || "").toLowerCase().trim();
+
+  // 1. Tarjeta de José Miguel (cargos diferidos, abonos o pagos a la tarjeta)
+  const isCardJM =
+    src.startsWith("tarjeta_jm") ||
+    src === "tarjeta" ||
+    note.includes("tarjeta josé miguel") ||
+    note.includes("tarjeta jose miguel") ||
+    note.includes("tarjeta jm") ||
+    note.includes("abono a tarjeta") ||
+    cat.includes("abono a tarjeta") ||
+    cat.includes("tarjeta de crédito") ||
+    cat.includes("tarjeta de credito") ||
+    cat.includes("gastos especiales");
+
+  if (isCardJM) return true;
+
+  // 2. Servicios recurrentes
+  const isService =
+    src === "servicio" ||
+    (note.startsWith("servicio ·") && !note.includes("nomina") && !note.includes("nómina")) ||
+    note.includes("pago de servicio") ||
+    cat === "servicios recurrentes";
+
+  if (isService) return true;
+
+  return false;
+}
+
+

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { GastosView } from "@/components/gastos/gastos-view";
 import { getExpenses, isAdmin, getBcvRates } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
-import { getExpenseBreakdown } from "@/lib/cuentas-helpers";
+import { getExpenseBreakdown, isExcludedFromExpenseTotals } from "@/lib/cuentas-helpers";
 import {
   getDeferredCharges,
   getDeferredAbonos,
@@ -22,8 +22,10 @@ export default async function GastosPage() {
       getDeferredCardLimit(),
     ]);
 
-  const totalPagado = expenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
-  const totalPorPagar = expenses.reduce((s, e) => s + getExpenseBreakdown(e).pendingAmount, 0);
+  // Excluir de los totales de gastos los servicios recurrentes y pagos de tarjeta JM
+  const operationalExpenses = expenses.filter((e) => !isExcludedFromExpenseTotals(e));
+  const totalPagado = operationalExpenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
+  const totalPorPagar = operationalExpenses.reduce((s, e) => s + getExpenseBreakdown(e).pendingAmount, 0);
 
   return (
     <GastosView

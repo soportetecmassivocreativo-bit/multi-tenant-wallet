@@ -10,7 +10,7 @@ import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon, PlusIcon } from "@/com
 import { MoneyInput } from "@/components/ui/money-input";
 import type { Expense } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
-import { getPaymentMethodsForAccount, getExpenseBreakdown } from "@/lib/cuentas-helpers";
+import { getPaymentMethodsForAccount, getExpenseBreakdown, isExcludedFromExpenseTotals } from "@/lib/cuentas-helpers";
 
 interface EditExpenseLine {
   id: string;
@@ -404,6 +404,14 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
                       {!isPending && (
                         <span className="rounded-full bg-income/10 text-income font-semibold px-2 py-0.5 text-[10px]">
                           Pagado
+                        </span>
+                      )}
+                      {isExcludedFromExpenseTotals(e) && (
+                        <span
+                          className="rounded-full bg-warning/15 text-warning font-semibold px-2 py-0.5 text-[10px]"
+                          title="No suma en el total general de gastos (contabilizado en su módulo especial)"
+                        >
+                          Especial / No suma
                         </span>
                       )}
                     </div>
