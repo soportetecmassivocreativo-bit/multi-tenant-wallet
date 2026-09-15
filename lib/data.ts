@@ -198,7 +198,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data: invData, error: invErr } = await supabase
       .from("invoices")
       .select(
-        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at",
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at, notes",
       )
       .order("created_at", { ascending: true });
 
@@ -240,7 +240,7 @@ export async function getProformas(): Promise<Proforma[]> {
             total: inv.total,
             currency: (inv.currency as CurrencyCode) || "USD",
             status: "pendiente" as ProformaStatus,
-            notes: descMap.get(inv.id) || "Proforma de servicios",
+            notes: (rawInv.notes as string) || descMap.get(inv.id) || "Proforma de servicios",
             vesRate: (rawInv.vesRate as number) ?? (rawInv.ves_rate as number) ?? null,
             vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
             vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
@@ -389,7 +389,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
         .select(
-          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, notes",
         )
         .eq("id", id)
         .maybeSingle();

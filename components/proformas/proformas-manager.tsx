@@ -383,7 +383,11 @@ export function ProformasManager({
                       {clientMap.get(p.clientId) || "Cliente General"} · Emisión:{" "}
                       {formatDate(p.date)}
                       {p.targetAccountName && ` · 🏦 Prevista: ${p.targetAccountName}`}
-                      {p.notes && ` · "${p.notes}"`}
+                      {p.notes && (() => {
+                        const clean = p.notes.replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").replace(/\[Cuenta:.*?\]/gi, "").trim();
+                        const firstLine = clean.split("\n")[0]?.trim();
+                        return firstLine ? ` · "${firstLine}"` : "";
+                      })()}
                     </p>
                   </div>
 

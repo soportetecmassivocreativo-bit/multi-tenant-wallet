@@ -423,6 +423,11 @@ export function CobrosManager({
                           {clientMap.get(inv.clientId) || "Cliente General"} · Emisión:{" "}
                           {formatDate(inv.date)}
                           {inv.targetAccountName && ` · 🏦 Acreditar en: ${inv.targetAccountName}`}
+                          {inv.notes && (() => {
+                            const clean = inv.notes.replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim();
+                            const firstLine = clean.split("\n")[0]?.trim();
+                            return firstLine ? ` · "${firstLine}"` : "";
+                          })()}
                         </p>
                       </div>
 

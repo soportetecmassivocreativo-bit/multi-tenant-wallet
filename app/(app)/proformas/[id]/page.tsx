@@ -27,6 +27,16 @@ export default async function ProformaDetailPage({
   const isForeign = prof.currency !== "VES";
   const isPaid = prof.status === "pagada";
 
+  const rawNotes = prof.notes || "";
+  const cleanNotes = rawNotes
+    .replace(/\[\[.*?\]\]/g, "")
+    .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+    .replace(/\[Cuenta:.*?\]/gi, "")
+    .trim();
+  const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+  const generalProjectConcept = noteLines[0] || "";
+  const extraNotes = noteLines.slice(1).join("\n");
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <header className="flex items-center justify-between">
@@ -75,27 +85,40 @@ export default async function ProformaDetailPage({
       </section>
 
       {/* Conceptos + totales */}
-      <section className="rounded-2xl border border-line bg-card p-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-hint mb-3">
-          Conceptos Cotizados
-        </h3>
-        {prof.items.length === 0 ? (
-          <p className="text-sm text-hint">Sin conceptos.</p>
-        ) : (
-          prof.items.map((it) => (
-            <div
-              key={it.id}
-              className="flex items-center justify-between py-1.5 text-sm border-b border-line/40 last:border-0"
-            >
-              <span className="min-w-0 flex-1 truncate">
-                {it.qty} × {it.description}
-              </span>
-              <span className="tnum ml-3 font-medium">
-                {formatCurrency(it.qty * it.unitPrice, prof.currency)}
-              </span>
-            </div>
-          ))
+      <section className="rounded-2xl border border-line bg-card p-4 space-y-3">
+        {generalProjectConcept && (
+          <div className="rounded-xl border border-accent/20 bg-accent/5 p-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-accent block">
+              Concepto General del Proyecto / Título Principal
+            </span>
+            <p className="font-semibold text-sm text-foreground mt-0.5">
+              {generalProjectConcept}
+            </p>
+          </div>
         )}
+
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-hint mb-3">
+            Desglose Modular / Conceptos Cotizados
+          </h3>
+          {prof.items.length === 0 ? (
+            <p className="text-sm text-hint">Sin conceptos.</p>
+          ) : (
+            prof.items.map((it) => (
+              <div
+                key={it.id}
+                className="flex items-center justify-between py-1.5 text-sm border-b border-line/40 last:border-0"
+              >
+                <span className="min-w-0 flex-1 truncate">
+                  {it.qty} × {it.description}
+                </span>
+                <span className="tnum ml-3 font-medium">
+                  {formatCurrency(it.qty * it.unitPrice, prof.currency)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
 
         <div className="mt-3 space-y-1.5 border-t border-line pt-3 text-sm">
           <Row label="Subtotal" value={formatCurrency(prof.subtotal, prof.currency)} />
@@ -125,10 +148,10 @@ export default async function ProformaDetailPage({
           )}
         </div>
 
-        {prof.notes && (
+        {extraNotes && (
           <div className="mt-4 rounded-xl bg-soft/40 p-3 border border-line/60">
             <p className="text-[11px] font-bold text-muted uppercase">Condiciones & Notas:</p>
-            <p className="text-xs text-foreground mt-1">{prof.notes}</p>
+            <p className="text-xs text-foreground mt-1 whitespace-pre-line">{extraNotes}</p>
           </div>
         )}
       </section>

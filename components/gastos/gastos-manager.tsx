@@ -389,7 +389,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="truncate text-sm font-semibold text-foreground">
-                        {e.note}
+                        {e.note ? e.note.split("\n")[0] : "Gasto General"}
                       </p>
                       <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
                         {e.code || "Mas-Corp-0001"}
