@@ -50,6 +50,7 @@ export interface CreateInvoiceInput {
   creditDays: number;
   rateRef: RateRef;
   rate: number;
+  notes?: string;
   // Opciones de pago de contado
   accountId?: string;
   accountName?: string;
@@ -142,6 +143,7 @@ export async function createInvoice(
       status: initialStatus,
       issue_date: issueDateISO,
       due_date: result.dueDateISO,
+      notes: input.notes || null,
     })
     .select("id")
     .single();
@@ -1166,6 +1168,7 @@ export interface UpdateInvoiceInput {
   rateRef?: RateRef;
   rate?: number;
   note?: string;
+  notes?: string;
   status?: InvoiceStatus;
   date?: string;
   vesRate?: number;
@@ -1186,6 +1189,9 @@ export async function updateInvoice(
     if (input.clientId) updateData.client_id = input.clientId;
     if (input.status) updateData.status = input.status;
     if (input.date) updateData.issue_date = input.date;
+    if (input.note !== undefined || input.notes !== undefined) {
+      updateData.notes = input.note ?? input.notes;
+    }
     if (input.vesRate !== undefined && input.vesRate > 0) {
       updateData.ves_rate = input.vesRate;
       updateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");

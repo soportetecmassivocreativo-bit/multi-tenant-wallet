@@ -67,6 +67,8 @@ export function NuevaFacturaForm({
   const [taxRate, setTaxRate] = useState(0.16);
   const [discountPct, setDiscountPct] = useState(0);
   const [creditDays, setCreditDays] = useState(0);
+  const [projectTitle, setProjectTitle] = useState("");
+  const [notes, setNotes] = useState("");
   const [accountId, setAccountId] = useState<string>(
     accounts.find((a) => a.isDefault || a.currency === "USD")?.id || accounts[0]?.id || ""
   );
@@ -177,15 +179,32 @@ export function NuevaFacturaForm({
     });
   }
 
+  function addLine() {
+    setLines((ls) => [
+      ...ls,
+      { id: nextId++, description: "", qty: 1, unitPrice: 0 },
+    ]);
+  }
+
   function submit() {
     setError(null);
+    const cleanLines = lines
+      .map((l) => ({ ...l, description: l.description.trim() }))
+      .filter((l) => l.description.length > 0);
+
+    if (!cleanLines.length) {
+      setError("Agrega al menos un concepto o módulo con descripción.");
+      return;
+    }
+
     const selectedAcc = accounts.find((a) => a.id === accountId);
+    const combinedNotes = [projectTitle.trim(), notes.trim()].filter(Boolean).join("\n\n");
 
     startSaving(async () => {
       const r = await createInvoice({
         clientId,
         currency,
-        lines: lines.map(({ description, qty, unitPrice }) => ({
+        lines: cleanLines.map(({ description, qty, unitPrice }) => ({
           description,
           qty,
           unitPrice,
@@ -195,6 +214,7 @@ export function NuevaFacturaForm({
         creditDays,
         rateRef,
         rate,
+        notes: combinedNotes || undefined,
         accountId: creditDays === 0 ? accountId : undefined,
         accountName: creditDays === 0 && selectedAcc ? selectedAcc.name : undefined,
         paymentMethod: creditDays === 0 ? paymentMethod : undefined,
@@ -227,6 +247,8 @@ export function NuevaFacturaForm({
           <button
             onClick={() => {
               setSaved(false);
+              setProjectTitle("");
+              setNotes("");
               setLines([{ id: nextId++, description: "", qty: 1, unitPrice: 0 }]);
               setClientId("");
             }}
@@ -287,72 +309,124 @@ export function NuevaFacturaForm({
         </div>
       </section>
 
-      {/* Conceptos y Líneas de Facturación */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-foreground">
-            Descripción / Concepto del Cobro o Factura *
+      {/* Conceptos & Desglose Modular */}
+      <section className="space-y-4">
+        {/* Concepto General del Proyecto */}
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-1">
+          <label className="block text-xs font-bold uppercase tracking-wider text-hint">
+            Concepto General del Proyecto / Título Principal
           </label>
-          <span className="text-[10px] text-hint font-medium">Define los ítems y servicios a facturar</span>
+          <input
+            type="text"
+            value={projectTitle}
+            onChange={(e) => setProjectTitle(e.target.value)}
+            placeholder="Ej: Desarrollo de Sistema Web Oslo / Servicios de Consultoría Mensual"
+            className={inputClass}
+          />
+          <p className="text-[11px] text-muted">
+            Concepto macro de la facturación que aparecerá como título destacado en la factura y PDF.
+          </p>
         </div>
-        {lines.map((l) => (
-          <div key={l.id} className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-muted mb-1">
-                Concepto / Detalle del Ítem *
-              </label>
-              <input
-                value={l.description}
-                onChange={(e) => updateLine(l.id, { description: e.target.value })}
-                placeholder="Escribe aquí el concepto o servicio (Ej: Consultoría mensual, diseño, materiales...)"
-                className="w-full rounded-xl border border-line bg-soft px-3.5 py-2.5 text-sm font-medium outline-none focus:border-accent focus:bg-card focus:ring-1 focus:ring-accent transition-all"
-                autoFocus={l.id === 1}
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] text-hint">Cant.</span>
-                <MoneyInput
-                  value={l.qty}
-                  onValueChange={(n) => updateLine(l.id, { qty: n })}
-                  className="w-14 rounded-lg border border-line bg-page px-2 py-1 text-sm outline-none focus:border-accent"
-                />
-              </div>
-              <div className="flex flex-1 items-center gap-1">
-                <span className="text-[11px] text-hint">
-                  Precio {CURRENCIES[currency].symbol}
-                </span>
-                <MoneyInput
-                  value={l.unitPrice}
-                  onValueChange={(n) => updateLine(l.id, { unitPrice: n })}
-                  className="w-full rounded-lg border border-line bg-page px-2 py-1 text-sm outline-none focus:border-accent"
-                />
-              </div>
-              <button
-                onClick={() => removeLine(l.id)}
-                aria-label="Eliminar línea"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-hint hover:text-overdue hover:bg-overdue/10 active:scale-90 transition-all"
-              >
-                <TrashIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
 
-        {products.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {products.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => addProduct(p.name, p.price)}
-                className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-xs text-muted active:scale-95 hover:border-accent hover:text-accent transition-all"
-              >
-                <PlusIcon className="h-3 w-3" />
-                {p.name}
-              </button>
-            ))}
+        {/* Desglose Modular / Módulos de Facturación */}
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-hint">
+                Desglose Modular / Módulos y Conceptos
+              </h3>
+              <p className="text-[11px] text-muted">
+                Especifica los módulos, ítems o servicios detallados a cobrar.
+              </p>
+            </div>
+            {products.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {products.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addProduct(p.name, p.price)}
+                    className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] text-muted active:scale-95 hover:border-accent hover:text-accent transition-all"
+                  >
+                    <PlusIcon className="h-3 w-3" />
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="space-y-3">
+            {lines.map((l, idx) => (
+              <div
+                key={l.id}
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-line/60 bg-soft/20 p-2.5"
+              >
+                <div className="w-full sm:flex-1">
+                  <input
+                    value={l.description}
+                    onChange={(e) => updateLine(l.id, { description: e.target.value })}
+                    placeholder={`Módulo o concepto #${idx + 1}...`}
+                    className={inputClass}
+                    autoFocus={idx === 0 && !projectTitle}
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="w-20">
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Cant."
+                      value={l.qty}
+                      onChange={(e) => updateLine(l.id, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <MoneyInput
+                      value={l.unitPrice}
+                      onValueChange={(n) => updateLine(l.id, { unitPrice: n })}
+                      placeholder="Precio"
+                      className={inputClass}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeLine(l.id)}
+                    disabled={lines.length === 1}
+                    aria-label="Eliminar línea"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-hint hover:text-overdue hover:bg-overdue/10 active:scale-90 transition-all disabled:opacity-30"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addLine}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-line px-3.5 py-2 text-xs font-semibold text-muted hover:text-accent hover:border-accent w-full justify-center"
+            >
+              <PlusIcon className="h-4 w-4" />
+              <span>Agregar otro concepto / módulo</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Observaciones / Notas adicionales opcionales */}
+        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-1">
+          <label className="block text-xs font-medium text-muted">
+            Notas u Observaciones Adicionales (Opcional)
+          </label>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Ej: Incluye soporte técnico y entrega de credenciales."
+            className={inputClass}
+          />
+        </div>
       </section>
 
       {/* Impuesto / descuento / crédito */}

@@ -26,6 +26,13 @@ const termOptions = [
 const inputClass =
   "w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm outline-none focus:border-accent";
 
+interface ExpenseLine {
+  id: number;
+  description: string;
+  qty: number;
+  unitPrice: number;
+}
+
 interface NuevoGastoFormProps {
   accounts?: CompanyAccount[];
   bcv?: { usd: number; eur: number; date: string };
@@ -39,9 +46,13 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
     date: bcv?.date ?? new Date().toISOString().slice(0, 10),
   };
   const [currentBcv, setCurrentBcv] = useState(safeBcv);
+  const [projectTitle, setProjectTitle] = useState("");
   const [note, setNote] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Operaciones");
+  const [lines, setLines] = useState<ExpenseLine[]>([
+    { id: 1, description: "", qty: 1, unitPrice: 0 },
+  ]);
   const [amount, setAmount] = useState(0);
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [rateRef, setRateRef] = useState<RateRef>("USD");
@@ -59,10 +70,31 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
+  function addLine() {
+    setLines((prev) => [
+      ...prev,
+      { id: Date.now(), description: "", qty: 1, unitPrice: 0 },
+    ]);
+  }
+
+  function removeLine(id: number) {
+    setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
+  }
+
+  function updateLine(id: number, patch: Partial<ExpenseLine>) {
+    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  }
+
+  const computedTotal = lines.reduce(
+    (sum, l) => sum + (Number(l.qty) || 1) * (Number(l.unitPrice) || 0),
+    0
+  );
+  const activeTotal = computedTotal > 0 ? computedTotal : amount;
+
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const isCash = creditDays === 0;
   const isForeign = currency !== "VES";
-  const vesEquivalent = isForeign ? toBolivars(amount, rate) : null;
+  const vesEquivalent = isForeign ? toBolivars(activeTotal, rate) : null;
 
   function onCurrencyChange(c: CurrencyCode) {
     setCurrency(c);
@@ -132,13 +164,36 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
   }
 
   function submit() {
-    if (!note.trim() || amount <= 0) {
-      setError("El concepto y el monto son obligatorios.");
+    const validLines = lines
+      .map((l) => ({ ...l, description: l.description.trim() }))
+      .filter((l) => l.description.length > 0 && (Number(l.unitPrice) > 0 || Number(l.qty) > 0));
+
+    const totalToUse = computedTotal > 0 ? computedTotal : amount;
+    if (totalToUse <= 0 || (!projectTitle.trim() && validLines.length === 0 && !note.trim())) {
+      setError("Indica el concepto y al menos una partida con monto.");
       return;
     }
     setError(null);
 
-    let fullNote = description.trim() ? `${note.trim()} (${description.trim()})` : note.trim();
+    let fullNote = "";
+    if (validLines.length > 0) {
+      const itemsList = validLines
+        .map((l, idx) => `• #${idx + 1} ${l.description} (${l.qty > 1 ? `${l.qty}x ` : ""}${formatCurrency(l.qty * l.unitPrice, currency)})`)
+        .join("\n");
+
+      if (projectTitle.trim()) {
+        fullNote = `${projectTitle.trim()}\n${itemsList}`;
+      } else {
+        fullNote = itemsList;
+      }
+    } else {
+      fullNote = projectTitle.trim() || note.trim();
+    }
+
+    if (description.trim()) {
+      fullNote = `${fullNote}\nObs: ${description.trim()}`;
+    }
+
     if (!isCash) {
       fullNote = `${fullNote} [A Crédito ${creditDays} días / Por Pagar]`;
     }
@@ -147,7 +202,7 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
       const r = await createExpense({
         note: fullNote,
         category: category.trim() || "General",
-        amount,
+        amount: totalToUse,
         currency,
         accountId: isCash ? (selectedAccountId || undefined) : undefined,
         accountName: isCash && selectedAccount ? selectedAccount.name : undefined,
@@ -155,8 +210,10 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
       });
 
       if (r.ok) {
+        setProjectTitle("");
         setNote("");
         setDescription("");
+        setLines([{ id: Date.now(), description: "", qty: 1, unitPrice: 0 }]);
         setAmount(0);
         setReference("");
         setCreditDays(0);
@@ -324,59 +381,120 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
             </section>
           )}
 
-          {/* Fila 2: Concepto del Gasto (Recuadro idéntico a Nueva Factura) */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-foreground">
-                Descripción / Concepto del Gasto *
+          {/* Fila 2: Concepto General & Desglose Modular del Gasto */}
+          <div className="space-y-4">
+            {/* Concepto General */}
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-hint">
+                Concepto General del Gasto / Proyecto
               </label>
-              <span className="text-[10px] text-hint font-medium">Detalle del egreso o servicio</span>
+              <input
+                value={projectTitle}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                placeholder="Ej: Proyecto Oslo - Servidores e Infraestructura / Gastos Operativos de Oficina"
+                className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-sm font-medium outline-none focus:border-accent"
+                autoFocus
+              />
+              <p className="text-[11px] text-muted">
+                Título o concepto macro del egreso que encabezará el comprobante y los reportes.
+              </p>
             </div>
 
+            {/* Desglose Modular de Partidas */}
             <div className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-muted mb-1">
-                  Concepto / Detalle del Gasto *
-                </label>
-                <input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Escribe aquí el concepto o servicio (Ej: Combustible, Materiales de oficina, Servidor AWS...)"
-                  className="w-full rounded-xl border border-line bg-soft px-3.5 py-2.5 text-sm font-medium outline-none focus:border-accent focus:bg-card focus:ring-1 focus:ring-accent transition-all"
-                  autoFocus
-                />
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-hint">
+                    Desglose Modular / Partidas del Gasto
+                  </h4>
+                  <p className="text-[11px] text-muted">
+                    Detalla cada partida, insumo o servicio con su cantidad y costo unitario.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addLine}
+                  className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/20 transition-all"
+                >
+                  <PlusIcon className="h-3.5 w-3.5" />
+                  <span>+ Agregar Partida</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-muted">
-                    Monto {CURRENCIES[currency].symbol} *
-                  </label>
-                  <MoneyInput
-                    value={amount}
-                    onValueChange={setAmount}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border border-line bg-page px-3.5 py-2 text-sm outline-none focus:border-accent font-semibold"
-                  />
-                  {vesEquivalent !== null && amount > 0 && (
-                    <p className="text-[11px] text-muted font-mono mt-0.5">
-                      ≈ {formatCurrency(vesEquivalent, "VES")} (Tasa {rate})
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-muted">
-                    Detalle Adicional / Proveedor (Opcional)
-                  </label>
-                  <input
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Ej: Factura Nº 4920 de proveedor XYZ"
-                    className="w-full rounded-xl border border-line bg-page px-3.5 py-2 text-sm outline-none focus:border-accent"
-                  />
-                </div>
+              <div className="space-y-2.5">
+                {lines.map((l, idx) => (
+                  <div
+                    key={l.id}
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-line/60 bg-soft/20 p-2.5"
+                  >
+                    <div className="w-full sm:flex-1">
+                      <input
+                        value={l.description}
+                        onChange={(e) => updateLine(l.id, { description: e.target.value })}
+                        placeholder={`Partida o ítem #${idx + 1} (ej. Servidor EC2, Combustible, etc.)...`}
+                        className="w-full rounded-lg border border-line bg-card px-3 py-1.5 text-xs outline-none focus:border-accent"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="w-16">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Cant."
+                          value={l.qty}
+                          onChange={(e) => updateLine(l.id, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-xs font-mono text-center outline-none focus:border-accent"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <MoneyInput
+                          value={l.unitPrice}
+                          onValueChange={(v) => updateLine(l.id, { unitPrice: v })}
+                          placeholder="Precio"
+                          className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-xs font-mono text-right outline-none focus:border-accent"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeLine(l.id)}
+                        disabled={lines.length === 1}
+                        className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-hint hover:text-overdue hover:bg-overdue/10 disabled:opacity-30 transition-all"
+                        title="Eliminar partida"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {/* Total Calculado y Conversión */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-line/60">
+                <div className="text-xs text-muted">
+                  Total del Gasto:{" "}
+                  <strong className="font-mono text-accent text-sm ml-1">
+                    {formatCurrency(activeTotal, currency)}
+                  </strong>
+                </div>
+                {vesEquivalent !== null && activeTotal > 0 && (
+                  <p className="text-[11px] text-muted font-mono">
+                    ≈ {formatCurrency(vesEquivalent, "VES")} (Tasa {rate})
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Detalle Adicional / Proveedor */}
+            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm space-y-1">
+              <label className="block text-xs font-semibold text-muted">
+                Observaciones / Proveedor (Opcional)
+              </label>
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ej: Factura Nº 4920 / Proveedor Inversiones Caracas"
+                className="w-full rounded-xl border border-line bg-card px-3.5 py-2 text-xs outline-none focus:border-accent"
+              />
             </div>
           </div>
 

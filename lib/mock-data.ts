@@ -96,6 +96,10 @@ export interface Invoice {
   vesRate?: number | null;
   vesRateRef?: string | null;
   vesTotal?: number | null;
+  subtotal?: number;
+  discount?: number;
+  tax?: number;
+  items?: Array<{ id: string; description: string; qty: number; unitPrice: number }>;
 }
 
 export const invoices: Invoice[] = [

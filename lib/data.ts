@@ -82,6 +82,28 @@ export async function getInvoices(): Promise<Invoice[]> {
   let maxNum = 0;
   const processed: Invoice[] = [];
 
+  const invIds = rows.map((r: any) => r.id);
+  const itemsByInv = new Map<string, Array<{ id: string; description: string; qty: number; unitPrice: number }>>();
+
+  if (invIds.length > 0) {
+    try {
+      const { data: itemsData } = await supabase
+        .from("invoice_items")
+        .select("invoice_id, id, description, qty, unit_price")
+        .in("invoice_id", invIds);
+
+      (itemsData ?? []).forEach((it: any) => {
+        if (!itemsByInv.has(it.invoice_id)) itemsByInv.set(it.invoice_id, []);
+        itemsByInv.get(it.invoice_id)!.push({
+          id: it.id,
+          description: it.description,
+          qty: Number(it.qty) || 1,
+          unitPrice: Number(it.unit_price) || 0,
+        });
+      });
+    } catch {}
+  }
+
   for (const inv of rows) {
     let num = Number(inv.number);
     if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
@@ -94,10 +116,15 @@ export async function getInvoices(): Promise<Invoice[]> {
       if (num > maxNum) maxNum = num;
     }
 
+    const items = itemsByInv.get(inv.id) || [];
+    const notes = inv.notes || (items[0]?.description) || undefined;
+
     processed.push({
       ...inv,
       number: num,
       code: formatEntityCode(prefix, num, digits),
+      notes,
+      items,
     } as unknown as Invoice);
   }
 

@@ -21,6 +21,13 @@ import type { Payment } from "@/lib/data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
 import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
 
+interface EditLine {
+  id: string;
+  description: string;
+  qty: number;
+  unitPrice: number;
+}
+
 interface CobrosManagerProps {
   invoices: Invoice[];
   clients: Client[];
@@ -60,7 +67,9 @@ export function CobrosManager({
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [editClientId, setEditClientId] = useState("");
   const [editStatus, setEditStatus] = useState<InvoiceStatus>("pendiente");
+  const [editProjectTitle, setEditProjectTitle] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [editDate, setEditDate] = useState("");
   const [editBcvCurrency, setEditBcvCurrency] = useState<"USD" | "EUR">("USD");
   const [editVesRate, setEditVesRate] = useState<number | "">("");
@@ -144,7 +153,6 @@ export function CobrosManager({
     setEditingInvoice(inv);
     setEditClientId(inv.clientId);
     setEditStatus(inv.status as InvoiceStatus);
-    setEditNote(inv.notes || "");
     setEditDate(inv.date ? inv.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
     const isEur = ((inv as any).vesRateRef || "").includes("EUR") || inv.currency === "EUR";
@@ -153,6 +161,77 @@ export function CobrosManager({
     const defaultRate = inv.vesRate || (isEur ? bcv?.eur : bcv?.usd) || "";
     setEditVesRate(defaultRate);
     setEditError(null);
+
+    // Separar Concepto General del Proyecto de las notas / coordenadas
+    const rawNotes = inv.notes || "";
+    const cleanNotes = rawNotes
+      .replace(/\[\[.*?\]\]/g, "")
+      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+      .replace(/\[Cuenta:.*?\]/gi, "")
+      .trim();
+
+    const noteLines = cleanNotes ? cleanNotes.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+    let initialProjectTitle = "";
+    let initialExtraNotes = "";
+
+    if (noteLines.length > 0) {
+      initialProjectTitle = noteLines[0];
+      if (noteLines.length > 1) {
+        initialExtraNotes = noteLines.slice(1).join("\n");
+      }
+    }
+
+    setEditProjectTitle(initialProjectTitle);
+    setEditNote(initialExtraNotes);
+
+    // Cargar ítems existentes de la factura
+    const existingItems = inv.items;
+    if (existingItems && existingItems.length > 0) {
+      setEditLines(
+        existingItems.map((it, idx) => ({
+          id: it.id || `line_${idx}_${Date.now()}`,
+          description: (it.description || "").replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim(),
+          qty: Number(it.qty) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+        }))
+      );
+    } else {
+      setEditLines([
+        {
+          id: `line_1_${Date.now()}`,
+          description: "Módulo Principal",
+          qty: 1,
+          unitPrice: inv.total || 0,
+        },
+      ]);
+    }
+  }
+
+  function handleAddEditLine() {
+    setEditLines((prev) => [
+      ...prev,
+      {
+        id: `line_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        description: "",
+        qty: 1,
+        unitPrice: 0,
+      },
+    ]);
+  }
+
+  function handleRemoveEditLine(index: number) {
+    setEditLines((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  function handleUpdateEditLine(index: number, field: keyof EditLine, val: any) {
+    setEditLines((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      return updated;
+    });
   }
 
   function handleAccountSelect(accId: string) {
@@ -193,19 +272,35 @@ export function CobrosManager({
     if (!editingInvoice) return;
     setEditError(null);
 
+    const validLines = editLines
+      .filter((l) => l.description.trim() !== "")
+      .map((l) => ({
+        description: l.description.trim(),
+        qty: Number(l.qty) > 0 ? Number(l.qty) : 1,
+        unitPrice: Number(l.unitPrice) >= 0 ? Number(l.unitPrice) : 0,
+      }));
+
+    if (validLines.length === 0) {
+      setEditError("Debes incluir al menos un módulo o concepto de cobro con descripción.");
+      return;
+    }
+
+    const computedTotal = validLines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
     const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
-    const vesTotal = vesRateNum ? editingInvoice.total * vesRateNum : undefined;
+    const vesTotal = vesRateNum ? computedTotal * vesRateNum : undefined;
+    const combinedNotes = [editProjectTitle.trim(), editNote.trim()].filter(Boolean).join("\n\n");
 
     startTransition(async () => {
       const res = await updateInvoice({
         id: editingInvoice.id,
         clientId: editClientId,
-        note: editNote.trim() || undefined,
+        note: combinedNotes || undefined,
         status: editStatus,
         date: editDate || undefined,
         vesRate: vesRateNum,
         vesRateRef: editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD",
         vesTotal,
+        lines: validLines,
       });
 
       if (res.ok) {
@@ -667,15 +762,15 @@ export function CobrosManager({
 
       {/* Modal para Editar Factura */}
       {editingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 overflow-y-auto">
+          <div className="w-full max-w-xl rounded-2xl border border-line bg-card p-6 shadow-2xl space-y-4 my-8">
             <div className="flex items-start justify-between border-b border-line pb-3">
               <div>
                 <h3 className="font-serif text-lg font-bold text-foreground">
                   Editar Factura #{editingInvoice.number}
                 </h3>
                 <p className="text-xs text-hint mt-0.5">
-                  Modifica cliente, estado o notas de la factura
+                  Modifica cliente, concepto macro, desglose modular, estado y tasa
                 </p>
               </div>
               <button
@@ -694,44 +789,144 @@ export function CobrosManager({
             )}
 
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-muted font-medium mb-1">Cliente</label>
-                <select
-                  value={editClientId}
-                  onChange={(e) => setEditClientId(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.rif})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-muted font-medium mb-1">Cliente Destinatario</label>
+                  <select
+                    value={editClientId}
+                    onChange={(e) => setEditClientId(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  >
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.rif})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-muted font-medium mb-1">Estado de Factura</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as InvoiceStatus)}
+                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                  >
+                    <option value="pendiente">Pendiente (Por Cobrar)</option>
+                    <option value="parcial">Abono Parcial</option>
+                    <option value="pagada">Pagada (Cobrada 100%)</option>
+                    <option value="anulada">Anulada</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-muted font-medium mb-1">Estado</label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value as InvoiceStatus)}
+              {/* Concepto General del Proyecto */}
+              <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-1.5">
+                <label className="block text-xs font-bold text-foreground">
+                  Concepto General del Proyecto / Título Principal
+                </label>
+                <input
+                  type="text"
+                  value={editProjectTitle}
+                  onChange={(e) => setEditProjectTitle(e.target.value)}
+                  placeholder="Ej: Desarrollo de Sistema Web Oslo / Servicios Integrales"
                   className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  <option value="pendiente">Pendiente (Por Cobrar)</option>
-                  <option value="parcial">Abono Parcial</option>
-                  <option value="pagada">Pagada (Cobrada 100%)</option>
-                  <option value="anulada">Anulada</option>
-                </select>
+                />
+                <p className="text-[11px] text-muted">
+                  Título global que encabeza la factura y el PDF.
+                </p>
+              </div>
+
+              {/* Desglose Modular / Módulos de Facturación */}
+              <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-bold text-foreground">
+                      Desglose Modular / Módulos y Conceptos
+                    </label>
+                    <p className="text-[11px] text-muted">
+                      Agrega o edita cada módulo con su cantidad y precio.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddEditLine}
+                    className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/20 transition-all"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    <span>+ Agregar Módulo</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {editLines.map((line, idx) => (
+                    <div
+                      key={line.id}
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-line/70 bg-card p-2.5 shadow-xs"
+                    >
+                      <div className="w-full sm:flex-1">
+                        <input
+                          type="text"
+                          placeholder={`Módulo o concepto #${idx + 1}...`}
+                          value={line.description}
+                          onChange={(e) => handleUpdateEditLine(idx, "description", e.target.value)}
+                          className="w-full rounded-lg border border-line bg-soft/30 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="w-16">
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Cant."
+                            value={line.qty}
+                            onChange={(e) => handleUpdateEditLine(idx, "qty", Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-full rounded-lg border border-line bg-soft/30 px-2 py-1.5 text-xs text-foreground font-mono text-center focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Precio"
+                            value={line.unitPrice}
+                            onChange={(e) => handleUpdateEditLine(idx, "unitPrice", Math.max(0, parseFloat(e.target.value) || 0))}
+                            className="w-full rounded-lg border border-line bg-soft/30 px-2 py-1.5 text-xs text-foreground font-mono text-right focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditLine(idx)}
+                          disabled={editLines.length <= 1}
+                          className="p-1.5 text-hint hover:text-overdue hover:bg-overdue/10 rounded-lg disabled:opacity-30 transition-all"
+                          title="Eliminar módulo"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Subtotal calculado de los módulos */}
+                <div className="flex justify-between items-center pt-2 border-t border-line/60 text-xs">
+                  <span className="font-semibold text-muted">Total de Módulos Calculado:</span>
+                  <span className="font-mono font-bold text-accent text-sm">
+                    {formatMoney(editLines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0))}
+                  </span>
+                </div>
               </div>
 
               <div>
                 <label className="block text-muted font-medium mb-1">
-                  Notas / Términos
+                  Notas u Observaciones Adicionales
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={editNote}
                   onChange={(e) => setEditNote(e.target.value)}
-                  placeholder="Detalles de la factura..."
+                  placeholder="Detalles u observaciones complementarias..."
                   className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
@@ -783,7 +978,6 @@ export function CobrosManager({
                       onChange={(e) => {
                         const newDate = e.target.value;
                         setEditDate(newDate);
-                        // Al actualizar la fecha, toma automáticamente la tasa BCV de la moneda seleccionada
                         if (editBcvCurrency === "EUR" && bcv?.eur) {
                           setEditVesRate(bcv.eur);
                         } else if (bcv?.usd) {
@@ -821,9 +1015,9 @@ export function CobrosManager({
                         🔄 Hoy
                       </button>
                     </div>
-                    {editVesRate && typeof editVesRate === "number" && editingInvoice && (
+                    {editVesRate && typeof editVesRate === "number" && (
                       <p className="text-[11px] text-income font-medium mt-1">
-                        ≈ {(editingInvoice.total * editVesRate).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
+                        ≈ {(editLines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0) * editVesRate).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
                       </p>
                     )}
                   </div>
@@ -842,10 +1036,6 @@ export function CobrosManager({
                     🔄 Actualizar Fecha a Hoy y Tasa {editBcvCurrency} ({editBcvCurrency === "EUR" ? (bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV") : (bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV")})
                   </span>
                 </button>
-
-                <p className="text-[11px] text-hint">
-                  Puedes alternar entre Dólar ($) y Euro (€). Al cambiar la fecha o hacer clic en actualizar, el sistema toma la tasa oficial del BCV vigente para reflejar el total en bolívares en el PDF.
-                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 border-t border-line pt-4">
