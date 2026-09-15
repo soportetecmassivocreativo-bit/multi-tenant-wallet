@@ -255,6 +255,47 @@ export async function getProformas(): Promise<Proforma[]> {
     }
   } catch (err) {}
 
+  // Cargar items de todas las proformas para edición y detalle
+  try {
+    const profIds = Array.from(combinedMap.keys());
+    if (profIds.length > 0) {
+      const [pItemsRes, invItemsRes] = await Promise.all([
+        supabase.from("proforma_items").select("proforma_id, id, description, qty, unit_price").in("proforma_id", profIds),
+        supabase.from("invoice_items").select("invoice_id, id, description, qty, unit_price").in("invoice_id", profIds),
+      ]);
+
+      const itemsByParent = new Map<string, ProformaItem[]>();
+      (pItemsRes.data ?? []).forEach((it: any) => {
+        const parentId = it.proforma_id;
+        if (!itemsByParent.has(parentId)) itemsByParent.set(parentId, []);
+        itemsByParent.get(parentId)!.push({
+          id: it.id,
+          description: it.description,
+          qty: Number(it.qty) || 1,
+          unitPrice: Number(it.unit_price) || 0,
+        });
+      });
+
+      (invItemsRes.data ?? []).forEach((it: any) => {
+        const parentId = it.invoice_id;
+        if (!itemsByParent.has(parentId)) itemsByParent.set(parentId, []);
+        itemsByParent.get(parentId)!.push({
+          id: it.id,
+          description: it.description,
+          qty: Number(it.qty) || 1,
+          unitPrice: Number(it.unit_price) || 0,
+        });
+      });
+
+      for (const [id, prof] of combinedMap.entries()) {
+        const items = itemsByParent.get(id);
+        if (items && items.length > 0) {
+          (prof as any).items = items;
+        }
+      }
+    }
+  } catch (err) {}
+
   const list = Array.from(combinedMap.values());
   return list.sort((a, b) => Number(b.number) - Number(a.number));
 }

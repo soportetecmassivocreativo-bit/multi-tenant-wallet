@@ -830,7 +830,7 @@ export async function updateProforma(
     if (input.lines && input.lines.length > 0) {
       const result = computeInvoice({
         lines: input.lines,
-        taxRate: input.taxRate ?? 0.16,
+        taxRate: input.taxRate ?? 0,
         discountPct: (input.discountPct ?? 0) / 100,
         creditDays: input.validDays || 15,
         issueDateISO: input.date || today(),
@@ -880,6 +880,33 @@ export async function updateProforma(
         }
       }
 
+      if (input.lines && input.lines.length > 0) {
+        const result = computeInvoice({
+          lines: input.lines,
+          taxRate: input.taxRate ?? 0,
+          discountPct: (input.discountPct ?? 0) / 100,
+          creditDays: input.validDays || 15,
+          issueDateISO: input.date || today(),
+        });
+        invUpdateData.subtotal = result.subtotal;
+        invUpdateData.discount = result.discount;
+        invUpdateData.tax = result.tax;
+        invUpdateData.total = result.total;
+
+        try {
+          await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
+          await supabase.from("invoice_items").insert(
+            input.lines.map((l) => ({
+              company_id: companyId,
+              invoice_id: input.id,
+              description: l.description,
+              qty: l.qty,
+              unit_price: l.unitPrice,
+            }))
+          );
+        } catch {}
+      }
+
       // 1. Intentar actualizar tabla invoices con datos completos
       const { error: invErr } = await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
       if (invErr) {
@@ -888,11 +915,12 @@ export async function updateProforma(
         if (input.clientId) minimalData.client_id = input.clientId;
         if (input.date) minimalData.issue_date = input.date;
         if (input.vesRate) minimalData.ves_rate = input.vesRate;
+        if (invUpdateData.total !== undefined) minimalData.total = invUpdateData.total;
         await supabase.from("invoices").update(minimalData).eq("id", input.id);
       }
 
-      // 2. Si se editó la nota, actualizar la descripción del ítem en invoice_items
-      if (input.notes && input.notes.trim()) {
+      // 2. Si se editó la nota y no hubo líneas explícitas, actualizar la descripción del ítem en invoice_items
+      if (input.notes && input.notes.trim() && (!input.lines || input.lines.length === 0)) {
         try {
           const { data: items } = await supabase
             .from("invoice_items")

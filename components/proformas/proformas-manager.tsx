@@ -14,10 +14,18 @@ import {
   SearchIcon,
   PlusIcon,
   DownloadIcon,
+  TrashIcon,
 } from "@/components/ui/icons";
 import type { Proforma, Client } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
 import { getPaymentMethodsForAccount } from "@/lib/cuentas-helpers";
+
+interface EditLine {
+  id: string | number;
+  description: string;
+  qty: number;
+  unitPrice: number;
+}
 
 interface ProformasManagerProps {
   proformas: Proforma[];
@@ -59,6 +67,7 @@ export function ProformasManager({
   const [editDate, setEditDate] = useState("");
   const [editBcvCurrency, setEditBcvCurrency] = useState<"USD" | "EUR">("USD");
   const [editVesRate, setEditVesRate] = useState<number | "">("");
+  const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
 
   const [pending, startTransition] = useTransition();
@@ -131,6 +140,56 @@ export function ProformasManager({
     const defaultRate = p.vesRate || (isEur ? bcv?.eur : bcv?.usd) || "";
     setEditVesRate(defaultRate);
     setEditError(null);
+
+    // Cargar ítems existentes de la proforma
+    const existingItems = (p as any).items as Array<{ id: string; description: string; qty: number; unitPrice: number }> | undefined;
+    if (existingItems && existingItems.length > 0) {
+      setEditLines(
+        existingItems.map((it, idx) => ({
+          id: it.id || `line_${idx}_${Date.now()}`,
+          description: (it.description || "").replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim(),
+          qty: Number(it.qty) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+        }))
+      );
+    } else {
+      const cleanNoteDesc = (p.notes || "").replace(/\[\[.*?\]\]/g, "").replace(/\[Cuenta Prevista:.*?\]/gi, "").trim();
+      setEditLines([
+        {
+          id: `line_1_${Date.now()}`,
+          description: cleanNoteDesc || "Servicio / Cotización",
+          qty: 1,
+          unitPrice: p.total || 0,
+        },
+      ]);
+    }
+  }
+
+  function handleAddEditLine() {
+    setEditLines((prev) => [
+      ...prev,
+      {
+        id: `line_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        description: "",
+        qty: 1,
+        unitPrice: 0,
+      },
+    ]);
+  }
+
+  function handleRemoveEditLine(index: number) {
+    setEditLines((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  function handleUpdateEditLine(index: number, field: keyof EditLine, val: any) {
+    setEditLines((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      return updated;
+    });
   }
 
   function handleAccountSelect(accId: string) {
@@ -177,9 +236,23 @@ export function ProformasManager({
     if (!editingProforma) return;
     setEditError(null);
 
+    const validLines = editLines
+      .filter((l) => l.description.trim() !== "")
+      .map((l) => ({
+        description: l.description.trim(),
+        qty: Number(l.qty) > 0 ? Number(l.qty) : 1,
+        unitPrice: Number(l.unitPrice) >= 0 ? Number(l.unitPrice) : 0,
+      }));
+
+    if (validLines.length === 0) {
+      setEditError("Debes incluir al menos un concepto de cobro con descripción.");
+      return;
+    }
+
+    const computedTotal = validLines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
     const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
-    const vesTotal = vesRateNum ? editingProforma.total * vesRateNum : undefined;
+    const vesTotal = vesRateNum ? computedTotal * vesRateNum : undefined;
 
     startTransition(async () => {
       const res = await updateProforma({
@@ -192,6 +265,7 @@ export function ProformasManager({
         vesRate: vesRateNum,
         vesRateRef: editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD",
         vesTotal,
+        lines: validLines,
       });
 
       if (res.ok) {
@@ -555,213 +629,348 @@ export function ProformasManager({
       )}
 
       {/* Modal para Editar Proforma */}
-      {editingProforma && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between border-b border-line pb-3">
-              <div>
-                <h3 className="font-serif text-lg font-bold text-foreground">
-                  Editar Proforma #{editingProforma.number}
-                </h3>
-                <p className="text-xs text-hint mt-0.5">
-                  Modifica cliente, cuenta prevista o notas de la cotización
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingProforma(null)}
-                className="text-muted hover:text-foreground text-sm font-bold p-1"
-              >
-                ✕
-              </button>
-            </div>
+      {editingProforma && (() => {
+        const computedEditTotal = editLines.reduce(
+          (sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0),
+          0
+        );
+        const computedVesTotal =
+          typeof editVesRate === "number" && editVesRate > 0
+            ? computedEditTotal * editVesRate
+            : undefined;
 
-            {editError && (
-              <div className="rounded-xl border border-overdue/20 bg-overdue/10 p-3 text-xs font-medium text-overdue">
-                {editError}
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-muted font-medium mb-1">Cliente</label>
-                <select
-                  value={editClientId}
-                  onChange={(e) => setEditClientId(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.rif})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {accounts.length > 0 && (
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-line bg-card shadow-2xl overflow-hidden">
+              {/* Header Modal */}
+              <div className="flex items-start justify-between border-b border-line p-5 bg-soft/40">
                 <div>
-                  <label className="block text-muted font-medium mb-1">
-                    Cuenta Prevista para Recibir Fondos
-                  </label>
-                  <select
-                    value={editAccountId}
-                    onChange={(e) => setEditAccountId(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                  >
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
-                      </option>
-                    ))}
-                  </select>
+                  <h3 className="font-serif text-lg font-bold text-foreground flex items-center gap-2">
+                    <span>Editar Proforma #{editingProforma.number}</span>
+                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-accent/10 text-accent">
+                      {formatMoney(computedEditTotal, editingProforma.currency || "USD")}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-hint mt-0.5">
+                    Modifica cliente, cuenta prevista, conceptos de cobro o tasa de la cotización
+                  </p>
                 </div>
-              )}
-
-              <div>
-                <label className="block text-muted font-medium mb-1">
-                  Notas / Descripción
-                </label>
-                <textarea
-                  rows={3}
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Detalles de la cotización..."
-                  className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                />
+                <button
+                  type="button"
+                  onClick={() => setEditingProforma(null)}
+                  className="text-muted hover:text-foreground text-sm font-bold p-1 rounded-lg hover:bg-soft"
+                >
+                  ✕
+                </button>
               </div>
 
-              {/* Fecha y Tasa BCV */}
-              <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV de la Proforma</p>
-
-                  {/* Selector de Moneda de Referencia: USD ($) o EUR (€) */}
-                  <div className="flex items-center gap-1 p-0.5 bg-card rounded-xl border border-line w-fit">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditBcvCurrency("USD");
-                        if (bcv?.usd) setEditVesRate(bcv.usd);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                        editBcvCurrency === "USD"
-                          ? "bg-accent text-white shadow-xs"
-                          : "text-muted hover:text-foreground"
-                      }`}
-                    >
-                      💵 $ USD ({bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV"})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditBcvCurrency("EUR");
-                        if (bcv?.eur) setEditVesRate(bcv.eur);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                        editBcvCurrency === "EUR"
-                          ? "bg-accent text-white shadow-xs"
-                          : "text-muted hover:text-foreground"
-                      }`}
-                    >
-                      💶 € EUR ({bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV"})
-                    </button>
+              {/* Contenido Scrollable */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                {editError && (
+                  <div className="rounded-xl border border-overdue/20 bg-overdue/10 p-3 text-xs font-medium text-overdue">
+                    {editError}
                   </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <form id="edit-proforma-form" onSubmit={handleEditSubmit} className="space-y-4">
+                  {/* Cliente y Cuenta Prevista */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-muted font-medium mb-1">Cliente *</label>
+                      <select
+                        value={editClientId}
+                        onChange={(e) => setEditClientId(e.target.value)}
+                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        {clients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.rif ? `(${c.rif})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {accounts.length > 0 && (
+                      <div>
+                        <label className="block text-muted font-medium mb-1">
+                          Cuenta Prevista para Recibir Fondos
+                        </label>
+                        <select
+                          value={editAccountId}
+                          onChange={(e) => setEditAccountId(e.target.value)}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                        >
+                          {accounts.map((acc) => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} ({acc.bankName || acc.accountType}) · {acc.currency}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SECCIÓN CONCEPTOS DE COBRO / COTIZACIÓN */}
+                  <div className="rounded-xl border border-line bg-card p-3.5 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-line pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground text-xs">
+                          📦 Conceptos de Cobro y Presupuesto ({editLines.length})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddEditLine}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-accent hover:underline"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                        <span>Agregar Concepto</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {editLines.map((line, idx) => {
+                        const lineTotal = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0);
+                        return (
+                          <div
+                            key={line.id}
+                            className="rounded-xl border border-line/80 bg-soft/30 p-2.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+                          >
+                            <div className="flex-1">
+                              <label className="block text-[10px] text-muted mb-0.5">
+                                Descripción del Concepto / Cotización #{idx + 1}
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={line.description}
+                                onChange={(e) => handleUpdateEditLine(idx, "description", e.target.value)}
+                                placeholder="Ej. Desarrollo de Software, Diseño Web, etc."
+                                className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent font-medium"
+                              />
+                            </div>
+
+                            <div className="w-20">
+                              <label className="block text-[10px] text-muted mb-0.5">Cant.</label>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={line.qty}
+                                onChange={(e) => handleUpdateEditLine(idx, "qty", parseInt(e.target.value) || 1)}
+                                className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-center text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                              />
+                            </div>
+
+                            <div className="w-32">
+                              <label className="block text-[10px] text-muted mb-0.5">
+                                Precio Unit. ({editingProforma.currency || "USD"})
+                              </label>
+                              <MoneyInput
+                                value={line.unitPrice}
+                                onValueChange={(val) => handleUpdateEditLine(idx, "unitPrice", val)}
+                                className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-right text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                              />
+                            </div>
+
+                            <div className="w-28 text-right self-end sm:self-center pr-1">
+                              <span className="text-[10px] text-muted block sm:hidden">Total Ítem:</span>
+                              <span className="font-mono font-bold text-xs text-foreground">
+                                {formatMoney(lineTotal, editingProforma.currency || "USD")}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditLine(idx)}
+                              disabled={editLines.length <= 1}
+                              className="self-end sm:self-center p-1.5 rounded-lg text-hint hover:text-overdue hover:bg-overdue/10 disabled:opacity-30 transition-all"
+                              title="Eliminar concepto"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-2 border-t border-line gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddEditLine}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-soft transition-all shadow-xs"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5 text-accent" />
+                        <span>+ Agregar Otro Concepto</span>
+                      </button>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3 text-xs bg-soft/50 px-3 py-1.5 rounded-xl border border-line">
+                        <span className="text-muted font-medium">Total Proforma:</span>
+                        <span className="font-mono font-bold text-sm text-foreground">
+                          {formatMoney(computedEditTotal, editingProforma.currency || "USD")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notas / Observaciones */}
                   <div>
-                    <label className="block text-muted font-medium mb-1">Fecha de Emisión</label>
-                    <input
-                      type="date"
-                      value={editDate}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        setEditDate(newDate);
-                        // Al actualizar la fecha, toma automáticamente la tasa BCV de la moneda seleccionada
-                        if (editBcvCurrency === "EUR" && bcv?.eur) {
-                          setEditVesRate(bcv.eur);
-                        } else if (bcv?.usd) {
-                          setEditVesRate(bcv.usd);
-                        }
-                      }}
+                    <label className="block text-muted font-medium mb-1">
+                      Notas / Observaciones Adicionales
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Detalles adicionales, acuerdos de entrega o comentarios..."
                       className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-muted font-medium mb-1">
-                      Tasa BCV Referencial (Bs./{editBcvCurrency})
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder={editBcvCurrency === "EUR" ? (bcv?.eur ? bcv.eur.toFixed(2) : "Ej. 50.00") : (bcv?.usd ? bcv.usd.toFixed(2) : "Ej. 45.50")}
-                        value={editVesRate}
-                        onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
-                        className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
-                          if (rateToUse > 0) setEditVesRate(rateToUse);
-                          setEditDate(new Date().toISOString().slice(0, 10));
-                        }}
-                        className="rounded-xl border border-line bg-card px-2.5 py-2 text-[10px] font-semibold text-accent hover:bg-soft active:scale-95 transition-all whitespace-nowrap shadow-xs"
-                        title="Tomar fecha de hoy y tasa actual"
-                      >
-                        🔄 Hoy
-                      </button>
+                  {/* Fecha y Tasa BCV */}
+                  <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV de la Proforma</p>
+
+                      {/* Selector de Moneda de Referencia: USD ($) o EUR (€) */}
+                      <div className="flex items-center gap-1 p-0.5 bg-card rounded-xl border border-line w-fit">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditBcvCurrency("USD");
+                            if (bcv?.usd) setEditVesRate(bcv.usd);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                            editBcvCurrency === "USD"
+                              ? "bg-accent text-white shadow-xs"
+                              : "text-muted hover:text-foreground"
+                          }`}
+                        >
+                          💵 $ USD ({bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV"})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditBcvCurrency("EUR");
+                            if (bcv?.eur) setEditVesRate(bcv.eur);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                            editBcvCurrency === "EUR"
+                              ? "bg-accent text-white shadow-xs"
+                              : "text-muted hover:text-foreground"
+                          }`}
+                        >
+                          💶 € EUR ({bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV"})
+                        </button>
+                      </div>
                     </div>
-                    {editVesRate && typeof editVesRate === "number" && editingProforma && (
-                      <p className="text-[11px] text-income font-medium mt-1">
-                        ≈ {(editingProforma.total * editVesRate).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
-                      </p>
-                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-muted font-medium mb-1">Fecha de Emisión</label>
+                        <input
+                          type="date"
+                          value={editDate}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            setEditDate(newDate);
+                            if (editBcvCurrency === "EUR" && bcv?.eur) {
+                              setEditVesRate(bcv.eur);
+                            } else if (bcv?.usd) {
+                              setEditVesRate(bcv.usd);
+                            }
+                          }}
+                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-muted font-medium mb-1">
+                          Tasa BCV Referencial (Bs./{editBcvCurrency})
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={editBcvCurrency === "EUR" ? (bcv?.eur ? bcv.eur.toFixed(2) : "Ej. 50.00") : (bcv?.usd ? bcv.usd.toFixed(2) : "Ej. 45.50")}
+                            value={editVesRate}
+                            onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                            className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
+                              if (rateToUse > 0) setEditVesRate(rateToUse);
+                              setEditDate(new Date().toISOString().slice(0, 10));
+                            }}
+                            className="rounded-xl border border-line bg-card px-2.5 py-2 text-[10px] font-semibold text-accent hover:bg-soft active:scale-95 transition-all whitespace-nowrap shadow-xs"
+                            title="Tomar fecha de hoy y tasa actual"
+                          >
+                            🔄 Hoy
+                          </button>
+                        </div>
+                        {computedVesTotal !== undefined && (
+                          <p className="text-[11px] text-income font-medium mt-1">
+                            ≈ {computedVesTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditDate(new Date().toISOString().slice(0, 10));
+                        const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
+                        if (rateToUse > 0) setEditVesRate(rateToUse);
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 py-1.5 px-3 text-xs font-semibold text-accent hover:bg-accent/20 active:scale-95 transition-all"
+                    >
+                      <span>
+                        🔄 Actualizar Fecha a Hoy y Tasa {editBcvCurrency} ({editBcvCurrency === "EUR" ? (bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV") : (bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV")})
+                      </span>
+                    </button>
+
+                    <p className="text-[11px] text-hint">
+                      Puedes alternar entre Dólar ($) y Euro (€). Al cambiar la fecha o hacer clic en actualizar, el sistema toma la tasa oficial del BCV vigente para reflejar el total en bolívares en el PDF.
+                    </p>
                   </div>
+                </form>
+              </div>
+
+              {/* Footer Modal con Botones de Acción */}
+              <div className="flex items-center justify-between border-t border-line p-4 bg-soft/30">
+                <div className="text-xs">
+                  <span className="text-muted">Total Proforma: </span>
+                  <span className="font-mono font-bold text-foreground">
+                    {formatMoney(computedEditTotal, editingProforma.currency || "USD")}
+                  </span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditDate(new Date().toISOString().slice(0, 10));
-                    const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
-                    if (rateToUse > 0) setEditVesRate(rateToUse);
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 py-1.5 px-3 text-xs font-semibold text-accent hover:bg-accent/20 active:scale-95 transition-all"
-                >
-                  <span>
-                    🔄 Actualizar Fecha a Hoy y Tasa {editBcvCurrency} ({editBcvCurrency === "EUR" ? (bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV") : (bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV")})
-                  </span>
-                </button>
-
-                <p className="text-[11px] text-hint">
-                  Puedes alternar entre Dólar ($) y Euro (€). Al cambiar la fecha o hacer clic en actualizar, el sistema toma la tasa oficial del BCV vigente para reflejar el total en bolívares en el PDF.
-                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProforma(null)}
+                    className="rounded-xl border border-line px-4 py-2 font-medium text-muted hover:bg-soft transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    form="edit-proforma-form"
+                    disabled={pending || computedEditTotal <= 0}
+                    className="rounded-xl bg-accent px-5 py-2 font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    {pending ? "Guardando..." : "Guardar Cambios"}
+                  </button>
+                </div>
               </div>
-
-              <div className="flex items-center justify-end gap-2 border-t border-line pt-4">
-                <button
-                  type="button"
-                  onClick={() => setEditingProforma(null)}
-                  className="rounded-xl border border-line px-4 py-2 font-medium text-muted hover:bg-soft transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-xl bg-accent px-5 py-2 font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {pending ? "Guardando..." : "Guardar Cambios"}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
