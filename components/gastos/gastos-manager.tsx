@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, formatDate } from "@/lib/format";
 import { DeleteButton } from "@/components/ui/delete-button";
-import { deleteExpense, updateExpense } from "@/lib/mutations";
+import { deleteExpense, updateExpense, clearSettledExpenses } from "@/lib/mutations";
 import { exportExpenseVoucherPdf } from "@/lib/pdf-export";
 import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon, PlusIcon } from "@/components/ui/icons";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -317,6 +317,20 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
     });
   }
 
+  function handleClearSettled() {
+    if (!confirm("¿Deseas eliminar del historial los registros de gastos y abonos que ya fueron saldados? Esta acción no se puede deshacer.")) {
+      return;
+    }
+    startTransition(async () => {
+      const res = await clearSettledExpenses();
+      if (res.ok) {
+        router.refresh();
+      } else {
+        alert(res.error || "No se pudieron eliminar los gastos.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-4">
       {/* Barra de Búsqueda y Filtros de Categoría */}
@@ -365,8 +379,21 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
 
       {/* Lista del Historial de Gastos */}
       <div className="rounded-2xl border border-line bg-card overflow-hidden shadow-sm">
-        <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted">
-          <span>Historial de Gastos & Comprobantes ({filtered.length})</span>
+        <div className="bg-soft/60 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs font-medium text-muted flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span>Historial de Gastos & Comprobantes ({filtered.length})</span>
+            {admin && filtered.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearSettled}
+                disabled={pending}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-0.5 rounded-full transition-all active:scale-95 disabled:opacity-50"
+                title="Eliminar del historial los registros de gastos y abonos que ya fueron saldados"
+              >
+                🧹 Limpiar gastos saldados
+              </button>
+            )}
+          </div>
           <span>Monto & Acciones</span>
         </div>
 
