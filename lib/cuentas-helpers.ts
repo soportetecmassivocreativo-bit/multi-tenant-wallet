@@ -118,9 +118,14 @@ export function getExpenseBreakdown(e: { note?: string; amount: number }): Expen
 
 /**
  * Determina si un gasto debe excluirse de los totales de gastos corrientes / operativos.
- * Excluye:
- * 1. Pagos de Servicios Recurrentes (gestionados en su módulo y cargos especiales).
- * 2. Consumos, cargos o abonos de la Tarjeta de José Miguel (Gastos Especiales).
+ * 
+ * Reglas contables:
+ * - NO INCIDEN (Excluidos):
+ *   1. Servicios recurrentes (gestionados y mostrados en su módulo de Servicios).
+ *   2. Lo que se CARGA a la tarjeta de José Miguel (consumos / cargos diferidos).
+ * - SÍ INCIDEN (Incluidos en la suma):
+ *   1. Gastos directos y nómina.
+ *   2. Pagos y abonos reales a cargo de la Tarjeta de José Miguel (desembolso efectivo).
  */
 export function isExcludedFromExpenseTotals(e: {
   note?: string;
@@ -131,30 +136,53 @@ export function isExcludedFromExpenseTotals(e: {
   const note = (e.note || "").toLowerCase().trim();
   const cat = (e.category || "").toLowerCase().trim();
 
-  // 1. Tarjeta de José Miguel (cargos diferidos, abonos o pagos a la tarjeta)
-  const isCardJM =
-    src.startsWith("tarjeta_jm") ||
-    src === "tarjeta" ||
-    note.includes("tarjeta josé miguel") ||
-    note.includes("tarjeta jose miguel") ||
-    note.includes("tarjeta jm") ||
+  // 1. Pagos y Abonos a la Tarjeta de José Miguel: SÍ DEBEN INCIDIR (egreso real pagado)
+  const isCardPayment =
+    src === "tarjeta_jm_abono" ||
+    src === "tarjeta_jm_pago" ||
+    src === "tarjeta_jm" ||
+    cat === "abono a tarjeta" ||
+    cat.includes("abono") ||
+    note.includes("abono a la deuda") ||
     note.includes("abono a tarjeta") ||
-    cat.includes("abono a tarjeta") ||
+    note.includes("liquidación tarjeta") ||
+    note.includes("liquidacion tarjeta") ||
+    note.includes("pago a tarjeta") ||
+    note.includes("pago de tarjeta");
+
+  if (isCardPayment) {
+    return false; // NO excluir -> SÍ SUMA
+  }
+
+  // 2. Cargos y consumos cargados a la Tarjeta de José Miguel: NO DEBEN INCIDIR
+  const isCardCharge =
+    src === "tarjeta_jm_consumo" ||
+    src === "tarjeta" ||
+    note.includes("[tarjeta josé miguel]") ||
+    note.includes("[tarjeta jose miguel]") ||
+    note.includes("[tarjeta jm]") ||
+    note.includes("cargo en tarjeta") ||
+    note.includes("consumo tarjeta") ||
     cat.includes("tarjeta de crédito") ||
     cat.includes("tarjeta de credito") ||
-    cat.includes("gastos especiales");
+    cat === "gastos especiales";
 
-  if (isCardJM) return true;
+  if (isCardCharge) {
+    return true; // EXCLUIR -> NO SUMA
+  }
 
-  // 2. Servicios recurrentes
+  // 3. Servicios Recurrentes: NO DEBEN INCIDIR en la suma general
   const isService =
     src === "servicio" ||
     (note.startsWith("servicio ·") && !note.includes("nomina") && !note.includes("nómina")) ||
     note.includes("pago de servicio") ||
     cat === "servicios recurrentes";
 
-  if (isService) return true;
+  if (isService) {
+    return true; // EXCLUIR -> NO SUMA
+  }
 
+  // 4. Gastos directos y nómina: SÍ DEBEN INCIDIR
   return false;
 }
 

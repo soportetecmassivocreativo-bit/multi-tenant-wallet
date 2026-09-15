@@ -406,13 +406,26 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
                           Pagado
                         </span>
                       )}
-                      {isExcludedFromExpenseTotals(e) && (
+                      {isExcludedFromExpenseTotals(e) ? (
                         <span
                           className="rounded-full bg-warning/15 text-warning font-semibold px-2 py-0.5 text-[10px]"
-                          title="No suma en el total general de gastos (contabilizado en su módulo especial)"
+                          title="No suma en el total general de gastos (se gestiona en su sección correspondiente)"
                         >
-                          Especial / No suma
+                          {(e.source === "servicio" || (e.note || "").toLowerCase().startsWith("servicio ·"))
+                            ? "Servicio Recurrente · No suma"
+                            : "Cargo Tarjeta JM · No suma"}
                         </span>
+                      ) : (
+                        (e.source === "tarjeta_jm_abono" ||
+                          e.source === "tarjeta_jm" ||
+                          (e.category || "").toLowerCase().includes("abono")) && (
+                          <span
+                            className="rounded-full bg-purple-500/10 text-purple-600 font-semibold px-2 py-0.5 text-[10px]"
+                            title="Pago/Abono a la tarjeta de José Miguel (Suma en total de gastos)"
+                          >
+                            Abono Tarjeta JM · Suma
+                          </span>
+                        )
                       )}
                     </div>
                     <p className="text-[11px] text-hint mt-0.5">

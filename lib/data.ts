@@ -751,14 +751,16 @@ export async function getRecentMovements(limit = 8): Promise<Movement[]> {
       date: p.paidOn,
     };
   });
-  const gastos: Movement[] = expenses.map((e) => ({
-    id: `e_${e.id}`,
-    kind: "gasto",
-    title: e.note,
-    subtitle: e.category,
-    amount: -e.amount,
-    date: e.date,
-  }));
+  const gastos: Movement[] = expenses
+    .filter((e) => !isExcludedFromExpenseTotals(e))
+    .map((e) => ({
+      id: `e_${e.id}`,
+      kind: "gasto",
+      title: e.note,
+      subtitle: e.category,
+      amount: -e.amount,
+      date: e.date,
+    }));
 
   return [...cobros, ...gastos]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
