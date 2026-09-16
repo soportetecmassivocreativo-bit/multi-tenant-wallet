@@ -99,10 +99,12 @@ export default async function ProformaPrintPage({
             size: ${paperSize === "a4" ? "A4" : paperSize === "legal" ? "legal" : "letter"};
             margin: 0;
           }
-          body {
+          html, body {
             background-color: #ffffff !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           .no-print {
             display: none !important;
@@ -110,13 +112,24 @@ export default async function ProformaPrintPage({
           .proforma-sheet {
             box-shadow: none !important;
             border: none !important;
-            margin: 0 auto !important;
-            min-height: 100vh !important;
+            margin: 0 !important;
+            padding: 24px 32px !important;
             width: 100% !important;
             max-width: 100% !important;
             border-radius: 0 !important;
+            box-sizing: border-box !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+          .proforma-sheet:last-of-type {
+            page-break-after: auto !important;
+            break-after: auto !important;
           }
           .page-break {
             page-break-before: always !important;
@@ -139,10 +152,10 @@ export default async function ProformaPrintPage({
       </div>
 
       {/* HOJA 1: COTIZACIÓN, CONCEPTOS Y TOTALES */}
-      <div className="proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 min-h-[1050px] mb-8">
+      <div className="proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 min-h-[960px] mb-8">
         
         {/* CONTENIDO PRINCIPAL HOJA 1 */}
-        <div className="p-8 sm:p-10 space-y-6 flex-1 flex flex-col justify-between">
+        <div className="p-6 sm:p-8 space-y-4 flex-1 flex flex-col justify-between">
           
           <div className="space-y-6">
             {/* 1. ENCABEZADO: BLOQUE AZUL + TITULO PROFORMA */}
@@ -284,20 +297,13 @@ export default async function ProformaPrintPage({
 
                         return (
                           <tr key={item.id} className="text-neutral-800">
-                            <td className="py-3 pr-4 leading-relaxed">{cleanDescription || item.description}</td>
-                            <td className="py-3 px-2 text-center font-mono">{item.qty}</td>
-                            <td className="py-3 px-2 text-right font-mono">{formatCurrency(item.unitPrice, prof.currency)}</td>
-                            <td className="py-3 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, prof.currency)}</td>
+                            <td className="py-2.5 pr-4 leading-relaxed">{cleanDescription || item.description}</td>
+                            <td className="py-2.5 px-2 text-center font-mono">{item.qty}</td>
+                            <td className="py-2.5 px-2 text-right font-mono">{formatCurrency(item.unitPrice, prof.currency)}</td>
+                            <td className="py-2.5 pl-2 text-right font-mono font-semibold">{formatCurrency(item.qty * item.unitPrice, prof.currency)}</td>
                           </tr>
                         );
                       })
-                    )}
-                    {/* Líneas complementarias de relleno si hay pocos items */}
-                    {prof.items.length < 4 && (
-                      <>
-                        <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
-                        <tr className="border-b border-neutral-100 h-8"><td colSpan={4}></td></tr>
-                      </>
                     )}
                   </tbody>
                 </table>
@@ -307,7 +313,7 @@ export default async function ProformaPrintPage({
               {extraNotes && (
                 <div className="pt-2 text-xs space-y-1">
                   <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Notas / Observaciones:</p>
-                  <div className="whitespace-pre-line text-neutral-700 bg-neutral-50/80 p-3 rounded-xl border border-neutral-200/80 text-[11px] leading-relaxed">
+                  <div className="whitespace-pre-line text-neutral-700 bg-neutral-50/80 p-2.5 rounded-xl border border-neutral-200/80 text-[11px] leading-relaxed">
                     {extraNotes}
                   </div>
                 </div>
@@ -315,7 +321,7 @@ export default async function ProformaPrintPage({
             </div>
 
             {/* 6. RESUMEN DE TOTALES */}
-            <div className="pt-4 flex justify-end">
+            <div className="pt-3 flex justify-end">
               <div className="w-full sm:w-64 space-y-1.5 text-right text-xs">
                 <div className="flex justify-between items-center py-1 border-b border-neutral-200">
                   <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
@@ -351,7 +357,7 @@ export default async function ProformaPrintPage({
           </div>
 
           {/* Pie de Página Hoja 1 */}
-          <div className="pt-6 border-t border-neutral-200 flex items-center justify-between text-[10px] text-neutral-400">
+          <div className="pt-4 border-t border-neutral-200 flex items-center justify-between text-[10px] text-neutral-400">
             <span>{config.pdfProformaFooterText || "Massivo Corp · Proforma Oficial · Documento Preliminar"}</span>
             <span className="font-mono font-bold">
               {showConditions && hasAnyCondition ? "Página 1 de 2 · Continúa en Hoja 2 ➔" : "Página 1 de 1"}
@@ -364,9 +370,9 @@ export default async function ProformaPrintPage({
 
       {/* HOJA 2: CONDICIONES COMERCIALES Y DEL PROYECTO (SALTO DE PÁGINA) */}
       {showConditions && hasAnyCondition && (
-        <div className="page-break proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 min-h-[1050px]">
+        <div className="page-break proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 min-h-[960px]">
           
-          <div className="p-8 sm:p-10 space-y-6 flex-1 flex flex-col justify-between">
+          <div className="p-6 sm:p-8 space-y-4 flex-1 flex flex-col justify-between">
             
             {/* Header de Segunda Hoja */}
             <div className="space-y-5">
