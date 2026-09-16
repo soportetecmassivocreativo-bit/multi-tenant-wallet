@@ -395,7 +395,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     const { data, error } = await supabase
       .from("proformas")
       .select(
-        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, notes, invoiceId:invoice_id",
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, notes, invoiceId:invoice_id, targetAccountId:target_account_id, targetAccountName:target_account_name, hasConditions:has_conditions, conditions",
       )
       .eq("id", id)
       .maybeSingle();
@@ -515,6 +515,10 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     notes: extractedNote,
     items: cleanItems,
     invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
+    targetAccountId: (row.targetAccountId || (row as any).target_account_id) as string | undefined,
+    targetAccountName: (row.targetAccountName || (row as any).target_account_name) as string | undefined,
+    hasConditions: (row.hasConditions ?? (row as any).has_conditions) as boolean | undefined,
+    conditions: typeof row.conditions === "string" ? (() => { try { return JSON.parse(row.conditions as string); } catch { return undefined; } })() : (row.conditions as any) || undefined,
   };
 }
 

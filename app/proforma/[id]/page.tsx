@@ -75,6 +75,17 @@ export default async function ProformaPrintPage({
   const generalProjectConcept = parsedNotes.title;
   const extraNotes = parsedNotes.notes;
 
+  const showConditions = prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
+  const conditions = {
+    payment: prof.conditions?.payment || config.pdfProformaConditionsPayment || "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente.",
+    delivery: prof.conditions?.delivery || config.pdfProformaConditionsDelivery || "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente.",
+    ip: prof.conditions?.ip || config.pdfProformaConditionsIP || "La propiedad intelectual de todos los elementos del proyecto, incluyendo el código fuente, el diseño gráfico, los contenidos y la marca, corresponderá al cliente.",
+    confidentiality: prof.conditions?.confidentiality || config.pdfProformaConditionsConfidentiality || "Todas las partes se comprometen a mantener la confidencialidad de toda la información relacionada con el proyecto.",
+  };
+  const hasAnyCondition = Boolean(
+    conditions.payment || conditions.delivery || conditions.ip || conditions.confidentiality
+  );
+
   const paperSize = config.pdfProformaPaperSize || "letter";
   const showRif = config.pdfProformaShowRif ?? false;
 
@@ -295,7 +306,7 @@ export default async function ProformaPrintPage({
           </div>
 
           {/* 6. RESUMEN DE TOTALES */}
-          <div className="pt-8 flex justify-end">
+          <div className="pt-6 flex justify-end">
             <div className="w-full sm:w-64 space-y-1.5 text-right text-xs">
               <div className="flex justify-between items-center py-1 border-b border-neutral-200">
                 <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
@@ -328,6 +339,58 @@ export default async function ProformaPrintPage({
               )}
             </div>
           </div>
+
+          {/* 7. CONDICIONES DEL PROYECTO */}
+          {showConditions && hasAnyCondition && (
+            <div className="pt-4 text-xs">
+              <div className="rounded-xl bg-neutral-50/90 border border-neutral-200/90 p-4 space-y-2.5 text-neutral-800">
+                <p className="font-bold text-neutral-900 uppercase tracking-wider text-[11px] border-b border-neutral-200 pb-1">
+                  Condiciones del Proyecto
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {conditions.payment && (
+                    <div className="space-y-0.5">
+                      <p className="text-neutral-900 font-bold text-[11px]">Forma de Pago:</p>
+                      <p className="text-neutral-700 leading-relaxed text-[11px]">{conditions.payment}</p>
+                    </div>
+                  )}
+                  {conditions.delivery && (
+                    <div className="space-y-0.5">
+                      <p className="text-neutral-900 font-bold text-[11px]">Tiempo de Entrega:</p>
+                      <p className="text-neutral-700 leading-relaxed text-[11px]">{conditions.delivery}</p>
+                    </div>
+                  )}
+                  {conditions.ip && (
+                    <div className="space-y-0.5">
+                      <p className="text-neutral-900 font-bold text-[11px]">Propiedad Intelectual:</p>
+                      <p className="text-neutral-700 leading-relaxed text-[11px]">{conditions.ip}</p>
+                    </div>
+                  )}
+                  {conditions.confidentiality && (
+                    <div className="space-y-0.5">
+                      <p className="text-neutral-900 font-bold text-[11px]">Confidencialidad:</p>
+                      <p className="text-neutral-700 leading-relaxed text-[11px]">{conditions.confidentiality}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 8. TÉRMINOS & CONDICIONES GENERALES */}
+          {config.pdfProformaTermsAndConditions && !showConditions && (
+            <div className="pt-3 text-[10px] text-neutral-500 border-t border-neutral-200">
+              <p className="font-bold uppercase tracking-wider text-neutral-700 text-[10px]">Términos & Condiciones:</p>
+              <p className="mt-0.5 leading-relaxed">{config.pdfProformaTermsAndConditions}</p>
+            </div>
+          )}
+
+          {/* 9. MENSAJE FINAL */}
+          {config.pdfProformaFooterText && (
+            <div className="pt-2 text-center text-[10px] text-neutral-400">
+              {config.pdfProformaFooterText}
+            </div>
+          )}
 
         </div>
 

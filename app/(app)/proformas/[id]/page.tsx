@@ -9,6 +9,8 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
 import { getProformaDetail, isAdmin } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
+import { getSystemConfig } from "@/lib/config-actions";
+import { DEFAULT_SYSTEM_CONFIG } from "@/lib/config";
 import { ProformasManager } from "@/components/proformas/proformas-manager";
 
 export default async function ProformaDetailPage({
@@ -17,10 +19,11 @@ export default async function ProformaDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [prof, admin, accounts] = await Promise.all([
+  const [prof, admin, accounts, config] = await Promise.all([
     getProformaDetail(id),
     isAdmin(),
     getCompanyAccounts(),
+    getSystemConfig(),
   ]);
   if (!prof) notFound();
 
@@ -30,6 +33,17 @@ export default async function ProformaDetailPage({
   const parsedNotes = cleanConceptAndNotes(prof.notes);
   const generalProjectConcept = parsedNotes.title;
   const extraNotes = parsedNotes.notes;
+
+  const showConditions = prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
+  const conditions = {
+    payment: prof.conditions?.payment || config.pdfProformaConditionsPayment || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsPayment,
+    delivery: prof.conditions?.delivery || config.pdfProformaConditionsDelivery || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsDelivery,
+    ip: prof.conditions?.ip || config.pdfProformaConditionsIP || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsIP,
+    confidentiality: prof.conditions?.confidentiality || config.pdfProformaConditionsConfidentiality || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsConfidentiality,
+  };
+  const hasAnyCondition = Boolean(
+    conditions.payment || conditions.delivery || conditions.ip || conditions.confidentiality
+  );
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -143,9 +157,43 @@ export default async function ProformaDetailPage({
         </div>
 
         {extraNotes && (
-          <div className="mt-4 rounded-xl bg-soft/40 p-3 border border-line/60">
-            <p className="text-[11px] font-bold text-muted uppercase">Condiciones & Notas:</p>
+          <div className="mt-4 rounded-xl bg-soft/40 p-3.5 border border-line/60">
+            <p className="text-[11px] font-bold text-muted uppercase">Notas / Observaciones:</p>
             <p className="text-xs text-foreground mt-1 whitespace-pre-line">{extraNotes}</p>
+          </div>
+        )}
+
+        {showConditions && hasAnyCondition && (
+          <div className="mt-4 rounded-xl bg-soft/30 p-4 border border-line/70 space-y-3">
+            <p className="text-[11px] font-bold text-foreground uppercase tracking-wider border-b border-line/40 pb-1.5">
+              Condiciones del Proyecto
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              {conditions.payment && (
+                <div>
+                  <span className="font-semibold text-foreground text-[11px] block">Forma de Pago:</span>
+                  <span className="text-muted leading-relaxed text-[11px]">{conditions.payment}</span>
+                </div>
+              )}
+              {conditions.delivery && (
+                <div>
+                  <span className="font-semibold text-foreground text-[11px] block">Tiempo de Entrega:</span>
+                  <span className="text-muted leading-relaxed text-[11px]">{conditions.delivery}</span>
+                </div>
+              )}
+              {conditions.ip && (
+                <div>
+                  <span className="font-semibold text-foreground text-[11px] block">Propiedad Intelectual:</span>
+                  <span className="text-muted leading-relaxed text-[11px]">{conditions.ip}</span>
+                </div>
+              )}
+              {conditions.confidentiality && (
+                <div>
+                  <span className="font-semibold text-foreground text-[11px] block">Confidencialidad:</span>
+                  <span className="text-muted leading-relaxed text-[11px]">{conditions.confidentiality}</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </section>
