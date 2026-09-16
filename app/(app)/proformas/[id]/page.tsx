@@ -34,7 +34,9 @@ export default async function ProformaDetailPage({
   const generalProjectConcept = parsedNotes.title;
   const extraNotes = parsedNotes.notes;
 
-  const showConditions = prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
+  const profNum = Number(prof.number);
+  const isEligibleForConditions = !isNaN(profNum) ? profNum >= 14 : true;
+  const showConditions = isEligibleForConditions && prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
   const conditions = {
     payment: prof.conditions?.payment || config.pdfProformaConditionsPayment || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsPayment,
     delivery: prof.conditions?.delivery || config.pdfProformaConditionsDelivery || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsDelivery,

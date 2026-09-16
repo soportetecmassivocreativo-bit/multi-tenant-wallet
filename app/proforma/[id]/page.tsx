@@ -75,7 +75,9 @@ export default async function ProformaPrintPage({
   const generalProjectConcept = parsedNotes.title;
   const extraNotes = parsedNotes.notes;
 
-  const showConditions = prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
+  const profNum = Number(prof.number);
+  const isEligibleForConditions = !isNaN(profNum) ? profNum >= 14 : true;
+  const showConditions = isEligibleForConditions && prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
   const conditions = {
     payment: prof.conditions?.payment || config.pdfProformaConditionsPayment || "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente.",
     delivery: prof.conditions?.delivery || config.pdfProformaConditionsDelivery || "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente.",
@@ -469,27 +471,10 @@ export default async function ProformaPrintPage({
               )}
             </div>
 
-            {/* Firmas de Conformidad y Pie de Página */}
-            <div className="pt-6 space-y-6">
-              <div className="grid grid-cols-2 gap-12 pt-6">
-                <div className="text-center space-y-1">
-                  <div className="border-b-2 border-neutral-400 w-4/5 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-neutral-900 uppercase tracking-wider">Por Massivo Creativo C.A.</p>
-                  <p className="text-[10px] text-neutral-500">Emisor Autorizado</p>
-                </div>
-
-                <div className="text-center space-y-1">
-                  <div className="border-b-2 border-neutral-400 w-4/5 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-neutral-900 uppercase tracking-wider">Aceptado y Conforme</p>
-                  <p className="text-[10px] text-neutral-500">Firma del Cliente</p>
-                </div>
-              </div>
-
-              {/* Pie de página Hoja 2 */}
-              <div className="pt-4 border-t border-neutral-200 flex items-center justify-between text-[10px] text-neutral-400">
-                <span>{config.pdfProformaFooterText || "Massivo Corp · Proforma Oficial · Documento Preliminar"}</span>
-                <span className="font-mono font-bold">Página 2 de 2</span>
-              </div>
+            {/* Pie de página Hoja 2 */}
+            <div className="pt-6 border-t border-neutral-200 flex items-center justify-between text-[10px] text-neutral-400">
+              <span>{config.pdfProformaFooterText || "Massivo Corp · Proforma Oficial · Documento Preliminar"}</span>
+              <span className="font-mono font-bold">Página 2 de 2</span>
             </div>
 
           </div>
