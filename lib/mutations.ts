@@ -66,12 +66,12 @@ export async function getNextCorrelativeNumber(supabase: any, companyId: string)
     const { data: invRows } = await supabase
       .from("invoices")
       .select("number")
-      .eq("company_id", companyId)
-      .order("number", { ascending: false })
-      .limit(1);
+      .eq("company_id", companyId);
     if (invRows && invRows.length > 0) {
-      const n = Number(invRows[0].number);
-      if (!isNaN(n) && n > maxNum) maxNum = n;
+      invRows.forEach((r: any) => {
+        const n = Number(r.number);
+        if (!isNaN(n) && n > maxNum) maxNum = n;
+      });
     }
   } catch {}
 
@@ -79,24 +79,12 @@ export async function getNextCorrelativeNumber(supabase: any, companyId: string)
     const { data: profRows } = await supabase
       .from("proformas")
       .select("number")
-      .eq("company_id", companyId)
-      .order("number", { ascending: false })
-      .limit(1);
+      .eq("company_id", companyId);
     if (profRows && profRows.length > 0) {
-      const n = Number(profRows[0].number);
-      if (!isNaN(n) && n > maxNum) maxNum = n;
-    }
-  } catch {}
-
-  try {
-    const { data: company } = await supabase
-      .from("companies")
-      .select("next_invoice_number")
-      .eq("id", companyId)
-      .single();
-    if (company?.next_invoice_number) {
-      const n = Number(company.next_invoice_number);
-      if (!isNaN(n) && n - 1 > maxNum) maxNum = n - 1;
+      profRows.forEach((r: any) => {
+        const n = Number(r.number);
+        if (!isNaN(n) && n > maxNum) maxNum = n;
+      });
     }
   } catch {}
 
@@ -1306,14 +1294,32 @@ export async function deleteProforma(id: string): Promise<MutationResult> {
   if (!ctx) return { ok: false, error: "No autenticado." };
 
   try {
+    await ctx.supabase.from("proforma_items").delete().eq("proforma_id", id);
+  } catch (err) {}
+
+  try {
+    await ctx.supabase.from("invoice_items").delete().eq("invoice_id", id);
+  } catch (err) {}
+
+  try {
     await ctx.supabase.from("proformas").delete().eq("id", id);
   } catch (err) {}
-  // También intentar por si estaba en invoices
+
   try {
     await ctx.supabase.from("invoices").delete().eq("id", id).eq("status", "pendiente");
   } catch (err) {}
 
+  // Recalcular correlativo actual y sincronizar la empresa
+  try {
+    const nextNum = await getNextCorrelativeNumber(ctx.supabase, ctx.companyId);
+    await ctx.supabase
+      .from("companies")
+      .update({ next_invoice_number: nextNum })
+      .eq("id", ctx.companyId);
+  } catch (err) {}
+
   revalidatePath("/proformas");
+  revalidatePath("/cobros");
   revalidatePath("/dashboard");
   return { ok: true };
 }
