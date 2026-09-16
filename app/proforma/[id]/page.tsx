@@ -97,7 +97,7 @@ export default async function ProformaPrintPage({
         @media print {
           @page {
             size: ${paperSize === "a4" ? "A4" : paperSize === "legal" ? "legal" : "letter"};
-            margin: 0;
+            margin: 8mm 12mm 8mm 12mm !important;
           }
           *, *::before, *::after {
             box-sizing: border-box !important;
@@ -110,7 +110,6 @@ export default async function ProformaPrintPage({
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
-            height: 100% !important;
           }
           .proforma-print-wrapper {
             background: #ffffff !important;
@@ -126,14 +125,14 @@ export default async function ProformaPrintPage({
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            padding: 24px 32px 18px 32px !important;
+            padding: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
             border-radius: 0 !important;
             box-sizing: border-box !important;
-            height: 100vh !important;
-            min-height: 100vh !important;
-            max-height: 100vh !important;
+            height: ${paperSize === "a4" ? "280mm" : paperSize === "legal" ? "338mm" : "262mm"} !important;
+            min-height: ${paperSize === "a4" ? "280mm" : paperSize === "legal" ? "338mm" : "262mm"} !important;
+            max-height: ${paperSize === "a4" ? "280mm" : paperSize === "legal" ? "338mm" : "262mm"} !important;
             display: flex !important;
             flex-direction: column !important;
             justify-content: space-between !important;
