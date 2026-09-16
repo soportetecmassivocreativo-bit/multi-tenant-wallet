@@ -76,8 +76,8 @@ export default async function ProformaPrintPage({
   const extraNotes = parsedNotes.notes;
 
   const profNum = Number(prof.number);
-  const isEligibleForConditions = !isNaN(profNum) ? profNum >= 14 : true;
-  const showConditions = isEligibleForConditions && prof.hasConditions !== false && (config.pdfProformaShowConditions ?? true);
+  const isEligibleForConditions = !isNaN(profNum) ? profNum >= 14 : false;
+  const showConditions = isEligibleForConditions && (prof.hasConditions === true || (profNum === 14 && prof.hasConditions !== false));
   const conditions = {
     payment: prof.conditions?.payment || config.pdfProformaConditionsPayment || "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente.",
     delivery: prof.conditions?.delivery || config.pdfProformaConditionsDelivery || "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente.",
