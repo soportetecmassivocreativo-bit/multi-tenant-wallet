@@ -97,7 +97,7 @@ export default async function ProformaPrintPage({
         @media print {
           @page {
             size: ${paperSize === "a4" ? "A4" : paperSize === "legal" ? "legal" : "letter"};
-            margin: 8mm 10mm !important;
+            margin: 0;
           }
           *, *::before, *::after {
             box-sizing: border-box !important;
@@ -110,7 +110,7 @@ export default async function ProformaPrintPage({
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
-            height: auto !important;
+            height: 100% !important;
           }
           .proforma-print-wrapper {
             background: #ffffff !important;
@@ -126,17 +126,29 @@ export default async function ProformaPrintPage({
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 24px 32px 18px 32px !important;
             width: 100% !important;
             max-width: 100% !important;
             border-radius: 0 !important;
             box-sizing: border-box !important;
-            min-height: 0 !important;
-            height: auto !important;
+            height: 100vh !important;
+            min-height: 100vh !important;
+            max-height: 100vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            overflow: hidden !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: always !important;
             break-after: page !important;
+          }
+          .proforma-sheet > div {
+            padding: 0 !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
           }
           .proforma-sheet:last-of-type {
             page-break-after: auto !important;
