@@ -108,13 +108,6 @@ export async function getInvoices(): Promise<Invoice[]> {
   for (const inv of rows) {
     let num = Number(inv.number);
 
-    // Si coincide con la proforma/factura 15 que el usuario solicitó eliminar, limpiarla
-    if (num === 15 || inv.total === 16000) {
-      supabase.from("invoice_items").delete().eq("invoice_id", inv.id).then(() => {});
-      supabase.from("invoices").delete().eq("id", inv.id).then(() => {});
-      continue;
-    }
-
     if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
       maxNum++;
       num = maxNum;
@@ -239,12 +232,6 @@ export async function getProformas(): Promise<Proforma[]> {
       for (const inv of invData) {
         let num = Number(inv.number);
 
-        if (num === 15 || inv.total === 16000) {
-          supabase.from("invoice_items").delete().eq("invoice_id", inv.id).then(() => {});
-          supabase.from("invoices").delete().eq("id", inv.id).then(() => {});
-          continue;
-        }
-
         if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
           maxNum++;
           num = maxNum;
@@ -294,12 +281,6 @@ export async function getProformas(): Promise<Proforma[]> {
     if (!error && profData && profData.length > 0) {
       for (const p of profData) {
         let num = Number(p.number);
-
-        if (num === 15 || p.total === 16000) {
-          supabase.from("proforma_items").delete().eq("proforma_id", p.id).then(() => {});
-          supabase.from("proformas").delete().eq("id", p.id).then(() => {});
-          continue;
-        }
 
         if (isNaN(num) || num <= 0 || seenNumbers.has(num)) {
           maxNum++;
