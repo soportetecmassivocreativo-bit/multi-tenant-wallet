@@ -91,10 +91,10 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
   );
   const activeTotal = computedTotal > 0 ? computedTotal : amount;
   const hasValidLines = lines.some(
-    (l) => l.description.trim().length > 0 && (Number(l.unitPrice) > 0 || Number(l.qty) > 0)
+    (l) => l.description.trim().length > 0
   );
   const hasConcept = Boolean(projectTitle.trim() || hasValidLines || note.trim());
-  const isSubmitDisabled = activeTotal <= 0 || !hasConcept || pending;
+  const isSubmitDisabled = !hasConcept || pending;
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const isCash = creditDays === 0;
