@@ -61,33 +61,56 @@ export default async function ProformaPrintPage({
   const website = "www.massivocreativo.com";
 
   const targetAccountId = prof.targetAccountId || config.pdfProformaTargetAccountId;
-  const targetAccount =
-    accounts.find((a) => a.id === targetAccountId) ||
-    (prof.targetAccountName ? accounts.find((a) => a.name.toLowerCase().includes(prof.targetAccountName!.toLowerCase())) : null) ||
-    accounts.find((a) => a.isDefault && a.currency === (prof.currency === "VES" ? "VES" : "USD")) ||
-    accounts.find((a) => a.accountNumber && !a.accountNumber.includes("0000-00")) ||
-    accounts[0];
+  let targetAccount = targetAccountId ? accounts.find((a) => a.id === targetAccountId) : null;
 
+  if (!targetAccount && prof.targetAccountName) {
+    targetAccount = accounts.find((a) => a.name.toLowerCase().includes(prof.targetAccountName!.toLowerCase())) || null;
+  }
+
+  // Priorizar siempre cuenta bancaria con número de cuenta para las Coordenadas Bancarias
+  if (!targetAccount || !targetAccount.accountNumber || targetAccount.accountType === "efectivo" || targetAccount.accountType === "zelle") {
+    const bankAccount =
+      accounts.find((a) => a.accountNumber && a.accountNumber.startsWith("0134")) ||
+      accounts.find((a) => (a.accountType === "banco_nacional" || a.accountType === "banco_internacional") && a.accountNumber) ||
+      accounts.find((a) => a.id === "cta-1") ||
+      accounts[0];
+    if (bankAccount) {
+      targetAccount = bankAccount;
+    }
+  }
+
+  const rawHolder = targetAccount?.holderName?.trim();
   const targetHolder =
-    (targetAccount?.holderName && !targetAccount.holderName.includes("0000"))
-      ? targetAccount.holderName
+    (rawHolder &&
+     !rawHolder.includes("0000") &&
+     rawHolder.toLowerCase() !== "massivo creativo" &&
+     rawHolder.toLowerCase() !== "massivo creativo c.a." &&
+     rawHolder.toLowerCase() !== "massivo corp" &&
+     rawHolder.toLowerCase() !== "custodio de caja principal")
+      ? rawHolder
       : "MIRIANNYS GUTIERREZ";
 
+  const rawBank = targetAccount?.bankName?.trim();
   const targetBank =
-    (targetAccount?.bankName && !targetAccount.bankName.includes("0000"))
-      ? targetAccount.bankName
+    (rawBank && !rawBank.includes("0000") && rawBank.toLowerCase() !== "efectivo")
+      ? rawBank
       : "Banesco Banco Universal (0134)";
 
+  const rawNumber = targetAccount?.accountNumber?.trim();
   const targetNumber =
-    (targetAccount?.accountNumber && !targetAccount.accountNumber.includes("0000-00-0000000000"))
-      ? targetAccount.accountNumber
+    (rawNumber &&
+     !rawNumber.includes("0000-00-0000000000") &&
+     !rawNumber.includes("Sample") &&
+     rawNumber.length > 5)
+      ? rawNumber
       : (targetAccount?.phone && !targetAccount.phone.includes("0000000"))
         ? targetAccount.phone
         : "0134-0205-10-2053028252";
 
+  const rawId = targetAccount?.holderId?.trim();
   const targetId =
-    (targetAccount?.holderId && !targetAccount.holderId.includes("0000000"))
-      ? targetAccount.holderId
+    (rawId && !rawId.includes("0000000") && rawId !== "J-50000000-0" && rawId !== "J-00000000-0")
+      ? rawId
       : (targetAccount as any)?.idNumber || (targetAccount as any)?.taxId || "V-17102452";
 
   const rateRefLabel = (prof.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
@@ -198,7 +221,7 @@ export default async function ProformaPrintPage({
       </div>
 
       {/* HOJA 1: COTIZACIÓN, CONCEPTOS Y TOTALES */}
-      <div className="proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 p-6 sm:p-7 min-h-[900px] mb-8">
+      <div className="proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 p-4 sm:p-7 min-h-[900px] mb-8">
         
         {/* 1. CUERPO HOJA 1 */}
         <div className="space-y-3.5 flex-1 flex flex-col justify-start">
@@ -367,33 +390,33 @@ export default async function ProformaPrintPage({
 
           {/* 6. RESUMEN DE TOTALES */}
           <div className="pt-2 flex justify-end">
-            <div className="w-full sm:w-60 space-y-1 text-right text-[11px]">
+            <div className="w-full sm:w-80 space-y-1 text-right text-[11px]">
               <div className="flex justify-between items-center py-0.5 border-b border-neutral-200">
                 <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
-                <span className="font-mono font-bold text-neutral-900">
+                <span className="font-mono font-bold text-neutral-900 whitespace-nowrap">
                   {formatCurrency(prof.paidAmount || 0, prof.currency)}
                 </span>
               </div>
               
               <div className="flex justify-between items-center py-1 border-b-2 border-neutral-900">
                 <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL</span>
-                <span className="font-mono font-black text-neutral-900 text-sm">
+                <span className="font-mono font-black text-neutral-900 text-sm whitespace-nowrap">
                   {formatCurrency(prof.total, prof.currency)}
                 </span>
               </div>
 
               {isForeign && (
-                <div className="flex justify-between items-center py-1 border-b border-neutral-300">
-                  <div className="flex flex-col text-left">
+                <div className="flex justify-between items-center py-1 border-b border-neutral-300 gap-2">
+                  <div className="flex flex-col text-left shrink-0">
                     <span className="font-black text-neutral-900 text-[11px] uppercase tracking-wider">TOTAL BS</span>
                     {currentRate > 0 && (
-                      <span className="text-[9.5px] text-neutral-500 font-mono">
+                      <span className="text-[9.5px] text-neutral-500 font-mono whitespace-nowrap">
                         Tasa {prof.vesRateRef || "BCV"}: {currentRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Bs.
                       </span>
                     )}
                   </div>
-                  <span className="font-mono font-black text-neutral-900 text-xs">
-                    {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                  <span className="font-mono font-black text-neutral-900 text-xs whitespace-nowrap shrink-0 text-right">
+                    {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;Bs.
                   </span>
                 </div>
               )}
@@ -413,7 +436,7 @@ export default async function ProformaPrintPage({
 
       {/* HOJA 2: CONDICIONES COMERCIALES Y DEL PROYECTO (SALTO DE PÁGINA) */}
       {showConditions && hasAnyCondition && (
-        <div className="page-break proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 p-6 sm:p-7 min-h-[900px]">
+        <div className="page-break proforma-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 p-4 sm:p-7 min-h-[900px]">
           
           {/* 1. CUERPO HOJA 2 */}
           <div className="space-y-3.5 flex-1 flex flex-col justify-start">

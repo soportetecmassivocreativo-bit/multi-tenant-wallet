@@ -50,33 +50,56 @@ export default async function FacturaPage({
   const website = "www.massivocreativo.com";
 
   const targetAccountId = inv.targetAccountId || config.pdfInvoiceTargetAccountId;
-  const targetAccount =
-    accounts.find((a) => a.id === targetAccountId) ||
-    (inv.targetAccountName ? accounts.find((a) => a.name.toLowerCase().includes(inv.targetAccountName!.toLowerCase())) : null) ||
-    accounts.find((a) => a.isDefault && a.currency === (inv.currency === "VES" ? "VES" : "USD")) ||
-    accounts.find((a) => a.accountNumber && !a.accountNumber.includes("0000-00")) ||
-    accounts[0];
+  let targetAccount = targetAccountId ? accounts.find((a) => a.id === targetAccountId) : null;
 
+  if (!targetAccount && inv.targetAccountName) {
+    targetAccount = accounts.find((a) => a.name.toLowerCase().includes(inv.targetAccountName!.toLowerCase())) || null;
+  }
+
+  // Priorizar siempre cuenta bancaria con número de cuenta para las Coordenadas Bancarias
+  if (!targetAccount || !targetAccount.accountNumber || targetAccount.accountType === "efectivo" || targetAccount.accountType === "zelle") {
+    const bankAccount =
+      accounts.find((a) => a.accountNumber && a.accountNumber.startsWith("0134")) ||
+      accounts.find((a) => (a.accountType === "banco_nacional" || a.accountType === "banco_internacional") && a.accountNumber) ||
+      accounts.find((a) => a.id === "cta-1") ||
+      accounts[0];
+    if (bankAccount) {
+      targetAccount = bankAccount;
+    }
+  }
+
+  const rawHolder = targetAccount?.holderName?.trim();
   const targetHolder =
-    (targetAccount?.holderName && !targetAccount.holderName.includes("0000"))
-      ? targetAccount.holderName
+    (rawHolder &&
+     !rawHolder.includes("0000") &&
+     rawHolder.toLowerCase() !== "massivo creativo" &&
+     rawHolder.toLowerCase() !== "massivo creativo c.a." &&
+     rawHolder.toLowerCase() !== "massivo corp" &&
+     rawHolder.toLowerCase() !== "custodio de caja principal")
+      ? rawHolder
       : "MIRIANNYS GUTIERREZ";
 
+  const rawBank = targetAccount?.bankName?.trim();
   const targetBank =
-    (targetAccount?.bankName && !targetAccount.bankName.includes("0000"))
-      ? targetAccount.bankName
+    (rawBank && !rawBank.includes("0000") && rawBank.toLowerCase() !== "efectivo")
+      ? rawBank
       : "Banesco Banco Universal (0134)";
 
+  const rawNumber = targetAccount?.accountNumber?.trim();
   const targetNumber =
-    (targetAccount?.accountNumber && !targetAccount.accountNumber.includes("0000-00-0000000000"))
-      ? targetAccount.accountNumber
+    (rawNumber &&
+     !rawNumber.includes("0000-00-0000000000") &&
+     !rawNumber.includes("Sample") &&
+     rawNumber.length > 5)
+      ? rawNumber
       : (targetAccount?.phone && !targetAccount.phone.includes("0000000"))
         ? targetAccount.phone
         : "0134-0205-10-2053028252";
 
+  const rawId = targetAccount?.holderId?.trim();
   const targetId =
-    (targetAccount?.holderId && !targetAccount.holderId.includes("0000000"))
-      ? targetAccount.holderId
+    (rawId && !rawId.includes("0000000") && rawId !== "J-50000000-0" && rawId !== "J-00000000-0")
+      ? rawId
       : (targetAccount as any)?.idNumber || (targetAccount as any)?.taxId || "V-17102452";
 
   const rateRefLabel = (inv.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
@@ -352,30 +375,30 @@ export default async function FacturaPage({
             <div className="space-y-1.5 sm:pl-8 text-right text-xs">
               <div className="flex justify-between items-center py-1 border-b border-neutral-200">
                 <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
-                <span className="font-mono font-bold text-neutral-900">
+                <span className="font-mono font-bold text-neutral-900 whitespace-nowrap">
                   {formatCurrency(inv.paidTotal || 0, inv.currency)}
                 </span>
               </div>
               
               <div className="flex justify-between items-center py-1.5 border-b-2 border-neutral-900">
                 <span className="font-black text-neutral-900 text-sm uppercase tracking-wider">TOTAL</span>
-                <span className="font-mono font-black text-neutral-900 text-base">
+                <span className="font-mono font-black text-neutral-900 text-base whitespace-nowrap">
                   {formatCurrency(inv.total, inv.currency)}
                 </span>
               </div>
 
               {isForeign && (
-                <div className="flex justify-between items-center py-1.5 border-b border-neutral-300">
-                  <div className="flex flex-col text-left">
+                <div className="flex justify-between items-center py-1.5 border-b border-neutral-300 gap-2">
+                  <div className="flex flex-col text-left shrink-0">
                     <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL BS</span>
                     {currentRate > 0 && (
-                      <span className="text-[10px] text-neutral-500 font-mono">
+                      <span className="text-[10px] text-neutral-500 font-mono whitespace-nowrap">
                         Tasa {inv.vesRateRef || "BCV"}: {currentRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Bs.
                       </span>
                     )}
                   </div>
-                  <span className="font-mono font-black text-neutral-900 text-sm">
-                    {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                  <span className="font-mono font-black text-neutral-900 text-sm whitespace-nowrap shrink-0 text-right">
+                    {vesTotalCalculated.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}&nbsp;Bs.
                   </span>
                 </div>
               )}

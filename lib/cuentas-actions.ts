@@ -73,9 +73,13 @@ const DEFAULT_COMPANY_ACCOUNTS: CompanyAccount[] = [
     accountType: "zelle",
     currency: "USD",
     email: "massivoagencia@gmail.com",
-    holderName: "Massivo Creativo",
+    holderName: "MIRIANNYS GUTIERREZ",
+    holderId: "V-17102452",
+    phone: "+58 412-0979022",
+    bankName: "Banesco Banco Universal (0134)",
+    accountNumber: "0134-0205-10-2053028252",
     notes: "Colocar solo el número de proforma / factura en el concepto o memo.",
-    isDefault: true,
+    isDefault: false,
     active: true,
     createdAt: "2026-01-03T00:00:00.000Z",
   },
@@ -86,7 +90,8 @@ const DEFAULT_COMPANY_ACCOUNTS: CompanyAccount[] = [
     accountType: "crypto",
     currency: "USDT",
     accountNumber: "TPx9MassivoWalletAddressTronTRC20Sample",
-    holderName: "Massivo Binance Pay",
+    holderName: "MIRIANNYS GUTIERREZ",
+    holderId: "V-17102452",
     notes: "Red Tron (TRC-20) o Binance Pay ID: 888999111",
     isDefault: false,
     active: true,
@@ -118,8 +123,44 @@ export async function getCompanyAccounts(): Promise<CompanyAccount[]> {
       if (Array.isArray(parsed) && parsed.length > 0) {
         let needsResave = false;
 
-        // Re-secuenciar las cuentas existentes a 0002 y 0003 si venían de 0004 y 0005
+        // Sanitizar y actualizar cuentas para asegurar datos reales
         parsed = parsed.map((a, idx) => {
+          if (
+            !a.holderName ||
+            a.holderName.toLowerCase() === "massivo creativo" ||
+            a.holderName.toLowerCase() === "massivo creativo c.a." ||
+            a.holderName.toLowerCase() === "massivo corp"
+          ) {
+            needsResave = true;
+            a.holderName = "MIRIANNYS GUTIERREZ";
+          }
+          if (
+            !a.holderId ||
+            a.holderId.includes("0000000") ||
+            a.holderId === "J-50000000-0" ||
+            a.holderId === "J-00000000-0"
+          ) {
+            needsResave = true;
+            a.holderId = "V-17102452";
+          }
+          if (
+            !a.bankName ||
+            a.bankName.includes("0000") ||
+            a.accountType === "banco_nacional"
+          ) {
+            if (!a.bankName || a.bankName.includes("0000")) {
+              needsResave = true;
+              a.bankName = "Banesco Banco Universal (0134)";
+            }
+          }
+          if (
+            !a.accountNumber ||
+            a.accountNumber.includes("0000-00-0000000000") ||
+            a.accountNumber.includes("0000-00")
+          ) {
+            needsResave = true;
+            a.accountNumber = "0134-0205-10-2053028252";
+          }
           if (a.code === "Mas-Corp-Cta-0004" && (idx === 0 || a.name.includes("Binance"))) {
             needsResave = true;
             return { ...a, code: "Mas-Corp-Cta-0002" };

@@ -79,12 +79,12 @@ export function AccountsManager({ accounts }: AccountsManagerProps) {
     setName("");
     setAccountType("banco_nacional");
     setCurrency("VES");
-    setBankName("");
-    setAccountNumber("");
-    setHolderName("Massivo Creativo C.A.");
-    setHolderId("J-50000000-0");
+    setBankName("Banesco Banco Universal (0134)");
+    setAccountNumber("0134-0205-10-2053028252");
+    setHolderName("MIRIANNYS GUTIERREZ");
+    setHolderId("V-17102452");
     setEmail("");
-    setPhone("");
+    setPhone("+58 412-0979022");
     setNotes("");
     setIsDefault(false);
     setError(null);
