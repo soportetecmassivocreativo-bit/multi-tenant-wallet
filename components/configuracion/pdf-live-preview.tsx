@@ -89,20 +89,19 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
           : "";
 
   const emissionDateFormatted = (() => {
-    if (!bcv?.date) return "01 sep. 2026";
+    if (!bcv?.date) return "22/09/2026";
     try {
       const clean = bcv.date.trim().split("T")[0].split(" ")[0];
       const parts = clean.split("-").map(Number);
       if (parts.length === 3 && !parts.some(isNaN)) {
-        return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString("es-VE", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        });
+        const dd = String(parts[2]).padStart(2, "0");
+        const mm = String(parts[1]).padStart(2, "0");
+        const yyyy = String(parts[0]);
+        return `${dd}/${mm}/${yyyy}`;
       }
       return clean;
     } catch {
-      return "01 sep. 2026";
+      return "22/09/2026";
     }
   })();
 

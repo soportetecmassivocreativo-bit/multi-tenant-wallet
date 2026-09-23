@@ -28,7 +28,7 @@ export default async function ProformaPrintPage({
     config.pdfProformaCompanyName ||
     config.pdfCompanyName ||
     company?.name ||
-    "Massivo Creativo C.A.";
+    "Massivo Corp";
 
   const rawCompanyRif =
     config.pdfProformaCompanyRif ||
@@ -41,28 +41,54 @@ export default async function ProformaPrintPage({
       : "";
 
   const phone =
-    (config.pdfProformaContactPhone && config.pdfProformaContactPhone !== "+58 412-0000000")
+    (config.pdfProformaContactPhone && !config.pdfProformaContactPhone.includes("0000000"))
       ? config.pdfProformaContactPhone
-      : (config.pdfContactPhone && config.pdfContactPhone !== "+58 412-0000000")
+      : (config.pdfContactPhone && !config.pdfContactPhone.includes("0000000"))
         ? config.pdfContactPhone
-        : company?.phone || config.pdfProformaContactPhone || config.pdfContactPhone || "+58 412-0000000";
+        : company?.phone && !company.phone.includes("0000000")
+          ? company.phone
+          : "+58 412-0979022";
 
   const email =
-    (config.pdfProformaContactEmail && config.pdfProformaContactEmail !== "contacto@massivocorp.com" && config.pdfProformaContactEmail !== "info@massivocreativo.com")
+    (config.pdfProformaContactEmail && !config.pdfProformaContactEmail.includes("contacto@massivocorp.com") && !config.pdfProformaContactEmail.includes("info@massivocreativo.com"))
       ? config.pdfProformaContactEmail
-      : (config.pdfContactEmail && config.pdfContactEmail !== "contacto@massivocorp.com" && config.pdfContactEmail !== "info@massivocreativo.com")
+      : (config.pdfContactEmail && !config.pdfContactEmail.includes("contacto@massivocorp.com") && !config.pdfContactEmail.includes("info@massivocreativo.com"))
         ? config.pdfContactEmail
-        : company?.email || config.pdfProformaContactEmail || config.pdfContactEmail || "info@massivocreativo.com";
+        : company?.email && !company.email.includes("contacto@massivocorp.com")
+          ? company.email
+          : "massivoagencia@gmail.com";
 
   const website = "www.massivocreativo.com";
 
   const targetAccountId = prof.targetAccountId || config.pdfProformaTargetAccountId;
-  const targetAccount = accounts.find((a) => a.id === targetAccountId) || (prof.targetAccountName ? { name: prof.targetAccountName } : accounts[0]);
+  const targetAccount =
+    accounts.find((a) => a.id === targetAccountId) ||
+    (prof.targetAccountName ? accounts.find((a) => a.name.toLowerCase().includes(prof.targetAccountName!.toLowerCase())) : null) ||
+    accounts.find((a) => a.isDefault && a.currency === (prof.currency === "VES" ? "VES" : "USD")) ||
+    accounts.find((a) => a.accountNumber && !a.accountNumber.includes("0000-00")) ||
+    accounts[0];
 
-  const targetHolder = targetAccount?.holderName || targetAccount?.name || companyName;
-  const targetBank = targetAccount?.bankName || targetAccount?.name || "Banesco";
-  const targetNumber = targetAccount?.accountNumber || targetAccount?.phone || "0134-0000-00-0000000000";
-  const targetId = targetAccount?.holderId || (targetAccount as any)?.idNumber || (targetAccount as any)?.taxId || "";
+  const targetHolder =
+    (targetAccount?.holderName && !targetAccount.holderName.includes("0000"))
+      ? targetAccount.holderName
+      : "MIRIANNYS GUTIERREZ";
+
+  const targetBank =
+    (targetAccount?.bankName && !targetAccount.bankName.includes("0000"))
+      ? targetAccount.bankName
+      : "Banesco Banco Universal (0134)";
+
+  const targetNumber =
+    (targetAccount?.accountNumber && !targetAccount.accountNumber.includes("0000-00-0000000000"))
+      ? targetAccount.accountNumber
+      : (targetAccount?.phone && !targetAccount.phone.includes("0000000"))
+        ? targetAccount.phone
+        : "0134-0205-10-2053028252";
+
+  const targetId =
+    (targetAccount?.holderId && !targetAccount.holderId.includes("0000000"))
+      ? targetAccount.holderId
+      : (targetAccount as any)?.idNumber || (targetAccount as any)?.taxId || "V-17102452";
 
   const rateRefLabel = (prof.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
   const defaultBcvRate = rateRefLabel === "EUR" ? bcv.eur : bcv.usd;

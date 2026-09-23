@@ -142,11 +142,7 @@ export function generatePdfDoc(options: PdfReportOptions): { doc: jsPDF; filenam
 
   // Fecha y Tasa a la derecha
   const now = new Date();
-  const dateFormatted = now.toLocaleDateString("es-VE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const dateFormatted = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
   const timeFormatted = now.toLocaleTimeString("es-VE", {
     hour: "2-digit",
     minute: "2-digit",

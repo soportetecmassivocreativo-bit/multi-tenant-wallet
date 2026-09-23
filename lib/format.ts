@@ -20,9 +20,7 @@ export function formatNumber(value?: number | null): string {
   return nf.format(Math.round(safe));
 }
 
-const df = new Intl.DateTimeFormat("es-VE", { day: "numeric", month: "short" });
-
-/** Fecha ISO (yyyy-mm-dd o timestamp ISO) → "8 jul". Se construye local para evitar desfase de zona. */
+/** Fecha ISO (yyyy-mm-dd o timestamp ISO) → "22/09/2026" (DD/MM/YYYY) */
 export function formatDate(iso?: string | null): string {
   if (!iso || typeof iso !== "string") return "";
   try {
@@ -30,14 +28,17 @@ export function formatDate(iso?: string | null): string {
     const parts = clean.split("-").map(Number);
     if (parts.length === 3 && !parts.some(isNaN)) {
       const [y, m, d] = parts;
-      const date = new Date(y, m - 1, d);
-      if (!isNaN(date.getTime())) {
-        return df.format(date);
-      }
+      const dd = String(d).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      const yyyy = String(y);
+      return `${dd}/${mm}/${yyyy}`;
     }
     const fallbackDate = new Date(iso);
     if (!isNaN(fallbackDate.getTime())) {
-      return df.format(fallbackDate);
+      const dd = String(fallbackDate.getDate()).padStart(2, "0");
+      const mm = String(fallbackDate.getMonth() + 1).padStart(2, "0");
+      const yyyy = String(fallbackDate.getFullYear());
+      return `${dd}/${mm}/${yyyy}`;
     }
     return clean || iso;
   } catch {
