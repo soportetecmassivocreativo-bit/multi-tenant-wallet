@@ -90,6 +90,11 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
     0
   );
   const activeTotal = computedTotal > 0 ? computedTotal : amount;
+  const hasValidLines = lines.some(
+    (l) => l.description.trim().length > 0 && (Number(l.unitPrice) > 0 || Number(l.qty) > 0)
+  );
+  const hasConcept = Boolean(projectTitle.trim() || hasValidLines || note.trim());
+  const isSubmitDisabled = activeTotal <= 0 || !hasConcept || pending;
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const isCash = creditDays === 0;
@@ -207,6 +212,8 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
         accountId: isCash ? (selectedAccountId || undefined) : undefined,
         accountName: isCash && selectedAccount ? selectedAccount.name : undefined,
         reference: isCash && reference.trim() ? reference.trim() : undefined,
+        vesRate: isForeign ? rate : undefined,
+        vesRateRef: isForeign ? (rateRef === "USD" ? "BCV USD" : "BCV EUR") : undefined,
       });
 
       if (r.ok) {
@@ -614,9 +621,10 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
               </button>
             )}
             <button
+              type="button"
               onClick={submit}
-              disabled={!note || amount <= 0 || pending}
-              className="rounded-xl bg-accent px-6 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-[0.98] disabled:opacity-40 transition-all"
+              disabled={isSubmitDisabled}
+              className="rounded-xl bg-accent px-6 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-[0.98] disabled:opacity-40 transition-all cursor-pointer disabled:cursor-not-allowed"
             >
               {pending ? "Registrando…" : "Registrar Gasto"}
             </button>
