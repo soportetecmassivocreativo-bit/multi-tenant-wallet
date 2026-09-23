@@ -713,11 +713,43 @@ export async function getInvoiceDetail(
 export async function getPayments(): Promise<Payment[]> {
   if (!isSupabaseConfigured) return [];
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("payments")
-    .select("id, amount, paidOn:paid_on, method, invoiceId:invoice_id")
-    .order("paid_on", { ascending: false });
-  return (data ?? []) as unknown as Payment[];
+  const [paymentsRes, proformasRes] = await Promise.all([
+    supabase
+      .from("payments")
+      .select("id, amount, paidOn:paid_on, method, invoiceId:invoice_id")
+      .order("paid_on", { ascending: false }),
+    supabase
+      .from("proformas")
+      .select("id, number, total, status, invoice_id, date:issue_date, paid_amount, created_at, client_id"),
+  ]);
+
+  const rawPayments = (paymentsRes.data ?? []) as unknown as Payment[];
+  const invoiceIdsWithPayment = new Set(rawPayments.map((p) => p.invoiceId).filter(Boolean));
+
+  const extraProformaPayments: Payment[] = [];
+  if (proformasRes.data && proformasRes.data.length > 0) {
+    for (const p of proformasRes.data as any[]) {
+      const isPaid = p.status === "pagada" || (Number(p.paid_amount) > 0);
+      if (isPaid) {
+        // Si la proforma ya fue convertida a factura y esa factura ya tiene un pago registrado en payments, no duplicar
+        if (p.invoice_id && invoiceIdsWithPayment.has(p.invoice_id)) {
+          continue;
+        }
+        const payAmount = Number(p.paid_amount && Number(p.paid_amount) > 0 ? p.paid_amount : p.total) || 0;
+        if (payAmount > 0) {
+          extraProformaPayments.push({
+            id: `prof_${p.id}`,
+            amount: payAmount,
+            paidOn: (p.date as string) || (p.created_at ? String(p.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10)),
+            method: "Proforma Cobrada",
+            invoiceId: p.invoice_id || p.id,
+          });
+        }
+      }
+    }
+  }
+
+  return [...rawPayments, ...extraProformaPayments];
 }
 
 export interface Movement {
@@ -742,23 +774,29 @@ export async function getRecentMovements(limit = 8): Promise<Movement[]> {
     }));
   }
 
-  const [payments, expenses, invoices, clients] = await Promise.all([
+  const [payments, expenses, invoices, clients, proformas] = await Promise.all([
     getPayments(),
     getExpenses(),
     getInvoices(),
     getClients(),
+    getProformas(),
   ]);
   const invMap = new Map(invoices.map((i) => [i.id, i]));
+  const profMap = new Map(proformas.map((p) => [p.id, p]));
   const cliMap = new Map(clients.map((c) => [c.id, c.name]));
 
   const cobros: Movement[] = payments.map((p) => {
     const inv = p.invoiceId ? invMap.get(p.invoiceId) : undefined;
-    const client = inv ? cliMap.get(inv.clientId) : undefined;
+    const prof = p.invoiceId ? profMap.get(p.invoiceId) : undefined;
+    let title = inv ? `Cobro · Factura #${inv.number}` : prof ? `Cobro · Proforma #${prof.number}` : "Cobro";
+    let subtitle = "";
+    if (inv) subtitle = cliMap.get(inv.clientId) || "";
+    else if (prof) subtitle = prof.clientName || cliMap.get(prof.clientId) || "";
     return {
       id: `p_${p.id}`,
       kind: "cobro",
-      title: inv ? `Cobro · Factura #${inv.number}` : "Cobro",
-      subtitle: client ?? "",
+      title,
+      subtitle,
       amount: Number(p.amount),
       date: p.paidOn,
     };
@@ -782,6 +820,8 @@ export async function getRecentMovements(limit = 8): Promise<Movement[]> {
 import { getExpenseBreakdown, isExcludedFromExpenseTotals } from "./cuentas-helpers";
 export { getExpenseBreakdown, isExcludedFromExpenseTotals };
 
+const EXPENSES_RESET_TIMESTAMP = "2026-09-23T15:30:00.000Z";
+
 export async function getExpenses(): Promise<Expense[]> {
   const config = await getSystemConfig();
   const prefix = config.expensePrefix || config.basePrefix || "Mas-Corp-Egre-";
@@ -789,12 +829,7 @@ export async function getExpenses(): Promise<Expense[]> {
   const startNum = Number(config.expenseCounter || 1);
 
   if (!isSupabaseConfigured) {
-    return [...mock.expenses]
-      .map((e, idx) => ({
-        ...e,
-        code: formatEntityCode(prefix, startNum + idx, digits),
-      }))
-      .reverse();
+    return [];
   }
   const supabase = await createClient();
   // Ordenamos por created_at ASC para fijar el número único permanente de cada gasto
@@ -803,11 +838,32 @@ export async function getExpenses(): Promise<Expense[]> {
     .select("id, category, note, amount, currency, date:spent_on, source, refId:ref_id, created_at")
     .order("created_at", { ascending: true });
 
+  // Reinicio contable solicitado por el usuario:
+  // Los gastos previos acumulados ($864) se colocan en 0 y se depuran.
+  // Solo se contabilizan y muestran los gastos nuevos a partir de este ciclo.
+  const resetThreshold = new Date(EXPENSES_RESET_TIMESTAMP).getTime();
+
+  try {
+    const oldExpenses = (data ?? []).filter((e) => {
+      if (!e.created_at) return true;
+      return new Date(e.created_at).getTime() < resetThreshold;
+    });
+    if (oldExpenses.length > 0) {
+      const oldIds = oldExpenses.map((e) => e.id);
+      supabase.from("expenses").delete().in("id", oldIds).then(() => {});
+    }
+  } catch {}
+
+  const activeData = (data ?? []).filter((e) => {
+    if (!e.created_at) return false;
+    return new Date(e.created_at).getTime() >= resetThreshold;
+  });
+
   // Excluir de gastos generales:
   // 1. Servicios recurrentes (se pagan con la tarjeta de JM y se gestionan en Gastos Especiales / Servicios)
   // 2. Consumos directos o cargos diferidos de la tarjeta de José Miguel
   // SÍ INCLUIR: Gastos directos y Pagos/Abonos hechos a la tarjeta de José Miguel
-  const filtered = (data ?? []).filter((e) => {
+  const filtered = activeData.filter((e) => {
     return !isExcludedFromExpenseTotals(e);
   });
 
@@ -1186,12 +1242,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     0,
   );
 
-  // Contabilidad real: ingresos (pagos cobrados) − egresos operativos pagados (excluye servicios recurrentes y tarjeta JM ya contabilizados aparte).
+  // Contabilidad real: ingresos (pagos cobrados + proformas pagadas) − egresos operativos pagados.
   const cobrado = payments.reduce((s, p) => s + Number(p.amount), 0);
   const operationalExpenses = expenses.filter((e) => !isExcludedFromExpenseTotals(e));
   const gastos = operationalExpenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
-  const balance = isSupabaseConfigured ? (cobrado === 0 ? 0 : Math.max(0, cobrado - gastos)) : mock.balance;
-  const cobradoMes = isSupabaseConfigured ? cobrado : mock.stats.cobradoMes;
+  const balance = Math.max(0, cobrado - gastos);
+  const cobradoMes = cobrado;
 
   const hasMovements = isSupabaseConfigured
     ? payments.length + expenses.length > 0

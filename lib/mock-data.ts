@@ -4,8 +4,8 @@
  */
 import type { CurrencyCode } from "@/lib/currency";
 
-export const balance = 284750;
-export const deltaPct = 12.4;
+export const balance = 0;
+export const deltaPct = 0;
 
 /**
  * Tasas del Banco Central de Venezuela (BCV) — mock editable.
@@ -18,9 +18,9 @@ export const bcvRates = {
 };
 
 export const stats = {
-  porCobrar: 62300,
-  vencidas: 3,
-  cobradoMes: 118900,
+  porCobrar: 0,
+  vencidas: 0,
+  cobradoMes: 0,
 };
 
 /** Serie del gráfico: dos líneas normalizadas 0..1 (mes actual vs. anterior). */
@@ -165,12 +165,7 @@ export interface Expense {
   vesTotal?: number | null;
 }
 
-export const expenses: Expense[] = [
-  { id: "g1", code: "Mas-Corp-0001", category: "Transporte", note: "Combustible", amount: 2400, currency: "USD", date: "2026-07-10" },
-  { id: "g2", code: "Mas-Corp-0002", category: "Local", note: "Alquiler de oficina", amount: 25000, currency: "USD", date: "2026-07-01" },
-  { id: "g3", code: "Mas-Corp-0003", category: "Marketing", note: "Publicidad Meta Ads", amount: 4800, currency: "USD", date: "2026-07-06" },
-  { id: "g4", code: "Mas-Corp-0004", category: "Materiales", note: "Insumos de impresión", amount: 7300, currency: "USD", date: "2026-07-04" },
-];
+export const expenses: Expense[] = [];
 
 /* -------------------------- Movimientos (home) ---------------------- */
 
