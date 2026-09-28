@@ -152,6 +152,7 @@ export function GastosView({
           accounts={accounts}
           bcv={bcv}
           admin={admin}
+          expenses={expenses}
         />
       )}
     </div>

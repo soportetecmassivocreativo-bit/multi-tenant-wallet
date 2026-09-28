@@ -15,6 +15,7 @@ import {
   increaseDeferredCardDebt,
 } from "@/lib/gastos-especiales-actions";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
+import type { Expense } from "@/lib/mock-data";
 import { PlusIcon, CheckIcon, TrashIcon, SearchIcon, EditIcon } from "@/components/ui/icons";
 import { MoneyInput } from "@/components/ui/money-input";
 
@@ -25,6 +26,7 @@ interface GastosEspecialesTabProps {
   accounts: CompanyAccount[];
   bcv?: { usd: number; eur: number; date: string };
   admin: boolean;
+  expenses?: Expense[];
 }
 
 export function GastosEspecialesTab({
@@ -34,6 +36,7 @@ export function GastosEspecialesTab({
   accounts,
   bcv,
   admin,
+  expenses = [],
 }: GastosEspecialesTabProps) {
   const [subTab, setSubTab] = useState<"cargos" | "abonos">("cargos");
   const [search, setSearch] = useState("");
@@ -85,6 +88,80 @@ export function GastosEspecialesTab({
       !a.name.toLowerCase().includes("tarjeta jm")
   );
 
+  // Consolidar todos los abonos (del servidor + gastos directos de abono)
+  const allAbonos: DeferredAbono[] = [...abonos];
+  if (expenses && expenses.length > 0) {
+    for (const exp of expenses) {
+      const rawNote = exp.note || "";
+      const lowerNote = rawNote.toLowerCase();
+      const lowerCat = (exp.category || "").toLowerCase();
+      const src = ((exp as unknown as { source?: string }).source || "").toLowerCase();
+
+      const isAbono =
+        src === "tarjeta_jm_abono" ||
+        src === "tarjeta_jm_pago" ||
+        src === "tarjeta_jm" ||
+        lowerCat === "abono a tarjeta" ||
+        lowerCat.includes("abono") ||
+        lowerNote.includes("abono a la deuda") ||
+        lowerNote.includes("abono a tarjeta") ||
+        lowerNote.includes("abono tarjeta") ||
+        lowerNote.includes("liquidación tarjeta") ||
+        lowerNote.includes("liquidacion tarjeta") ||
+        lowerNote.includes("pago a tarjeta") ||
+        lowerNote.includes("pago de tarjeta") ||
+        lowerNote.includes("pago josé miguel") ||
+        lowerNote.includes("pago jose miguel") ||
+        lowerNote.includes("abono jm");
+
+      const isCharge =
+        src === "tarjeta_jm_consumo" ||
+        src === "servicio" ||
+        lowerNote.includes("cargo en tarjeta") ||
+        lowerNote.includes("consumo tarjeta");
+
+      if (!isAbono || isCharge) continue;
+
+      const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*$/, "").trim() || "Abono Tarjeta José Miguel";
+
+      let paidFrom = "Pago Móvil Banesco";
+      let ref = "";
+      const metaMatch = rawNote.match(/\[(.*?)\]$/);
+      if (metaMatch) {
+        const metaContent = metaMatch[1];
+        const refMatch = metaContent.match(/Ref:\s*(\d+)/i);
+        if (refMatch) ref = refMatch[1];
+        const cleanAcc = metaContent.replace(/Ref:\s*\d+/i, "").replace(/^[·\s]+|[·\s]+$/g, "").trim();
+        if (cleanAcc) paidFrom = cleanAcc;
+      }
+
+      const exists = allAbonos.some(
+        (a) =>
+          a.expenseId === exp.id ||
+          a.id === `abn_exp_${exp.id}` ||
+          (Number(a.amount) === Number(exp.amount) &&
+            (a.description.toLowerCase().includes(cleanDesc.toLowerCase()) ||
+              cleanDesc.toLowerCase().includes(a.description.toLowerCase())))
+      );
+
+      if (!exists) {
+        allAbonos.unshift({
+          id: `abn_exp_${exp.id}`,
+          code: exp.code || `Mas-Corp-ABN-000${allAbonos.length + 1}`,
+          description: cleanDesc,
+          amount: Number(exp.amount),
+          currency: (exp.currency as CurrencyCode) || "USD",
+          paidOn: exp.date || new Date().toISOString().slice(0, 10),
+          paidFrom,
+          reference: ref || undefined,
+          notes: rawNote,
+          expenseId: exp.id,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
   // Cálculos Financieros
   const totalCargosUSD = charges.reduce((s, c) => {
     const amt = Number(c.amount) || 0;
@@ -93,7 +170,7 @@ export function GastosEspecialesTab({
     return s + amt;
   }, 0);
 
-  const totalAbonosUSD = abonos.reduce((s, a) => {
+  const totalAbonosUSD = allAbonos.reduce((s, a) => {
     const amt = Number(a.amount) || 0;
     if (!a.currency || a.currency === "USD") return s + amt;
     if (a.currency === "VES" && bcv?.usd && bcv.usd > 0) return s + (amt / bcv.usd);
@@ -115,7 +192,7 @@ export function GastosEspecialesTab({
   });
 
   // Filtrado de abonos
-  const filteredAbonos = abonos.filter((a) => {
+  const filteredAbonos = allAbonos.filter((a) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -285,16 +362,19 @@ export function GastosEspecialesTab({
             💳
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-serif text-base font-bold text-foreground">
                 Gastos Especiales · Tarjeta José Miguel
               </h3>
-              <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-[10px] font-bold text-accent uppercase tracking-wider">
-                Deuda Total: {formatCurrency(cardLimit, "USD")}
+              <span className="rounded-full bg-pending text-neutral-900 px-3 py-0.5 text-xs font-bold uppercase tracking-wider shadow-xs">
+                Deuda Pendiente: {formatCurrency(saldoNetoPagar, "USD")}
+              </span>
+              <span className="text-xs text-muted font-medium">
+                (Deuda Base: {formatCurrency(cardLimit, "USD")} − Abonos: {formatCurrency(totalAbonosUSD, "USD")})
               </span>
             </div>
             <p className="text-xs text-muted mt-0.5">
-              La deuda base de la tarjeta se va descontando conforme se realizan abonos desde cuentas bancarias o crypto (ej. Banesco/Binance).
+              La deuda base de la tarjeta se va descontando conforme se asientan abonos desde cuentas bancarias o en gastos generales (ej. Banesco/Binance).
             </p>
           </div>
         </div>
@@ -463,7 +543,7 @@ export function GastosEspecialesTab({
         {/* Tarjeta 1: Deuda Total / Límite Inicial */}
         <div className="rounded-2xl border border-line bg-card p-4 shadow-sm relative group">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-muted font-medium">Deuda Total Tarjeta</p>
+            <p className="text-xs text-muted font-medium">Deuda Base Inicial</p>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -494,7 +574,7 @@ export function GastosEspecialesTab({
             {formatCurrency(cardLimit, "USD")}
           </p>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-[11px] text-hint">Saldo base adeudado</span>
+            <span className="text-[11px] text-hint">Saldo base inicial</span>
             <button
               type="button"
               onClick={() => setOpenIncreaseDebt(true)}
@@ -523,17 +603,20 @@ export function GastosEspecialesTab({
             − {formatCurrency(totalAbonosUSD, "USD")}
           </p>
           <p className="text-[11px] text-hint mt-1">
-            {abonos.length} abono(s) debitados
+            {allAbonos.length} abono(s) debitados
           </p>
         </div>
 
         {/* Tarjeta 4: Saldo Neto Restante a Pagar (Límite - Abonos) */}
-        <div className="rounded-2xl border border-pending/40 bg-pending/10 p-4 shadow-sm">
-          <p className="text-xs text-pending font-bold">Saldo a Pagar (Deuda)</p>
+        <div className="rounded-2xl border border-pending/50 bg-pending/10 p-4 shadow-sm ring-2 ring-pending/20">
+          <p className="text-xs text-pending font-bold flex items-center justify-between">
+            <span>Deuda Pendiente Actual</span>
+            <span className="text-[10px] uppercase tracking-wider bg-pending text-neutral-900 px-1.5 py-0.5 rounded-full font-bold">Por Pagar</span>
+          </p>
           <p className="tnum mt-1 text-xl sm:text-2xl font-bold text-pending">
             {formatCurrency(saldoNetoPagar, "USD")}
           </p>
-          <p className="text-[11px] text-muted mt-1">
+          <p className="text-[11px] text-muted mt-1 font-mono">
             {formatCurrency(cardLimit, "USD")} − {formatCurrency(totalAbonosUSD, "USD")}
           </p>
         </div>
@@ -869,7 +952,7 @@ export function GastosEspecialesTab({
               subTab === "abonos" ? "bg-card text-income shadow-xs font-bold" : "text-muted hover:text-foreground"
             }`}
           >
-            💸 Abonos & Pagos Realizados ({abonos.length})
+            💸 Abonos & Pagos Realizados ({allAbonos.length})
           </button>
         </div>
 
