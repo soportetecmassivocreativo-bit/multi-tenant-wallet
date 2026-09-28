@@ -252,17 +252,117 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
 }
 
 export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
+  let abonos: DeferredAbono[] = [];
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(DEFERRED_ABONOS_COOKIE)?.value;
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        abonos = parsed;
       }
     }
   } catch {}
-  return DEFAULT_ABONOS;
+
+  if (abonos.length === 0) {
+    abonos = [...DEFAULT_ABONOS];
+  }
+
+  // Sincronizar automáticamente con gastos de abonos/pagos registrados en Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: expRows } = await supabase
+        .from("expenses")
+        .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id, code")
+        .order("created_at", { ascending: false });
+
+      if (expRows && expRows.length > 0) {
+        for (const exp of expRows) {
+          const rawNote = exp.note || "";
+          const lowerNote = rawNote.toLowerCase();
+          const lowerCat = (exp.category || "").toLowerCase();
+          const src = (exp.source || "").toLowerCase();
+
+          // Identificar si es un abono o pago a la deuda de José Miguel / Tarjeta
+          const isAbono =
+            src === "tarjeta_jm_abono" ||
+            src === "tarjeta_jm_pago" ||
+            src === "tarjeta_jm" ||
+            lowerCat === "abono a tarjeta" ||
+            lowerCat.includes("abono") ||
+            lowerNote.includes("abono a la deuda") ||
+            lowerNote.includes("abono a tarjeta") ||
+            lowerNote.includes("abono tarjeta") ||
+            lowerNote.includes("liquidación tarjeta") ||
+            lowerNote.includes("liquidacion tarjeta") ||
+            lowerNote.includes("pago a tarjeta") ||
+            lowerNote.includes("pago de tarjeta") ||
+            lowerNote.includes("pago josé miguel") ||
+            lowerNote.includes("pago jose miguel") ||
+            lowerNote.includes("abono jm");
+
+          // Excluir si es un consumo o servicio directo cargado a la tarjeta
+          const isCharge =
+            src === "tarjeta_jm_consumo" ||
+            src === "servicio" ||
+            lowerNote.includes("cargo en tarjeta") ||
+            lowerNote.includes("consumo tarjeta");
+
+          if (!isAbono || isCharge) {
+            continue;
+          }
+
+          const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*$/, "").trim() || "Abono Tarjeta José Miguel";
+
+          // Extraer cuenta / banco y referencia
+          let paidFrom = "Pago Móvil Banesco";
+          let ref = exp.ref_id || "";
+          const metaMatch = rawNote.match(/\[(.*?)\]$/);
+          if (metaMatch) {
+            const metaContent = metaMatch[1];
+            const refMatch = metaContent.match(/Ref:\s*(\d+)/i);
+            if (refMatch) ref = refMatch[1];
+            const cleanAcc = metaContent.replace(/Ref:\s*\d+/i, "").replace(/^[·\s]+|[·\s]+$/g, "").trim();
+            if (cleanAcc) paidFrom = cleanAcc;
+          }
+
+          const alreadyExists = abonos.some(
+            (a) =>
+              (exp.id && a.expenseId === exp.id) ||
+              a.id === `abn_exp_${exp.id}` ||
+              (a.amount === Number(exp.amount) &&
+                a.paidOn === (exp.spent_on || exp.created_at?.slice(0, 10)) &&
+                (a.description.toLowerCase().includes(cleanDesc.toLowerCase()) ||
+                  cleanDesc.toLowerCase().includes(a.description.toLowerCase())))
+          );
+
+          if (!alreadyExists) {
+            const nextNum = abonos.length + 1;
+            const code = exp.code || formatEntityCode("Mas-Corp-ABN-", nextNum, 4);
+            abonos.unshift({
+              id: `abn_exp_${exp.id}`,
+              code,
+              description: cleanDesc,
+              amount: Number(exp.amount),
+              currency: exp.currency || "USD",
+              paidOn: exp.spent_on || (exp.created_at ? exp.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
+              paidFrom: paidFrom,
+              paidAccountId: undefined,
+              reference: ref || undefined,
+              notes: rawNote,
+              expenseId: exp.id,
+              createdAt: exp.created_at || new Date().toISOString(),
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error al sincronizar abonos en Tarjeta José Miguel:", e);
+    }
+  }
+
+  return abonos;
 }
 
 async function saveDeferredCharges(charges: DeferredCharge[]) {

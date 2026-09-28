@@ -238,6 +238,15 @@ export async function createExpense(
     finalNote = `${finalNote} [${metaParts.join(" · ")}]`;
   }
 
+  const isCardAbono =
+    (input.category || "").toLowerCase().includes("abono") ||
+    finalNote.toLowerCase().includes("abono") ||
+    finalNote.toLowerCase().includes("pago josé miguel") ||
+    finalNote.toLowerCase().includes("pago jose miguel") ||
+    finalNote.toLowerCase().includes("tarjeta jm");
+
+  const resolvedSource = isCardAbono ? "tarjeta_jm_abono" : "manual";
+
   const { data: exp, error } = await ctx.supabase
     .from("expenses")
     .insert({
@@ -247,7 +256,7 @@ export async function createExpense(
       amount: input.amount,
       currency,
       spent_on: input.date || today(),
-      source: "manual",
+      source: resolvedSource,
     })
     .select("id")
     .single();
@@ -298,11 +307,19 @@ export async function updateExpense(
     finalNote = cleanBaseNote;
   }
 
+  const isCardAbono =
+    (input.category || "").toLowerCase().includes("abono") ||
+    finalNote.toLowerCase().includes("abono") ||
+    finalNote.toLowerCase().includes("pago josé miguel") ||
+    finalNote.toLowerCase().includes("pago jose miguel") ||
+    finalNote.toLowerCase().includes("tarjeta jm");
+
   const updateData: Record<string, unknown> = {
     category: input.category || "General",
     note: finalNote,
     amount: input.amount,
     currency: input.currency ?? "USD",
+    ...(isCardAbono ? { source: "tarjeta_jm_abono" } : {}),
   };
   if (input.date) {
     updateData.spent_on = input.date;

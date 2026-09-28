@@ -86,8 +86,19 @@ export function GastosEspecialesTab({
   );
 
   // Cálculos Financieros
-  const totalCargosUSD = charges.reduce((s, c) => (c.currency === "USD" ? s + c.amount : s), 0);
-  const totalAbonosUSD = abonos.reduce((s, a) => (a.currency === "USD" ? s + a.amount : s), 0);
+  const totalCargosUSD = charges.reduce((s, c) => {
+    const amt = Number(c.amount) || 0;
+    if (!c.currency || c.currency === "USD") return s + amt;
+    if (c.currency === "VES" && bcv?.usd && bcv.usd > 0) return s + (amt / bcv.usd);
+    return s + amt;
+  }, 0);
+
+  const totalAbonosUSD = abonos.reduce((s, a) => {
+    const amt = Number(a.amount) || 0;
+    if (!a.currency || a.currency === "USD") return s + amt;
+    if (a.currency === "VES" && bcv?.usd && bcv.usd > 0) return s + (amt / bcv.usd);
+    return s + amt;
+  }, 0);
   
   // Saldo Neto a Pagar a José Miguel = Deuda / Límite de Tarjeta - Abonos Pagados
   const saldoNetoPagar = Math.max(0, cardLimit - totalAbonosUSD);
