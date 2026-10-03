@@ -13,7 +13,10 @@ import {
   deleteDeferredAbono,
   updateDeferredCardLimit,
   increaseDeferredCardDebt,
+  executeDeferredCardClosure,
 } from "@/lib/gastos-especiales-actions";
+import { exportCardClosurePdf } from "@/lib/pdf-export";
+import Link from "next/link";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
 import type { Expense } from "@/lib/mock-data";
 import { PlusIcon, CheckIcon, TrashIcon, SearchIcon, EditIcon } from "@/components/ui/icons";
@@ -77,6 +80,18 @@ export function GastosEspecialesTab({
   const [settleRef, setSettleRef] = useState("");
   const [settleNotes, setSettleNotes] = useState("");
   const [settleError, setSettleError] = useState("");
+
+  // Form states para cierre mensual
+  const [openClosureModal, setOpenClosureModal] = useState(false);
+  const now = new Date();
+  const defaultPeriod = `${now.toLocaleDateString("es-VE", { month: "long" })} ${now.getFullYear()}`;
+  const [closurePeriod, setClosurePeriod] = useState(
+    defaultPeriod.charAt(0).toUpperCase() + defaultPeriod.slice(1)
+  );
+  const [closureNotes, setClosureNotes] = useState("");
+  const [closureAutoDownloadPdf, setClosureAutoDownloadPdf] = useState(true);
+  const [closureError, setClosureError] = useState("");
+  const [closureSuccessMsg, setClosureSuccessMsg] = useState<string | null>(null);
 
   const [isPending, startTransition] = useTransition();
 
@@ -352,6 +367,35 @@ export function GastosEspecialesTab({
     });
   }
 
+  function handleExecuteClosure(e: React.FormEvent) {
+    e.preventDefault();
+    setClosureError("");
+
+    startTransition(async () => {
+      const res = await executeDeferredCardClosure({
+        period: closurePeriod,
+        notes: closureNotes,
+      });
+
+      if (res.ok && res.closure) {
+        setOpenClosureModal(false);
+        setClosureSuccessMsg(
+          `¡Cierre de mes "${res.closure.period}" completado exitosamente! El nuevo ciclo inicia en $0.00.`
+        );
+
+        if (closureAutoDownloadPdf) {
+          try {
+            exportCardClosurePdf(res.closure, bcv);
+          } catch (err) {
+            console.error("Error auto-downloading closure PDF:", err);
+          }
+        }
+      } else {
+        setClosureError(res.error || "Error al procesar el cierre del mes.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
       
@@ -415,14 +459,60 @@ export function GastosEspecialesTab({
               setOpenIncreaseDebt(false);
               setOpenNewCharge(false);
               setOpenEditLimit(false);
+              setOpenClosureModal(false);
             }}
             className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-accent/90 active:scale-95 transition-all"
           >
             <CheckIcon className="h-3.5 w-3.5" />
             <span>+ Abonar a Deuda</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOpenClosureModal(true);
+              setOpenIncreaseDebt(false);
+              setOpenNewCharge(false);
+              setOpenNewAbono(false);
+              setOpenEditLimit(false);
+            }}
+            className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs font-bold text-amber-500 hover:bg-amber-500/20 active:scale-95 transition-all shadow-xs"
+            title="Cerrar el mes y generar acta de balance"
+          >
+            <span>🔒 Cerrar Mes</span>
+          </button>
         </div>
       </div>
+
+      {/* BANNER ÉXITO DE CIERRE */}
+      {closureSuccessMsg && (
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-foreground animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">✅</span>
+            <div>
+              <p className="font-bold text-emerald-600 dark:text-emerald-400">{closureSuccessMsg}</p>
+              <p className="text-[11px] text-muted">
+                Puedes consultar todas las actas históricas y descargarlas en PDF desde la pestaña de Reportes.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/reportes"
+              className="rounded-xl bg-accent px-3 py-1.5 font-bold text-white shadow-xs hover:bg-accent/90"
+            >
+              Ir a Reportes →
+            </Link>
+            <button
+              type="button"
+              onClick={() => setClosureSuccessMsg(null)}
+              className="rounded-xl border border-line px-2.5 py-1.5 text-muted hover:bg-soft"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* FORMULARIO: AUMENTAR DEUDA DE LA TARJETA */}
       {openIncreaseDebt && (
@@ -1146,6 +1236,118 @@ export function GastosEspecialesTab({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODAL DE CIERRE MENSUAL */}
+      {openClosureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <form
+            onSubmit={handleExecuteClosure}
+            className="w-full max-w-lg rounded-2xl border border-line bg-card p-5 sm:p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-start justify-between border-b border-line pb-3">
+              <div>
+                <h3 className="font-serif text-base font-bold text-foreground flex items-center gap-2">
+                  <span>🔒 Cierre Mensual · Tarjeta José Miguel</span>
+                </h3>
+                <p className="text-xs text-muted mt-0.5">
+                  Archiva los consumos y abonos del ciclo actual, genera el acta PDF y reinicia la deuda del ciclo a $0.00.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenClosureModal(false)}
+                className="rounded-lg p-1 text-muted hover:bg-soft"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Resumen del Período a Cerrar */}
+            <div className="rounded-xl border border-line bg-soft/60 p-4 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted">Deuda Base Inicial:</span>
+                <span className="font-bold text-foreground">{formatCurrency(cardLimit, "USD")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Total Consumos del Ciclo:</span>
+                <span className="font-bold text-foreground">
+                  +{formatCurrency(totalCargosUSD, "USD")} ({charges.length} consumos)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted">Total Abonos / Pagos Realizados:</span>
+                <span className="font-bold text-emerald-500">
+                  −{formatCurrency(totalAbonosUSD, "USD")} ({allAbonos.length} abonos)
+                </span>
+              </div>
+              <div className="border-t border-line pt-2 flex justify-between font-bold text-sm">
+                <span>Saldo Final Pendiente:</span>
+                <span className={saldoNetoPagar > 0 ? "text-amber-500" : "text-emerald-500"}>
+                  {formatCurrency(saldoNetoPagar, "USD")}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Nombre / Período del Cierre *
+              </label>
+              <input
+                type="text"
+                required
+                value={closurePeriod}
+                onChange={(e) => setClosurePeriod(e.target.value)}
+                placeholder="Ej. Octubre 2026, Quincena 1 Octubre"
+                className="w-full rounded-xl border border-line bg-soft px-3 py-2 text-xs outline-none focus:border-accent font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Notas u Observaciones del Cierre (Opcional)
+              </label>
+              <textarea
+                rows={2}
+                value={closureNotes}
+                onChange={(e) => setClosureNotes(e.target.value)}
+                placeholder="Ej. Liquidación de tarjeta completada por transferencia bancaria..."
+                className="w-full rounded-xl border border-line bg-soft px-3 py-2 text-xs outline-none focus:border-accent resize-none"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={closureAutoDownloadPdf}
+                onChange={(e) => setClosureAutoDownloadPdf(e.target.checked)}
+                className="rounded text-accent focus:ring-accent"
+              />
+              <span>Descargar acta de cierre en PDF automáticamente al finalizar</span>
+            </label>
+
+            {closureError && (
+              <p className="text-xs text-rose-500 font-medium">{closureError}</p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setOpenClosureModal(false)}
+                className="rounded-xl border border-line px-4 py-2 text-xs font-semibold text-muted hover:bg-soft"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-accent/90 disabled:opacity-50"
+              >
+                🔒 {isPending ? "Generando Cierre..." : "Confirmar y Cerrar Mes"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

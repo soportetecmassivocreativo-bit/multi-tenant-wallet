@@ -71,9 +71,28 @@ export interface SettleDeferredChargeInput {
   notes?: string;
 }
 
+export interface DeferredCardClosure {
+  id: string;
+  code: string;
+  period: string;
+  closedAt: string;
+  closedBy?: string;
+  initialDebt: number;
+  totalCharges: number;
+  totalAbonos: number;
+  finalBalance: number;
+  currency: CurrencyCode;
+  notes?: string;
+  charges: DeferredCharge[];
+  abonos: DeferredAbono[];
+  createdAt: string;
+}
+
 const DEFERRED_CHARGES_COOKIE = "m_wallet_deferred_charges";
 const DEFERRED_ABONOS_COOKIE = "m_wallet_deferred_abonos";
 const DEFERRED_CARD_LIMIT_COOKIE = "m_wallet_deferred_card_limit";
+const DEFERRED_CARD_CLOSURES_COOKIE = "m_wallet_deferred_card_closures";
+const DEFERRED_LAST_CLOSURE_COOKIE = "m_wallet_deferred_last_closure_at";
 
 const DEFAULT_CHARGES: DeferredCharge[] = [
   {
@@ -121,11 +140,15 @@ export async function getDeferredCardLimit(): Promise<number> {
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(DEFERRED_CARD_LIMIT_COOKIE)?.value;
-    if (raw) {
+    if (raw !== undefined && raw !== null && raw !== "") {
       const parsed = parseFloat(raw);
-      if (!isNaN(parsed) && parsed > 0) {
+      if (!isNaN(parsed) && parsed >= 0) {
         return parsed;
       }
+    }
+    const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
+    if (lastClosure) {
+      return 0;
     }
   } catch {}
   return 539.12;
@@ -179,18 +202,22 @@ export async function increaseDeferredCardDebt(amountToAdd: number, reason?: str
 
 export async function getDeferredCharges(): Promise<DeferredCharge[]> {
   let charges: DeferredCharge[] = [];
+  let lastClosureTime = 0;
   try {
     const cookieStore = await cookies();
+    const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
+    if (lastClosure) lastClosureTime = new Date(lastClosure).getTime();
+
     const raw = cookieStore.get(DEFERRED_CHARGES_COOKIE)?.value;
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         charges = parsed;
       }
     }
   } catch {}
 
-  if (charges.length === 0) {
+  if (charges.length === 0 && lastClosureTime === 0) {
     charges = [...DEFAULT_CHARGES];
   }
 
@@ -206,6 +233,11 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
 
       if (svcExpenses && svcExpenses.length > 0) {
         for (const exp of svcExpenses) {
+          const expTime = exp.created_at ? new Date(exp.created_at).getTime() : 0;
+          if (lastClosureTime > 0 && expTime > 0 && expTime <= lastClosureTime) {
+            continue;
+          }
+
           const rawNote = exp.note || "Servicio";
           const lowerNote = rawNote.toLowerCase();
           // Excluir abonos/pagos de nómina o abonos a tarjeta
@@ -253,18 +285,22 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
 
 export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
   let abonos: DeferredAbono[] = [];
+  let lastClosureTime = 0;
   try {
     const cookieStore = await cookies();
+    const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
+    if (lastClosure) lastClosureTime = new Date(lastClosure).getTime();
+
     const raw = cookieStore.get(DEFERRED_ABONOS_COOKIE)?.value;
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         abonos = parsed;
       }
     }
   } catch {}
 
-  if (abonos.length === 0) {
+  if (abonos.length === 0 && lastClosureTime === 0) {
     abonos = [...DEFAULT_ABONOS];
   }
 
@@ -279,6 +315,11 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
 
       if (expRows && expRows.length > 0) {
         for (const exp of expRows) {
+          const expTime = exp.created_at ? new Date(exp.created_at).getTime() : 0;
+          if (lastClosureTime > 0 && expTime > 0 && expTime <= lastClosureTime) {
+            continue;
+          }
+
           const rawNote = exp.note || "";
           const lowerNote = rawNote.toLowerCase();
           const lowerCat = (exp.category || "").toLowerCase();
@@ -678,5 +719,137 @@ export async function deleteDeferredAbono(id: string): Promise<MutationResult> {
 
   revalidatePath("/gastos");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function getDeferredCardClosures(): Promise<DeferredCardClosure[]> {
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEFERRED_CARD_CLOSURES_COOKIE)?.value;
+    if (raw) {
+      const parsed = JSON.parse(decodeURIComponent(raw));
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime());
+      }
+    }
+  } catch {}
+  return [];
+}
+
+async function saveDeferredCardClosures(closures: DeferredCardClosure[]) {
+  const cookieStore = await cookies();
+  cookieStore.set(DEFERRED_CARD_CLOSURES_COOKIE, encodeURIComponent(JSON.stringify(closures)), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
+export async function executeDeferredCardClosure(input: {
+  period: string;
+  notes?: string;
+  resetLimitTo?: number;
+}): Promise<MutationResult & { closure?: DeferredCardClosure }> {
+  if (!input.period?.trim()) {
+    return { ok: false, error: "Indica el nombre o mes del periodo a cerrar." };
+  }
+
+  const periodName = input.period.trim();
+  const [currentLimit, currentCharges, currentAbonos, closures] = await Promise.all([
+    getDeferredCardLimit(),
+    getDeferredCharges(),
+    getDeferredAbonos(),
+    getDeferredCardClosures(),
+  ]);
+
+  const totalCharges = currentCharges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const totalAbonos = currentAbonos.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  const finalBalance = Math.max(0, currentLimit - totalAbonos);
+
+  const nextNum = closures.length + 1;
+  const code = formatEntityCode("Mas-Corp-CJM-", nextNum, 4);
+  const closureTime = new Date().toISOString();
+
+  const newClosure: DeferredCardClosure = {
+    id: `cjm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    code,
+    period: periodName,
+    closedAt: closureTime,
+    initialDebt: currentLimit,
+    totalCharges,
+    totalAbonos,
+    finalBalance,
+    currency: "USD",
+    notes: input.notes?.trim() || "",
+    charges: [...currentCharges],
+    abonos: [...currentAbonos],
+    createdAt: closureTime,
+  };
+
+  // Guardar en histórico de cierres
+  closures.unshift(newClosure);
+  await saveDeferredCardClosures(closures);
+
+  // Reiniciar el ciclo activo desde CERO (o saldo indicado)
+  const cookieStore = await cookies();
+  const nextLimit = input.resetLimitTo !== undefined && !isNaN(input.resetLimitTo) && input.resetLimitTo >= 0 ? input.resetLimitTo : 0;
+  
+  cookieStore.set(DEFERRED_CARD_LIMIT_COOKIE, String(nextLimit), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  cookieStore.set(DEFERRED_CHARGES_COOKIE, encodeURIComponent(JSON.stringify([])), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  cookieStore.set(DEFERRED_ABONOS_COOKIE, encodeURIComponent(JSON.stringify([])), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  cookieStore.set(DEFERRED_LAST_CLOSURE_COOKIE, closureTime, {
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  await logAuditEvent({
+    action: "cierre_mensual_tarjeta_jose_miguel",
+    entityType: "gasto",
+    entityId: newClosure.id,
+    description: `Ejecutó cierre mensual ${newClosure.period} (${newClosure.code}). Deuda base: ${currentLimit.toFixed(2)} USD, Consumos: ${totalCharges.toFixed(2)} USD, Abonos: ${totalAbonos.toFixed(2)} USD, Saldo liquidado: ${finalBalance.toFixed(2)} USD. Nuevo ciclo reiniciado a ${nextLimit.toFixed(2)} USD.`,
+    details: {
+      code,
+      period: periodName,
+      initialDebt: currentLimit,
+      totalCharges,
+      totalAbonos,
+      finalBalance,
+      chargesCount: currentCharges.length,
+      abonosCount: currentAbonos.length,
+    },
+  });
+
+  revalidatePath("/gastos");
+  revalidatePath("/reportes");
+  revalidatePath("/dashboard");
+
+  return { ok: true, id: newClosure.id, closure: newClosure };
+}
+
+export async function deleteDeferredCardClosure(id: string): Promise<MutationResult> {
+  const closures = await getDeferredCardClosures();
+  const updated = closures.filter((c) => c.id !== id);
+  await saveDeferredCardClosures(updated);
+
+  revalidatePath("/reportes");
+  revalidatePath("/gastos");
   return { ok: true };
 }

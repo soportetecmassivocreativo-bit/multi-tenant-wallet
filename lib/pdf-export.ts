@@ -537,3 +537,96 @@ export function exportServiceVoucherPdf(
     ],
   });
 }
+
+/**
+ * Genera y previsualiza el Acta Oficial de Cierre Mensual de Tarjeta José Miguel en PDF.
+ */
+export function exportCardClosurePdf(
+  closure: {
+    code?: string;
+    period: string;
+    closedAt: string;
+    initialDebt: number;
+    totalCharges: number;
+    totalAbonos: number;
+    finalBalance: number;
+    currency?: string;
+    notes?: string;
+    charges?: { code?: string; description: string; category?: string; amount: number; chargedOn: string }[];
+    abonos?: { code?: string; description: string; amount: number; paidFrom?: string; reference?: string; paidOn: string }[];
+  },
+  bcvRates?: { usd: number; eur: number; date?: string },
+  branding?: Partial<SystemConfig>
+): void {
+  const code = closure.code || "Mas-Corp-CJM-0001";
+  const currency = closure.currency || "USD";
+  const chargesList = closure.charges || [];
+  const abonosList = closure.abonos || [];
+
+  // Filas consolidadas para el reporte
+  const combinedRows: Record<string, string | number>[] = [];
+
+  // 1. Consumos
+  chargesList.forEach((c) => {
+    combinedRows.push({
+      tipo: "Consumo Tarjeta",
+      fecha: c.chargedOn || "—",
+      codigo: c.code || "—",
+      concepto: c.description,
+      categoriaCuenta: c.category || "Servicios",
+      referencia: "—",
+      monto: `${currency} ${Number(c.amount).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+    });
+  });
+
+  // 2. Abonos
+  abonosList.forEach((a) => {
+    combinedRows.push({
+      tipo: "Abono a Deuda",
+      fecha: a.paidOn || "—",
+      codigo: a.code || "—",
+      concepto: a.description,
+      categoriaCuenta: a.paidFrom || "Cuenta Bancaria",
+      referencia: a.reference ? `Ref: ${a.reference}` : "—",
+      monto: `− ${currency} ${Number(a.amount).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`,
+    });
+  });
+
+  if (combinedRows.length === 0) {
+    combinedRows.push({
+      tipo: "Cierre General",
+      fecha: closure.closedAt ? closure.closedAt.slice(0, 10) : "—",
+      codigo: code,
+      concepto: `Cierre del periodo ${closure.period}`,
+      categoriaCuenta: "Tarjeta JM",
+      referencia: "—",
+      monto: `${currency} 0,00`,
+    });
+  }
+
+  previewPdfReport({
+    title: "Acta de Cierre Mensual · Tarjeta José Miguel",
+    subtitle: `Periodo: ${closure.period} (${code}) · Fecha de Cierre: ${closure.closedAt ? closure.closedAt.slice(0, 10) : new Date().toISOString().slice(0, 10)}`,
+    filename: `Cierre_Tarjeta_JM_${closure.period.replace(/\s+/g, "_")}_${code}`,
+    branding,
+    bcvRates,
+    kpis: [
+      { label: "Código de Acta", value: code },
+      { label: "Periodo Cerrado", value: closure.period },
+      { label: "Deuda Base Inicial", value: `${currency} ${Number(closure.initialDebt).toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+      { label: "Consumos en Tarjeta", value: `${currency} ${Number(closure.totalCharges).toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+      { label: "Total Abonos Pagados", value: `− ${currency} ${Number(closure.totalAbonos).toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+      { label: "Saldo Final Remanente", value: `${currency} ${Number(closure.finalBalance).toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+    ],
+    columns: [
+      { header: "Tipo de Movimiento", dataKey: "tipo", align: "left" },
+      { header: "Fecha", dataKey: "fecha", align: "center" },
+      { header: "Código", dataKey: "codigo", align: "left" },
+      { header: "Concepto / Detalle", dataKey: "concepto", align: "left" },
+      { header: "Cuenta / Categoría", dataKey: "categoriaCuenta", align: "left" },
+      { header: "Referencia", dataKey: "referencia", align: "center" },
+      { header: "Monto", dataKey: "monto", align: "right" },
+    ],
+    data: combinedRows,
+  });
+}
