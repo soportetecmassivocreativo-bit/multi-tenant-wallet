@@ -103,79 +103,8 @@ export function GastosEspecialesTab({
       !a.name.toLowerCase().includes("tarjeta jm")
   );
 
-  // Consolidar todos los abonos (del servidor + gastos directos de abono)
-  const allAbonos: DeferredAbono[] = [...abonos];
-  if (expenses && expenses.length > 0) {
-    for (const exp of expenses) {
-      const rawNote = exp.note || "";
-      const lowerNote = rawNote.toLowerCase();
-      const lowerCat = (exp.category || "").toLowerCase();
-      const src = ((exp as unknown as { source?: string }).source || "").toLowerCase();
-
-      const isAbono =
-        src === "tarjeta_jm_abono" ||
-        src === "tarjeta_jm_pago" ||
-        src === "tarjeta_jm" ||
-        lowerCat === "abono a tarjeta" ||
-        lowerCat.includes("abono") ||
-        lowerNote.includes("abono a la deuda") ||
-        lowerNote.includes("abono a tarjeta") ||
-        lowerNote.includes("abono tarjeta") ||
-        lowerNote.includes("liquidación tarjeta") ||
-        lowerNote.includes("liquidacion tarjeta") ||
-        lowerNote.includes("pago a tarjeta") ||
-        lowerNote.includes("pago de tarjeta") ||
-        lowerNote.includes("pago josé miguel") ||
-        lowerNote.includes("pago jose miguel") ||
-        lowerNote.includes("abono jm");
-
-      const isCharge =
-        src === "tarjeta_jm_consumo" ||
-        src === "servicio" ||
-        lowerNote.includes("cargo en tarjeta") ||
-        lowerNote.includes("consumo tarjeta");
-
-      if (!isAbono || isCharge) continue;
-
-      const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*$/, "").trim() || "Abono Tarjeta José Miguel";
-
-      let paidFrom = "Pago Móvil Banesco";
-      let ref = "";
-      const metaMatch = rawNote.match(/\[(.*?)\]$/);
-      if (metaMatch) {
-        const metaContent = metaMatch[1];
-        const refMatch = metaContent.match(/Ref:\s*(\d+)/i);
-        if (refMatch) ref = refMatch[1];
-        const cleanAcc = metaContent.replace(/Ref:\s*\d+/i, "").replace(/^[·\s]+|[·\s]+$/g, "").trim();
-        if (cleanAcc) paidFrom = cleanAcc;
-      }
-
-      const exists = allAbonos.some(
-        (a) =>
-          a.expenseId === exp.id ||
-          a.id === `abn_exp_${exp.id}` ||
-          (Number(a.amount) === Number(exp.amount) &&
-            (a.description.toLowerCase().includes(cleanDesc.toLowerCase()) ||
-              cleanDesc.toLowerCase().includes(a.description.toLowerCase())))
-      );
-
-      if (!exists) {
-        allAbonos.unshift({
-          id: `abn_exp_${exp.id}`,
-          code: exp.code || `Mas-Corp-ABN-000${allAbonos.length + 1}`,
-          description: cleanDesc,
-          amount: Number(exp.amount),
-          currency: (exp.currency as CurrencyCode) || "USD",
-          paidOn: exp.date || new Date().toISOString().slice(0, 10),
-          paidFrom,
-          reference: ref || undefined,
-          notes: rawNote,
-          expenseId: exp.id,
-          createdAt: new Date().toISOString(),
-        });
-      }
-    }
-  }
+  // Lista de abonos activos del ciclo (sincronizados desde el servidor y filtrados por la fecha de cierre)
+  const allAbonos: DeferredAbono[] = abonos;
 
   // Cálculos Financieros
   const totalCargosUSD = charges.reduce((s, c) => {

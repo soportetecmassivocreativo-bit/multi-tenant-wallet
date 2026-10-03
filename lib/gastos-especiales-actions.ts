@@ -212,7 +212,11 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
       if (Array.isArray(parsed)) {
-        charges = parsed;
+        charges = parsed.filter((c) => {
+          if (!lastClosureTime) return true;
+          const cTime = c.createdAt ? new Date(c.createdAt).getTime() : 0;
+          return cTime > lastClosureTime;
+        });
       }
     }
   } catch {}
@@ -233,7 +237,8 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
 
       if (svcExpenses && svcExpenses.length > 0) {
         for (const exp of svcExpenses) {
-          const expTime = exp.created_at ? new Date(exp.created_at).getTime() : 0;
+          const expDateStr = exp.created_at || (exp.spent_on ? `${exp.spent_on}T23:59:59.999Z` : "");
+          const expTime = expDateStr ? new Date(expDateStr).getTime() : 0;
           if (lastClosureTime > 0 && expTime > 0 && expTime <= lastClosureTime) {
             continue;
           }
@@ -295,7 +300,11 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
       if (Array.isArray(parsed)) {
-        abonos = parsed;
+        abonos = parsed.filter((a) => {
+          if (!lastClosureTime) return true;
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          return aTime > lastClosureTime;
+        });
       }
     }
   } catch {}
@@ -315,7 +324,8 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
 
       if (expRows && expRows.length > 0) {
         for (const exp of expRows) {
-          const expTime = exp.created_at ? new Date(exp.created_at).getTime() : 0;
+          const expDateStr = exp.created_at || (exp.spent_on ? `${exp.spent_on}T23:59:59.999Z` : "");
+          const expTime = expDateStr ? new Date(expDateStr).getTime() : 0;
           if (lastClosureTime > 0 && expTime > 0 && expTime <= lastClosureTime) {
             continue;
           }
