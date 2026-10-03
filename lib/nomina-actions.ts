@@ -234,11 +234,30 @@ export async function payEmployee(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  const { data: emp } = await ctx.supabase
-    .from("employees")
-    .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
-    .eq("id", employeeId)
-    .single();
+  // Intentar con filtro de company_id (más seguro con RLS habilitado)
+  let emp: Record<string, unknown> | null = null;
+  try {
+    const { data: empFull } = await ctx.supabase
+      .from("employees")
+      .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
+      .eq("id", employeeId)
+      .eq("company_id", ctx.companyId)
+      .maybeSingle();
+    if (empFull) emp = empFull;
+  } catch {}
+
+  // Fallback: buscar solo por id (por si RLS no requiere company_id)
+  if (!emp) {
+    try {
+      const { data: empFallback } = await ctx.supabase
+        .from("employees")
+        .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
+        .eq("id", employeeId)
+        .maybeSingle();
+      if (empFallback) emp = empFallback;
+    } catch {}
+  }
+
   if (!emp) return { ok: false, error: "Empleado no encontrado." };
 
   const isApproved = options?.status === "pagado";
