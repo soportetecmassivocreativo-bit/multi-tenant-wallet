@@ -62,6 +62,7 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
   const [syncPending, startSyncTransition] = useTransition();
 
   const [creditDays, setCreditDays] = useState(0);
+  const [enableVesConversion, setEnableVesConversion] = useState(true);
   const [selectedAccountId, setSelectedAccountId] = useState<string>(
     accounts.find((a) => a.isDefault || a.currency === "USD")?.id || accounts[0]?.id || ""
   );
@@ -99,7 +100,7 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const isCash = creditDays === 0;
   const isForeign = currency !== "VES";
-  const vesEquivalent = isForeign ? toBolivars(activeTotal, rate) : null;
+  const vesEquivalent = isForeign && enableVesConversion ? toBolivars(activeTotal, rate) : null;
 
   function onCurrencyChange(c: CurrencyCode) {
     setCurrency(c);
@@ -212,8 +213,8 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
         accountId: isCash ? (selectedAccountId || undefined) : undefined,
         accountName: isCash && selectedAccount ? selectedAccount.name : undefined,
         reference: isCash && reference.trim() ? reference.trim() : undefined,
-        vesRate: isForeign ? rate : undefined,
-        vesRateRef: isForeign ? (rateRef === "USD" ? "BCV USD" : "BCV EUR") : undefined,
+        vesRate: isForeign && enableVesConversion ? rate : undefined,
+        vesRateRef: isForeign && enableVesConversion ? (rateRef === "USD" ? "BCV USD" : "BCV EUR") : undefined,
       });
 
       if (r.ok) {
@@ -286,8 +287,37 @@ export function NuevoGastoForm({ accounts = [], bcv, onClose }: NuevoGastoFormPr
             </div>
           </div>
 
-          {/* Conversión a Bolívares (BCV / Manual) */}
+          {/* Toggle: Convertir a Bolívares (BCV) */}
           {isForeign && (
+            <div className="flex items-center justify-between rounded-2xl border border-line bg-card px-4 py-3 shadow-sm">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Convertir a Bolívares (Tasa BCV)</p>
+                <p className="text-[11px] text-hint">
+                  {enableVesConversion
+                    ? "Se guardará la equivalencia en Bs. junto con el gasto."
+                    : "El gasto se registrará solo en divisa, sin equivalente en Bs."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnableVesConversion((v) => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                  enableVesConversion ? "bg-accent" : "bg-line"
+                }`}
+                role="switch"
+                aria-checked={enableVesConversion}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    enableVesConversion ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+
+          {/* Conversión a Bolívares (BCV / Manual) */}
+          {isForeign && enableVesConversion && (
             <section className="space-y-3 rounded-2xl border border-line bg-card p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>

@@ -123,6 +123,8 @@ export interface PayServiceOptions {
   notes?: string;
   status?: "pagado" | "pendiente";
   paymentDate?: string;
+  vesRate?: number;
+  vesRateRef?: string;
 }
 
 import {
@@ -191,6 +193,13 @@ export async function payService(
     note = `${note} [${metaParts.join(" · ")}]`;
   }
 
+  // Datos de conversión BCV (opcional)
+  const vesData: Record<string, unknown> = {};
+  if (options?.vesRate && options.vesRate > 0) {
+    vesData.ves_rate = options.vesRate;
+    vesData.ves_rate_ref = options.vesRateRef || "BCV";
+  }
+
   // 1. Insertar en expenses general
   const { error: expError } = await ctx.supabase.from("expenses").insert({
     company_id: ctx.companyId,
@@ -201,6 +210,7 @@ export async function payService(
     spent_on: payDate,
     source: "servicio",
     ref_id: serviceId,
+    ...vesData,
   });
 
   if (expError) return { ok: false, error: expError.message };

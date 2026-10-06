@@ -261,8 +261,8 @@ export function ProformasManager({
 
     const computedTotal = validLines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
-    const vesRateNum = editCurrency !== "VES" && editEnableVesConversion && typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
-    const vesTotal = vesRateNum ? computedTotal * vesRateNum : undefined;
+    const vesRateNum = editCurrency !== "VES" && editEnableVesConversion && typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : 0;
+    const vesTotal = vesRateNum > 0 ? computedTotal * vesRateNum : undefined;
 
     const combinedNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
 
@@ -276,7 +276,7 @@ export function ProformasManager({
         targetAccountName: selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined,
         date: editDate || undefined,
         vesRate: vesRateNum,
-        vesRateRef: vesRateNum ? (editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD") : undefined,
+        vesRateRef: vesRateNum > 0 ? (editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD") : undefined,
         vesTotal,
         lines: validLines,
       });

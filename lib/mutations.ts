@@ -247,6 +247,12 @@ export async function createExpense(
 
   const resolvedSource = isCardAbono ? "tarjeta_jm_abono" : "manual";
 
+  const vesData: Record<string, unknown> = {};
+  if (input.vesRate && input.vesRate > 0) {
+    vesData.ves_rate = input.vesRate;
+    vesData.ves_rate_ref = input.vesRateRef || "BCV";
+  }
+
   const { data: exp, error } = await ctx.supabase
     .from("expenses")
     .insert({
@@ -257,6 +263,7 @@ export async function createExpense(
       currency,
       spent_on: input.date || today(),
       source: resolvedSource,
+      ...vesData,
     })
     .select("id")
     .single();
@@ -326,11 +333,14 @@ export async function updateExpense(
   }
 
   try {
+    const vesFields = input.vesRate && input.vesRate > 0
+      ? { ves_rate: input.vesRate, ves_rate_ref: input.vesRateRef || "BCV" }
+      : (input.vesRate !== undefined ? { ves_rate: null, ves_rate_ref: null } : {});
     const { error } = await ctx.supabase
       .from("expenses")
       .update({
         ...updateData,
-        ...(input.vesRate ? { ves_rate: input.vesRate, ves_rate_ref: input.vesRateRef || "BCV" } : {}),
+        ...vesFields,
       })
       .eq("id", id);
 
@@ -853,6 +863,7 @@ export async function updateProforma(
     if (input.targetAccountName !== undefined) updateData.target_account_name = input.targetAccountName;
     if (input.hasConditions !== undefined) updateData.has_conditions = input.hasConditions;
     if (input.date) updateData.issue_date = input.date;
+    // vesRate explícito: si se proporciona y es > 0, guardar; si es 0/undefined, LIMPIAR (null) para quitar conversión
     if (input.vesRate !== undefined && input.vesRate > 0) {
       updateData.ves_rate = input.vesRate;
       updateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
@@ -860,6 +871,11 @@ export async function updateProforma(
       if (input.vesTotal !== undefined) {
         updateData.ves_total = input.vesTotal;
       }
+    } else if (input.vesRate !== undefined && input.vesRate <= 0) {
+      // Conversión desactivada: borrar campos BCV del registro
+      updateData.ves_rate = null;
+      updateData.ves_rate_ref = null;
+      updateData.ves_total = null;
     }
 
     if (input.lines && input.lines.length > 0) {
@@ -926,6 +942,10 @@ export async function updateProforma(
       if (input.vesTotal !== undefined) {
         invUpdateData.ves_total = input.vesTotal;
       }
+    } else if (input.vesRate !== undefined && input.vesRate <= 0) {
+      invUpdateData.ves_rate = null;
+      invUpdateData.ves_rate_ref = null;
+      invUpdateData.ves_total = null;
     }
 
     if (input.lines && input.lines.length > 0) {

@@ -227,7 +227,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
     }
 
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
-    const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
+    const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : 0;
 
     startTransition(async () => {
       const res = await updateExpense(editingExpense.id, {
@@ -240,7 +240,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
         reference: editReference.trim() ? editReference.trim() : undefined,
         date: editDate || undefined,
         vesRate: vesRateNum,
-        vesRateRef: editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD",
+        vesRateRef: vesRateNum > 0 ? (editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD") : undefined,
       });
 
       if (res.ok) {

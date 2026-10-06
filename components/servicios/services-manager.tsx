@@ -31,9 +31,10 @@ const inputClass =
 interface ServicesManagerProps {
   services: Service[];
   serviceExpenses?: Expense[];
+  bcv?: { usd: number; eur: number; date: string };
 }
 
-export function ServicesManager({ services, serviceExpenses = [] }: ServicesManagerProps) {
+export function ServicesManager({ services, serviceExpenses = [], bcv }: ServicesManagerProps) {
   const [tab, setTab] = useState<"activos" | "historial">("activos");
   const [query, setQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -44,6 +45,7 @@ export function ServicesManager({ services, serviceExpenses = [] }: ServicesMana
   const [cycle, setCycle] = useState("mensual");
   const [category, setCategory] = useState("");
   const [nextChargeDate, setNextChargeDate] = useState(TODAY);
+  const [enableVesConversion, setEnableVesConversion] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -261,6 +263,35 @@ export function ServicesManager({ services, serviceExpenses = [] }: ServicesMana
                 />
               </div>
 
+              {/* Toggle: Mostrar conversión a Bs. */}
+              {currency !== "VES" && bcv && (
+                <div className="flex items-center justify-between rounded-xl border border-line bg-soft/50 px-3 py-2.5">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Mostrar conversión a Bolívares</p>
+                    <p className="text-[10px] text-hint">
+                      {enableVesConversion && bcv
+                        ? `≈ ${((amount || 0) * (currency === "EUR" ? bcv.eur : bcv.usd)).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs. (Tasa ${currency === "EUR" ? bcv.eur.toFixed(2) : bcv.usd.toFixed(2)} BCV)`
+                        : "Se guardará solo en divisa, sin equivalente Bs."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEnableVesConversion((v) => !v)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                      enableVesConversion ? "bg-accent" : "bg-line"
+                    }`}
+                    role="switch"
+                    aria-checked={enableVesConversion}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        enableVesConversion ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
               {error && (
                 <p className="rounded-lg bg-overdue/10 px-3 py-2 text-xs text-overdue">
                   {error}
@@ -356,7 +387,10 @@ export function ServicesManager({ services, serviceExpenses = [] }: ServicesMana
                         <ActionButton
                           label="Pagar"
                           doneLabel="Pagado"
-                          action={() => payService(s.id)}
+                          action={() => payService(s.id, enableVesConversion && bcv && s.currency !== "VES" ? {
+                            vesRate: s.currency === "EUR" ? bcv.eur : bcv.usd,
+                            vesRateRef: s.currency === "EUR" ? "BCV EUR" : "BCV USD",
+                          } : undefined)}
                           className="px-3 py-1 text-xs"
                         />
                       </div>
