@@ -160,6 +160,9 @@ export interface PayPayrollOptions {
   notes?: string;
   periodLabel?: string;
   status?: "pagado" | "pendiente"; // 'pagado' = aprobado y liquidado, 'pendiente' = pendiente por aprobar en gastos
+  employeeName?: string;
+  salary?: number;
+  currency?: CurrencyCode;
 }
 
 /** Paga la nómina completa: registra los egresos vinculados para cada empleado activo */
@@ -170,12 +173,42 @@ export async function payPayroll(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  const { data: emps } = await ctx.supabase
-    .from("employees")
-    .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
-    .eq("company_id", ctx.companyId)
-    .eq("active", true);
-  if (!emps || emps.length === 0)
+  let emps: Array<{ id: string; full_name: string; salary: number; currency: CurrencyCode }> = [];
+
+  try {
+    const { data: empsWithCompany, error: err1 } = await ctx.supabase
+      .from("employees")
+      .select("id, full_name, salary, currency")
+      .eq("company_id", ctx.companyId)
+      .eq("active", true);
+    if (!err1 && empsWithCompany && empsWithCompany.length > 0) {
+      emps = empsWithCompany.map((e: any) => ({
+        id: e.id,
+        full_name: e.full_name,
+        salary: Number(e.salary) || 0,
+        currency: (e.currency as CurrencyCode) || "USD",
+      }));
+    }
+  } catch {}
+
+  if (emps.length === 0) {
+    try {
+      const { data: empsActive, error: err2 } = await ctx.supabase
+        .from("employees")
+        .select("id, full_name, salary, currency")
+        .eq("active", true);
+      if (!err2 && empsActive && empsActive.length > 0) {
+        emps = empsActive.map((e: any) => ({
+          id: e.id,
+          full_name: e.full_name,
+          salary: Number(e.salary) || 0,
+          currency: (e.currency as CurrencyCode) || "USD",
+        }));
+      }
+    } catch {}
+  }
+
+  if (emps.length === 0)
     return { ok: false, error: "No hay empleados activos." };
 
   const isApproved = options?.status === "pagado";
@@ -234,28 +267,54 @@ export async function payEmployee(
   const ctx = await getContext();
   if (!ctx) return { ok: false, error: "No autenticado." };
 
-  // Intentar con filtro de company_id (más seguro con RLS habilitado)
-  let emp: Record<string, unknown> | null = null;
+  let emp: { id: string; full_name: string; salary: number; currency: CurrencyCode } | null = null;
+
+  // 1. Buscar en BD por ID con los campos base universales
   try {
-    const { data: empFull } = await ctx.supabase
+    const { data, error } = await ctx.supabase
       .from("employees")
-      .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
+      .select("id, full_name, salary, currency")
       .eq("id", employeeId)
-      .eq("company_id", ctx.companyId)
       .maybeSingle();
-    if (empFull) emp = empFull;
+
+    if (!error && data) {
+      emp = {
+        id: data.id,
+        full_name: data.full_name,
+        salary: Number(data.salary) || 0,
+        currency: (data.currency as CurrencyCode) || "USD",
+      };
+    }
   } catch {}
 
-  // Fallback: buscar solo por id (por si RLS no requiere company_id)
-  if (!emp) {
+  // 2. Si no se encontró por ID directo, buscar por nombre si se proporcionó
+  if (!emp && options?.employeeName) {
     try {
-      const { data: empFallback } = await ctx.supabase
+      const { data, error } = await ctx.supabase
         .from("employees")
-        .select("id, full_name, salary, currency, role, id_number, bank_name, account_number")
-        .eq("id", employeeId)
+        .select("id, full_name, salary, currency")
+        .ilike("full_name", `%${options.employeeName.trim()}%`)
         .maybeSingle();
-      if (empFallback) emp = empFallback;
+
+      if (!error && data) {
+        emp = {
+          id: data.id,
+          full_name: data.full_name,
+          salary: Number(data.salary) || 0,
+          currency: (data.currency as CurrencyCode) || "USD",
+        };
+      }
     } catch {}
+  }
+
+  // 3. Fallback con los datos del empleado pasados desde el cliente
+  if (!emp && options?.employeeName) {
+    emp = {
+      id: employeeId,
+      full_name: options.employeeName,
+      salary: options.salary !== undefined ? Number(options.salary) : 0,
+      currency: options.currency || "USD",
+    };
   }
 
   if (!emp) return { ok: false, error: "Empleado no encontrado." };

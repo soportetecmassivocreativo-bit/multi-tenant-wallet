@@ -273,6 +273,7 @@ export function EmployeesManager({
     setPayModalError(null);
 
     const selectedAcc = accounts.find((a) => a.id === payAccountId);
+    const isSingleEmployee = payingTarget !== "all";
     const options: PayPayrollOptions = {
       accountId: payAccountId || undefined,
       accountName: selectedAcc?.name || undefined,
@@ -280,6 +281,9 @@ export function EmployeesManager({
       periodLabel: payPeriodLabel.trim() || undefined,
       notes: payNotes.trim() || undefined,
       status: payStatus,
+      employeeName: isSingleEmployee ? payingTarget.name : undefined,
+      salary: isSingleEmployee ? payingTarget.salary : undefined,
+      currency: isSingleEmployee ? payingTarget.currency : undefined,
     };
 
     start(async () => {
