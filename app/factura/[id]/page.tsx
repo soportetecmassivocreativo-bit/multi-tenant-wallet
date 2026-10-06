@@ -56,64 +56,65 @@ export default async function FacturaPage({
     targetAccount = accounts.find((a) => a.name.toLowerCase().includes(inv.targetAccountName!.toLowerCase())) || null;
   }
 
-  // Priorizar siempre cuenta bancaria con número de cuenta para las Coordenadas Bancarias
-  if (!targetAccount || !targetAccount.accountNumber || targetAccount.accountType === "efectivo" || targetAccount.accountType === "zelle") {
-    const bankAccount =
-      accounts.find((a) => a.accountNumber && a.accountNumber.startsWith("0134")) ||
-      accounts.find((a) => (a.accountType === "banco_nacional" || a.accountType === "banco_internacional") && a.accountNumber) ||
-      accounts.find((a) => a.id === "cta-1") ||
-      accounts[0];
-    if (bankAccount) {
-      targetAccount = bankAccount;
-    }
+  if (!targetAccount) {
+    targetAccount =
+      accounts.find((a) => a.isDefault) ||
+      accounts.find((a) => a.accountType === "banco_nacional" && a.accountNumber) ||
+      accounts[0] ||
+      null;
   }
 
-  const rawHolder = targetAccount?.holderName?.trim();
-  const targetHolder =
-    (rawHolder &&
-     !rawHolder.includes("0000") &&
-     rawHolder.toLowerCase() !== "massivo creativo" &&
-     rawHolder.toLowerCase() !== "massivo creativo c.a." &&
-     rawHolder.toLowerCase() !== "massivo corp" &&
-     rawHolder.toLowerCase() !== "custodio de caja principal")
-      ? rawHolder
-      : "MIRIANNYS GUTIERREZ";
+  const isCrypto = targetAccount?.accountType === "crypto" || targetAccount?.currency === "USDT" || (targetAccount?.name && targetAccount.name.toLowerCase().includes("binance"));
+  const isZelle = targetAccount?.accountType === "zelle" || (targetAccount?.name && targetAccount.name.toLowerCase().includes("zelle"));
+  const isPagoMovil = targetAccount?.accountType === "pago_movil";
 
-  const rawBank = targetAccount?.bankName?.trim();
-  const targetBank =
-    (rawBank && !rawBank.includes("0000") && rawBank.toLowerCase() !== "efectivo")
-      ? rawBank
-      : "Banesco Banco Universal (0134)";
+  let accountLabel1 = "Titular Cuenta:";
+  let accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
 
-  const rawNumber = targetAccount?.accountNumber?.trim();
-  const targetNumber =
-    (rawNumber &&
-     !rawNumber.includes("0000-00-0000000000") &&
-     !rawNumber.includes("Sample") &&
-     rawNumber.length > 5)
-      ? rawNumber
-      : (targetAccount?.phone && !targetAccount.phone.includes("0000000"))
-        ? targetAccount.phone
-        : "0134-0205-10-2053028252";
+  let accountLabel2 = "Cédula / RIF:";
+  let accountValue2 = targetAccount?.holderId?.trim() || (isCrypto ? "Red Tron (TRC-20)" : "V-17102452");
 
-  const rawId = targetAccount?.holderId?.trim();
-  const targetId =
-    (rawId && !rawId.includes("0000000") && rawId !== "J-50000000-0" && rawId !== "J-00000000-0")
-      ? rawId
-      : (targetAccount as any)?.idNumber || (targetAccount as any)?.taxId || "V-17102452";
+  let accountLabel3 = "Número Cuenta:";
+  let accountValue3 = targetAccount?.accountNumber?.trim() || "0134-0205-10-2053028252";
 
-  const rateRefLabel = (inv.vesRateRef || "").includes("EUR") ? "EUR" : "USD";
-  const defaultBcvRate = rateRefLabel === "EUR" ? bcv.eur : bcv.usd;
-  const currentRate = inv.vesRate || defaultBcvRate || (rateRefLabel === "EUR" ? 450 : 390.40);
-  const rateFormatted = currentRate.toLocaleString("es-VE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
-  });
+  let accountLabel4 = "Banco:";
+  let accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Banesco Banco Universal (0134)";
+
+  if (isCrypto) {
+    accountLabel1 = "Titular / Destino:";
+    accountLabel2 = "Red / Protocolo:";
+    accountValue2 = targetAccount?.holderId?.trim() || (targetAccount?.notes && targetAccount.notes.includes("Red") ? targetAccount.notes : "Red Tron (TRC-20)");
+    accountLabel3 = "Billetera / Pay ID:";
+    accountValue3 = targetAccount?.accountNumber?.trim() || targetAccount?.email?.trim() || targetAccount?.phone?.trim() || targetAccount?.notes || "Binance Pay ID / USDT";
+    accountLabel4 = "Plataforma:";
+    accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Binance USDT";
+  } else if (isZelle) {
+    accountLabel1 = "Titular:";
+    accountLabel2 = "Identificación:";
+    accountLabel3 = "Correo Zelle:";
+    accountValue3 = targetAccount?.email?.trim() || targetAccount?.phone?.trim() || "massivoagencia@gmail.com";
+    accountLabel4 = "Plataforma / Banco:";
+    accountValue4 = targetAccount?.bankName?.trim() || "Zelle Massivo";
+  } else if (isPagoMovil) {
+    accountLabel1 = "Titular:";
+    accountLabel2 = "Cédula / RIF:";
+    accountLabel3 = "Teléfono Pago Móvil:";
+    accountValue3 = targetAccount?.phone?.trim() || targetAccount?.accountNumber?.trim() || "+58 412-0979022";
+    accountLabel4 = "Banco:";
+    accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Banesco Banco Universal (0134)";
+  }
 
   const isForeign = inv.currency !== "VES";
-  const vesTotalCalculated = (inv.vesRate && inv.vesRate > 0)
-    ? (inv.total * inv.vesRate)
-    : (inv.vesTotal ?? (inv.total * currentRate));
+  // Mostrar conversión a Bs. SOLO si se especificó una tasa (> 0)
+  const showVesConversion = isForeign && inv.vesRate !== undefined && inv.vesRate !== null && Number(inv.vesRate) > 0;
+  const currentRate = Number(inv.vesRate) || 0;
+  const rateFormatted = currentRate > 0
+    ? currentRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+    : "";
+
+  const vesTotalCalculated = inv.vesTotal && inv.vesTotal > 0
+    ? inv.vesTotal
+    : (currentRate > 0 ? inv.total * currentRate : 0);
   const parsedNotes = cleanConceptAndNotes(inv.notes);
   const generalProjectConcept = parsedNotes.title;
   const extraNotes = parsedNotes.notes;
@@ -226,12 +227,14 @@ export default async function FacturaPage({
 
             {/* Columna Derecha: Coordenadas Bancarias */}
             <div className="space-y-1.5 text-neutral-800 sm:text-left">
-              <p><strong className="font-bold text-neutral-900">Titular Cuenta:</strong> {targetHolder}</p>
-              {targetId && (
-                <p><strong className="font-bold text-neutral-900">Cédula / RIF:</strong> <span className="font-mono font-bold">{targetId}</span></p>
+              <p><strong className="font-bold text-neutral-900">{accountLabel1}</strong> {accountValue1}</p>
+              {accountValue2 && (
+                <p><strong className="font-bold text-neutral-900">{accountLabel2}</strong> <span className="font-mono font-bold">{accountValue2}</span></p>
               )}
-              <p><strong className="font-bold text-neutral-900">Número Cuenta:</strong> <span className="font-mono">{targetNumber}</span></p>
-              <p><strong className="font-bold text-neutral-900">Banco:</strong> {targetBank}</p>
+              {accountValue3 && (
+                <p><strong className="font-bold text-neutral-900">{accountLabel3}</strong> <span className="font-mono">{accountValue3}</span></p>
+              )}
+              <p><strong className="font-bold text-neutral-900">{accountLabel4}</strong> {accountValue4}</p>
             </div>
           </div>
 
@@ -256,7 +259,7 @@ export default async function FacturaPage({
             );
 
             return (
-              <div className={`grid ${hasClientRif ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"} gap-3 text-xs pt-1 pb-2 border-b border-neutral-200`}>
+              <div className={`grid ${hasClientRif && showVesConversion ? "grid-cols-2 sm:grid-cols-4" : hasClientRif || showVesConversion ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"} gap-3 text-xs pt-1 pb-2 border-b border-neutral-200`}>
                 <div>
                   <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Empresa Cliente:</p>
                   <p className="text-neutral-900 font-bold text-sm truncate mt-0.5">{inv.clientName && inv.clientName !== "—" ? inv.clientName : "Cliente General"}</p>
@@ -271,10 +274,12 @@ export default async function FacturaPage({
                   <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">La suma de:</p>
                   <p className="text-neutral-900 font-bold text-sm mt-0.5">{formatCurrency(inv.total, inv.currency)}</p>
                 </div>
-                <div>
-                  <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Tasa:</p>
-                  <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{rateFormatted} Bs.</p>
-                </div>
+                {showVesConversion && (
+                  <div>
+                    <p className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">Tasa:</p>
+                    <p className="text-neutral-900 font-mono font-bold text-sm mt-0.5">{rateFormatted} Bs.</p>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -387,7 +392,7 @@ export default async function FacturaPage({
                 </span>
               </div>
 
-              {isForeign && (
+              {showVesConversion && (
                 <div className="flex justify-between items-center py-1.5 border-b border-neutral-300 gap-2">
                   <div className="flex flex-col text-left shrink-0">
                     <span className="font-black text-neutral-900 text-xs uppercase tracking-wider">TOTAL BS</span>

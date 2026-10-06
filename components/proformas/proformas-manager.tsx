@@ -62,6 +62,8 @@ export function ProformasManager({
   // Modal para Editar Proforma
   const [editingProforma, setEditingProforma] = useState<Proforma | null>(null);
   const [editClientId, setEditClientId] = useState("");
+  const [editCurrency, setEditCurrency] = useState<"USD" | "VES" | "EUR">("USD");
+  const [editEnableVesConversion, setEditEnableVesConversion] = useState<boolean>(true);
   const [editProjectTitle, setEditProjectTitle] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
@@ -131,13 +133,17 @@ export function ProformasManager({
     setOpenMenuId(null);
     setEditingProforma(p);
     setEditClientId(p.clientId);
+    const initialCurrency = (p.currency as "USD" | "VES" | "EUR") || "USD";
+    setEditCurrency(initialCurrency);
     setEditAccountId(p.targetAccountId || accounts[0]?.id || "");
     setEditDate(p.date ? p.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
     
-    const isEur = ((p as any).vesRateRef || "").includes("EUR") || p.currency === "EUR";
+    const isEur = ((p as any).vesRateRef || "").includes("EUR") || initialCurrency === "EUR";
     setEditBcvCurrency(isEur ? "EUR" : "USD");
     
-    const defaultRate = p.vesRate || (isEur ? bcv?.eur : bcv?.usd) || "";
+    const hasRate = p.vesRate !== undefined && p.vesRate !== null && Number(p.vesRate) > 0;
+    setEditEnableVesConversion(hasRate);
+    const defaultRate = hasRate ? Number(p.vesRate) : (isEur ? bcv?.eur : bcv?.usd) || "";
     setEditVesRate(defaultRate);
     setEditError(null);
 
@@ -255,7 +261,7 @@ export function ProformasManager({
 
     const computedTotal = validLines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
-    const vesRateNum = typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
+    const vesRateNum = editCurrency !== "VES" && editEnableVesConversion && typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : undefined;
     const vesTotal = vesRateNum ? computedTotal * vesRateNum : undefined;
 
     const combinedNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
@@ -264,12 +270,13 @@ export function ProformasManager({
       const res = await updateProforma({
         id: editingProforma.id,
         clientId: editClientId,
+        currency: editCurrency,
         notes: combinedNotes || undefined,
         targetAccountId: editAccountId,
         targetAccountName: selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined,
         date: editDate || undefined,
         vesRate: vesRateNum,
-        vesRateRef: editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD",
+        vesRateRef: vesRateNum ? (editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD") : undefined,
         vesTotal,
         lines: validLines,
       });
@@ -683,8 +690,8 @@ export function ProformasManager({
                 )}
 
                 <form id="edit-proforma-form" onSubmit={handleEditSubmit} className="space-y-4">
-                  {/* Cliente y Cuenta Prevista */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Cliente, Moneda y Cuenta Prevista */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-muted font-medium mb-1">Cliente *</label>
                       <select
@@ -697,6 +704,32 @@ export function ProformasManager({
                             {c.name} {c.rif ? `(${c.rif})` : ""}
                           </option>
                         ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-muted font-medium mb-1">Moneda Principal</label>
+                      <select
+                        value={editCurrency}
+                        onChange={(e) => {
+                          const newCurr = e.target.value as "USD" | "VES" | "EUR";
+                          setEditCurrency(newCurr);
+                          if (newCurr === "EUR") {
+                            setEditBcvCurrency("EUR");
+                            if (bcv?.eur) setEditVesRate(bcv.eur);
+                          } else if (newCurr === "USD") {
+                            setEditBcvCurrency("USD");
+                            if (bcv?.usd) setEditVesRate(bcv.usd);
+                          } else {
+                            setEditEnableVesConversion(false);
+                            setEditVesRate("");
+                          }
+                        }}
+                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-medium"
+                      >
+                        <option value="USD">💵 Dólares ($ USD)</option>
+                        <option value="VES">🇻🇪 Bolívares (Bs. VES)</option>
+                        <option value="EUR">💶 Euros (€ EUR)</option>
                       </select>
                     </div>
 
@@ -860,116 +893,142 @@ export function ProformasManager({
                     />
                   </div>
 
-                  {/* Fecha y Tasa BCV */}
-                  <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-foreground">📅 Fecha y Tasa BCV de la Proforma</p>
-
-                      {/* Selector de Moneda de Referencia: USD ($) o EUR (€) */}
-                      <div className="flex items-center gap-1 p-0.5 bg-card rounded-xl border border-line w-fit">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditBcvCurrency("USD");
-                            if (bcv?.usd) setEditVesRate(bcv.usd);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                            editBcvCurrency === "USD"
-                              ? "bg-accent text-white shadow-xs"
-                              : "text-muted hover:text-foreground"
-                          }`}
-                        >
-                          💵 $ USD ({bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV"})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditBcvCurrency("EUR");
-                            if (bcv?.eur) setEditVesRate(bcv.eur);
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                            editBcvCurrency === "EUR"
-                              ? "bg-accent text-white shadow-xs"
-                              : "text-muted hover:text-foreground"
-                          }`}
-                        >
-                          💶 € EUR ({bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV"})
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-muted font-medium mb-1">Fecha de Emisión</label>
+                  {/* Fecha y Tasa BCV (Opcional según si el cliente paga en Bs.) */}
+                  {editCurrency !== "VES" && (
+                    <div className="rounded-xl border border-line bg-soft/30 p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">
+                            ¿El cliente pagará en Bolívares (Bs.) con tasa de cambio?
+                          </p>
+                          <p className="text-[11px] text-muted">
+                            Si está activo, se calcula y muestra la conversión oficial en Bolívares en el PDF.
+                          </p>
+                        </div>
                         <input
-                          type="date"
-                          value={editDate}
+                          type="checkbox"
+                          checked={editEnableVesConversion}
                           onChange={(e) => {
-                            const newDate = e.target.value;
-                            setEditDate(newDate);
-                            if (editBcvCurrency === "EUR" && bcv?.eur) {
-                              setEditVesRate(bcv.eur);
-                            } else if (bcv?.usd) {
-                              setEditVesRate(bcv.usd);
+                            const checked = e.target.checked;
+                            setEditEnableVesConversion(checked);
+                            if (checked && !editVesRate) {
+                              const r = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
+                              setEditVesRate(r > 0 ? r : "");
                             }
                           }}
-                          className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-muted font-medium mb-1">
-                          Tasa BCV Referencial (Bs./{editBcvCurrency})
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder={editBcvCurrency === "EUR" ? (bcv?.eur ? bcv.eur.toFixed(2) : "Ej. 50.00") : (bcv?.usd ? bcv.usd.toFixed(2) : "Ej. 45.50")}
-                            value={editVesRate}
-                            onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
-                            className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
-                          />
+                      {editEnableVesConversion && (
+                        <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold text-foreground">Tasa BCV de Referencia:</span>
+
+                            {/* Selector de Moneda de Referencia: USD ($) o EUR (€) */}
+                            <div className="flex items-center gap-1 p-0.5 bg-card rounded-xl border border-line w-fit">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditBcvCurrency("USD");
+                                  if (bcv?.usd) setEditVesRate(bcv.usd);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                  editBcvCurrency === "USD"
+                                    ? "bg-accent text-white shadow-xs"
+                                    : "text-muted hover:text-foreground"
+                                }`}
+                              >
+                                💵 $ USD ({bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV"})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditBcvCurrency("EUR");
+                                  if (bcv?.eur) setEditVesRate(bcv.eur);
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                  editBcvCurrency === "EUR"
+                                    ? "bg-accent text-white shadow-xs"
+                                    : "text-muted hover:text-foreground"
+                                }`}
+                              >
+                                💶 € EUR ({bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV"})
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-muted font-medium mb-1">Fecha de Emisión</label>
+                              <input
+                                type="date"
+                                value={editDate}
+                                onChange={(e) => {
+                                  const newDate = e.target.value;
+                                  setEditDate(newDate);
+                                  if (editBcvCurrency === "EUR" && bcv?.eur) {
+                                    setEditVesRate(bcv.eur);
+                                  } else if (bcv?.usd) {
+                                    setEditVesRate(bcv.usd);
+                                  }
+                                }}
+                                className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-muted font-medium mb-1">
+                                Tasa BCV Referencial (Bs./{editBcvCurrency})
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder={editBcvCurrency === "EUR" ? (bcv?.eur ? bcv.eur.toFixed(2) : "Ej. 50.00") : (bcv?.usd ? bcv.usd.toFixed(2) : "Ej. 45.50")}
+                                  value={editVesRate}
+                                  onChange={(e) => setEditVesRate(e.target.value === "" ? "" : parseFloat(e.target.value))}
+                                  className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent font-mono font-bold"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
+                                    if (rateToUse > 0) setEditVesRate(rateToUse);
+                                    setEditDate(new Date().toISOString().slice(0, 10));
+                                  }}
+                                  className="rounded-xl border border-line bg-card px-2.5 py-2 text-[10px] font-semibold text-accent hover:bg-soft active:scale-95 transition-all whitespace-nowrap shadow-xs"
+                                  title="Tomar fecha de hoy y tasa actual"
+                                >
+                                  🔄 Hoy
+                                </button>
+                              </div>
+                              {computedVesTotal !== undefined && (
+                                <p className="text-[11px] text-income font-medium mt-1">
+                                  ≈ {computedVesTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
                           <button
                             type="button"
                             onClick={() => {
+                              setEditDate(new Date().toISOString().slice(0, 10));
                               const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
                               if (rateToUse > 0) setEditVesRate(rateToUse);
-                              setEditDate(new Date().toISOString().slice(0, 10));
                             }}
-                            className="rounded-xl border border-line bg-card px-2.5 py-2 text-[10px] font-semibold text-accent hover:bg-soft active:scale-95 transition-all whitespace-nowrap shadow-xs"
-                            title="Tomar fecha de hoy y tasa actual"
+                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 py-1.5 px-3 text-xs font-semibold text-accent hover:bg-accent/20 active:scale-95 transition-all"
                           >
-                            🔄 Hoy
+                            <span>
+                              🔄 Actualizar Fecha a Hoy y Tasa {editBcvCurrency} ({editBcvCurrency === "EUR" ? (bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV") : (bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV")})
+                            </span>
                           </button>
                         </div>
-                        {computedVesTotal !== undefined && (
-                          <p className="text-[11px] text-income font-medium mt-1">
-                            ≈ {computedVesTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditDate(new Date().toISOString().slice(0, 10));
-                        const rateToUse = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
-                        if (rateToUse > 0) setEditVesRate(rateToUse);
-                      }}
-                      className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent/10 py-1.5 px-3 text-xs font-semibold text-accent hover:bg-accent/20 active:scale-95 transition-all"
-                    >
-                      <span>
-                        🔄 Actualizar Fecha a Hoy y Tasa {editBcvCurrency} ({editBcvCurrency === "EUR" ? (bcv?.eur ? `${bcv.eur.toFixed(2)} Bs.` : "BCV") : (bcv?.usd ? `${bcv.usd.toFixed(2)} Bs.` : "BCV")})
-                      </span>
-                    </button>
-
-                    <p className="text-[11px] text-hint">
-                      Puedes alternar entre Dólar ($) y Euro (€). Al cambiar la fecha o hacer clic en actualizar, el sistema toma la tasa oficial del BCV vigente para reflejar el total en bolívares en el PDF.
-                    </p>
-                  </div>
+                  )}
                 </form>
               </div>
 

@@ -123,8 +123,12 @@ export async function getCompanyAccounts(): Promise<CompanyAccount[]> {
       if (Array.isArray(parsed) && parsed.length > 0) {
         let needsResave = false;
 
-        // Sanitizar y actualizar cuentas para asegurar datos reales
+        // Sanitizar y actualizar cuentas respetando el tipo de cuenta
         parsed = parsed.map((a, idx) => {
+          const isNationalBank = a.accountType === "banco_nacional" || a.accountType === "pago_movil";
+          const isCrypto = a.accountType === "crypto" || a.currency === "USDT" || a.name.toLowerCase().includes("binance");
+          const isZelle = a.accountType === "zelle" || a.name.toLowerCase().includes("zelle");
+
           if (
             !a.holderName ||
             a.holderName.toLowerCase() === "massivo creativo" ||
@@ -140,38 +144,38 @@ export async function getCompanyAccounts(): Promise<CompanyAccount[]> {
             a.holderId === "J-50000000-0" ||
             a.holderId === "J-00000000-0"
           ) {
-            needsResave = true;
-            a.holderId = "V-17102452";
+            if (!isCrypto) {
+              needsResave = true;
+              a.holderId = "V-17102452";
+            }
           }
-          if (
-            !a.bankName ||
-            a.bankName.includes("0000") ||
-            a.accountType === "banco_nacional"
-          ) {
+          if (isNationalBank) {
             if (!a.bankName || a.bankName.includes("0000")) {
               needsResave = true;
               a.bankName = "Banesco Banco Universal (0134)";
             }
-          }
-          if (
-            !a.accountNumber ||
-            a.accountNumber.includes("0000-00-0000000000") ||
-            a.accountNumber.includes("0000-00")
-          ) {
-            needsResave = true;
-            a.accountNumber = "0134-0205-10-2053028252";
-          }
-          if (a.code === "Mas-Corp-Cta-0004" && (idx === 0 || a.name.includes("Binance"))) {
-            needsResave = true;
-            return { ...a, code: "Mas-Corp-Cta-0002" };
-          }
-          if (a.code === "Mas-Corp-Cta-0005" && (idx === 1 || a.name.includes("Caja Chica"))) {
-            needsResave = true;
-            return { ...a, code: "Mas-Corp-Cta-0003" };
+            if (
+              !a.accountNumber ||
+              a.accountNumber.includes("0000-00-0000000000") ||
+              a.accountNumber.includes("0000-00")
+            ) {
+              needsResave = true;
+              a.accountNumber = "0134-0205-10-2053028252";
+            }
+          } else if (isCrypto) {
+            if (!a.bankName) {
+              needsResave = true;
+              a.bankName = "Binance (USDT)";
+            }
+          } else if (isZelle) {
+            if (!a.bankName) {
+              needsResave = true;
+              a.bankName = "Zelle";
+            }
           }
           if (!a.code) {
             needsResave = true;
-            return { ...a, code: formatEntityCode("Mas-Corp-Cta-", idx + 2, 4) };
+            return { ...a, code: formatEntityCode("Mas-Corp-Cta-", idx + 1, 4) };
           }
           return a;
         });

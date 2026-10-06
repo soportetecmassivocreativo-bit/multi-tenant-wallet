@@ -56,6 +56,7 @@ export function NuevaProformaForm({
   const [currentBcv, setCurrentBcv] = useState(safeBcv);
   const [clientId, setClientId] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
+  const [enableVesConversion, setEnableVesConversion] = useState(true);
   const [rateRef, setRateRef] = useState<RateRef>("USD");
   const [rateMode, setRateMode] = useState<"usd" | "eur" | "manual">("usd");
   const [rate, setRate] = useState<number>(safeBcv.usd);
@@ -174,7 +175,7 @@ export function NuevaProformaForm({
     [lines, taxRate, discountPct, validDays],
   );
 
-  const vesTotal = isForeign ? toBolivars(computed.total, rate) : null;
+  const vesTotal = isForeign && enableVesConversion && rate > 0 ? toBolivars(computed.total, rate) : null;
 
   function updateLine(id: number, patch: Partial<Line>) {
     setLines((prev) =>
@@ -235,7 +236,7 @@ export function NuevaProformaForm({
         discountPct,
         validDays,
         rateRef,
-        rate,
+        rate: isForeign && enableVesConversion && rate > 0 ? rate : 0,
         notes: combinedNotes || undefined,
         targetAccountId: selectedAccount?.id,
         targetAccountName: selectedAccount ? `${selectedAccount.name} (${selectedAccount.bankName || selectedAccount.accountType})` : undefined,
@@ -380,98 +381,119 @@ export function NuevaProformaForm({
           <div className="flex items-center justify-between">
             <div>
               <p className="font-serif text-[15px]">Conversión a Bolívares</p>
-              <p className="text-[11px] text-hint flex items-center gap-1.5 flex-wrap">
-                <span>
-                  {rateMode === "manual"
-                    ? "Tasa manual de contingencia"
-                    : `BCV Oficial · Fecha Valor: ${formatDate(currentBcv?.date) || "Hoy"}`}
-                </span>
-                {syncMsg && (
-                  <span className="rounded-md bg-income/15 px-1.5 py-0.5 text-[10px] font-semibold text-income">
-                    ✓ {syncMsg}
-                  </span>
-                )}
+              <p className="text-[11px] text-hint">
+                ¿El cliente pagará en Bolívares (Bs.) usando tasa de cambio?
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={syncPending}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-soft px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-line active:scale-95 disabled:opacity-50 transition-all border border-line"
-              title="Sincronizar tasa y fecha oficial del BCV en vivo"
-            >
-              <ArrowPathIcon className={`h-3.5 w-3.5 ${syncPending ? "animate-spin text-accent" : ""}`} />
-              <span className="text-[11px]">{syncPending ? "Sincronizando…" : "Actualizar BCV"}</span>
-            </button>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className="text-xs font-semibold text-foreground">
+                {enableVesConversion ? "Mostrar en Bs." : "Solo en Divisa"}
+              </span>
+              <input
+                type="checkbox"
+                checked={enableVesConversion}
+                onChange={(e) => setEnableVesConversion(e.target.checked)}
+                className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+              />
+            </label>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              onClick={() => onSelectRateRef("USD")}
-              className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
-                rateMode === "usd"
-                  ? "border-accent bg-accent-bg text-accent-text"
-                  : "border-line text-muted hover:bg-soft"
-              }`}
-            >
-              Tasa Dólar
-            </button>
+          {enableVesConversion && (
+            <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-hint flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    {rateMode === "manual"
+                      ? "Tasa manual de contingencia"
+                      : `BCV Oficial · Fecha Valor: ${formatDate(currentBcv?.date) || "Hoy"}`}
+                  </span>
+                  {syncMsg && (
+                    <span className="rounded-md bg-income/15 px-1.5 py-0.5 text-[10px] font-semibold text-income">
+                      ✓ {syncMsg}
+                    </span>
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleSync}
+                  disabled={syncPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-soft px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-line active:scale-95 disabled:opacity-50 transition-all border border-line"
+                  title="Sincronizar tasa y fecha oficial del BCV en vivo"
+                >
+                  <ArrowPathIcon className={`h-3.5 w-3.5 ${syncPending ? "animate-spin text-accent" : ""}`} />
+                  <span className="text-[11px]">{syncPending ? "Sincronizando…" : "Actualizar BCV"}</span>
+                </button>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => onSelectRateRef("EUR")}
-              className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
-                rateMode === "eur"
-                  ? "border-accent bg-accent-bg text-accent-text"
-                  : "border-line text-muted hover:bg-soft"
-              }`}
-            >
-              Tasa Euro
-            </button>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onSelectRateRef("USD")}
+                  className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                    rateMode === "usd"
+                      ? "border-accent bg-accent-bg text-accent-text"
+                      : "border-line text-muted hover:bg-soft"
+                  }`}
+                >
+                  Tasa Dólar
+                </button>
 
-            <button
-              type="button"
-              onClick={onSelectManual}
-              className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
-                rateMode === "manual"
-                  ? "border-accent bg-accent-bg text-accent-text"
-                  : "border-line text-muted hover:bg-soft"
-              }`}
-            >
-              Tasa Manual
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => onSelectRateRef("EUR")}
+                  className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                    rateMode === "eur"
+                      ? "border-accent bg-accent-bg text-accent-text"
+                      : "border-line text-muted hover:bg-soft"
+                  }`}
+                >
+                  Tasa Euro
+                </button>
 
-          <div className="flex items-center gap-2 pt-1">
-            <span className="whitespace-nowrap text-xs text-muted">
-              Bs por {CURRENCIES[rateRef].symbol}
-            </span>
-            <MoneyInput
-              value={rate}
-              onValueChange={onRateValueChange}
-              className={inputClass}
-            />
-          </div>
+                <button
+                  type="button"
+                  onClick={onSelectManual}
+                  className={`rounded-xl border px-2 py-2 text-xs font-medium transition-all active:scale-[0.98] ${
+                    rateMode === "manual"
+                      ? "border-accent bg-accent-bg text-accent-text"
+                      : "border-line text-muted hover:bg-soft"
+                  }`}
+                >
+                  Tasa Manual
+                </button>
+              </div>
 
-          {rateMode === "manual" && (
-            <div className="flex items-center justify-between rounded-xl bg-accent-bg/40 p-2.5 text-xs text-muted">
-              <span>Personalizada para esta proforma</span>
-              <button
-                type="button"
-                onClick={handleSaveAsGlobalRate}
-                disabled={syncPending}
-                className="font-medium text-accent hover:underline disabled:opacity-50"
-              >
-                Fijar como tasa general
-              </button>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="whitespace-nowrap text-xs text-muted">
+                  Bs por {CURRENCIES[rateRef].symbol}
+                </span>
+                <MoneyInput
+                  value={rate}
+                  onValueChange={onRateValueChange}
+                  className={inputClass}
+                />
+              </div>
+
+              {rateMode === "manual" && (
+                <div className="flex items-center justify-between rounded-xl bg-accent-bg/40 p-2.5 text-xs text-muted">
+                  <span>Personalizada para esta proforma</span>
+                  <button
+                    type="button"
+                    onClick={handleSaveAsGlobalRate}
+                    disabled={syncPending}
+                    className="font-medium text-accent hover:underline disabled:opacity-50"
+                  >
+                    Fijar como tasa general
+                  </button>
+                </div>
+              )}
+
+              {syncMsg && (
+                <p className="text-[11px] text-income animate-fade-in">
+                  ✓ {syncMsg}
+                </p>
+              )}
             </div>
-          )}
-
-          {syncMsg && (
-            <p className="text-[11px] text-income animate-fade-in">
-              ✓ {syncMsg}
-            </p>
           )}
         </section>
       )}
