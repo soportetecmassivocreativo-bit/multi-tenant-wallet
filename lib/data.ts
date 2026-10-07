@@ -173,6 +173,7 @@ export interface ProformaDetail {
   vesRateRef: string | null;
   vesTotal: number | null;
   notes?: string;
+  rawNotes?: string;
   items: ProformaItem[];
   invoiceId?: string;
   targetAccountId?: string;
@@ -408,7 +409,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
         .select(
-          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, targetAccountId:target_account_id, targetAccountName:target_account_name",
         )
         .eq("id", id)
         .maybeSingle();
@@ -513,6 +514,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     vesRateRef: (row.vesRateRef as string) ?? (row.ves_rate_ref as string) ?? null,
     vesTotal: (row.vesTotal as number) ?? (row.ves_total as number) ?? null,
     notes: extractedNote,
+    rawNotes: (row.notes as string) || undefined,
     items: cleanItems,
     invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
     targetAccountId: (row.targetAccountId || (row as any).target_account_id) as string | undefined,
@@ -590,6 +592,8 @@ export interface InvoiceDetail {
   payments: Payment[];
   paidTotal: number;
   balance: number;
+  targetAccountId?: string;
+  targetAccountName?: string;
 }
 
 export async function getInvoiceDetail(
@@ -633,7 +637,7 @@ export async function getInvoiceDetail(
   const { data: inv } = await supabase
     .from("invoices")
     .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, targetAccountId:target_account_id, targetAccountName:target_account_name",
     )
     .eq("id", id)
     .single();

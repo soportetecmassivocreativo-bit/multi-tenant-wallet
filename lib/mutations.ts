@@ -780,6 +780,8 @@ export async function createProforma(
       status: "pendiente",
       issue_date: issueDateISO,
       due_date: validUntilISO,
+      target_account_id: input.targetAccountId || null,
+      target_account_name: input.targetAccountName || null,
     })
     .select("id")
     .single();

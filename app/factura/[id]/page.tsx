@@ -49,11 +49,47 @@ export default async function FacturaPage({
           : "massivoagencia@gmail.com";
   const website = "www.massivocreativo.com";
 
-  const targetAccountId = inv.targetAccountId || config.pdfInvoiceTargetAccountId;
+  const targetAccountId = inv.targetAccountId;
   let targetAccount = targetAccountId ? accounts.find((a) => a.id === targetAccountId) : null;
 
-  if (!targetAccount && inv.targetAccountName) {
-    targetAccount = accounts.find((a) => a.name.toLowerCase().includes(inv.targetAccountName!.toLowerCase())) || null;
+  let savedNameCandidate = inv.targetAccountName || "";
+  if (!savedNameCandidate && inv.notes) {
+    const cuentaMatch = inv.notes.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || inv.notes.match(/\[Cuenta:\s*([^\]]+)\]/i);
+    if (cuentaMatch) {
+      savedNameCandidate = cuentaMatch[1];
+    }
+  }
+
+  if (!targetAccount && savedNameCandidate) {
+    const savedName = savedNameCandidate.toLowerCase();
+    targetAccount = accounts.find((a) => a.name.toLowerCase() === savedName.split("(")[0].trim()) || null;
+    if (!targetAccount) {
+      targetAccount = accounts.find((a) => savedName.includes(a.name.toLowerCase()) || a.name.toLowerCase().includes(savedName.split("(")[0].trim())) || null;
+    }
+    if (!targetAccount) {
+      const isSavedCrypto = savedName.includes("binance") || savedName.includes("usdt") || savedName.includes("crypto") || savedName.includes("trc") || savedName.includes("btc");
+      const isSavedZelle = savedName.includes("zelle");
+      const isSavedPagoMovil = savedName.includes("pago móvil") || savedName.includes("pago movil");
+      if (isSavedCrypto) {
+        targetAccount = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || (a.name && a.name.toLowerCase().includes("binance"))) || null;
+      } else if (isSavedZelle) {
+        targetAccount = accounts.find((a) => a.accountType === "zelle" || (a.name && a.name.toLowerCase().includes("zelle"))) || null;
+      } else if (isSavedPagoMovil) {
+        targetAccount = accounts.find((a) => a.accountType === "pago_movil") || null;
+      }
+    }
+  }
+
+  if (!targetAccount) {
+    const isCryptoHint = (inv.notes && (inv.notes.toLowerCase().includes("binance") || inv.notes.toLowerCase().includes("usdt") || inv.notes.toLowerCase().includes("trc"))) ||
+      (inv.currency as string) === "USDT";
+    if (isCryptoHint) {
+      targetAccount = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || (a.name && a.name.toLowerCase().includes("binance"))) || null;
+    }
+  }
+
+  if (!targetAccount && config.pdfInvoiceTargetAccountId) {
+    targetAccount = accounts.find((a) => a.id === config.pdfInvoiceTargetAccountId) || null;
   }
 
   if (!targetAccount) {
@@ -72,36 +108,49 @@ export default async function FacturaPage({
   let accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
 
   let accountLabel2 = "Cédula / RIF:";
-  let accountValue2 = targetAccount?.holderId?.trim() || (isCrypto ? "Red Tron (TRC-20)" : "V-17102452");
+  let accountValue2 = targetAccount?.holderId?.trim() || "";
 
   let accountLabel3 = "Número Cuenta:";
-  let accountValue3 = targetAccount?.accountNumber?.trim() || "0134-0205-10-2053028252";
+  let accountValue3 = targetAccount?.accountNumber?.trim() || "";
 
   let accountLabel4 = "Banco:";
-  let accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Banesco Banco Universal (0134)";
+  let accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "";
 
   if (isCrypto) {
     accountLabel1 = "Titular / Destino:";
+    accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
     accountLabel2 = "Red / Protocolo:";
-    accountValue2 = targetAccount?.holderId?.trim() || (targetAccount?.notes && targetAccount.notes.includes("Red") ? targetAccount.notes : "Red Tron (TRC-20)");
+    accountValue2 = targetAccount?.notes?.includes("Red")
+      ? targetAccount.notes
+      : (targetAccount?.holderId?.trim() && !targetAccount.holderId.startsWith("V-") && !targetAccount.holderId.startsWith("J-")
+          ? targetAccount.holderId.trim()
+          : "Red Tron (TRC-20)");
     accountLabel3 = "Billetera / Pay ID:";
-    accountValue3 = targetAccount?.accountNumber?.trim() || targetAccount?.email?.trim() || targetAccount?.phone?.trim() || targetAccount?.notes || "Binance Pay ID / USDT";
+    accountValue3 = targetAccount?.accountNumber?.trim() || targetAccount?.email?.trim() || targetAccount?.phone?.trim() || "Binance Pay ID / USDT";
     accountLabel4 = "Plataforma:";
     accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Binance USDT";
   } else if (isZelle) {
     accountLabel1 = "Titular:";
+    accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
     accountLabel2 = "Identificación:";
+    accountValue2 = targetAccount?.holderId?.trim() || "V-17102452";
     accountLabel3 = "Correo Zelle:";
     accountValue3 = targetAccount?.email?.trim() || targetAccount?.phone?.trim() || "massivoagencia@gmail.com";
     accountLabel4 = "Plataforma / Banco:";
     accountValue4 = targetAccount?.bankName?.trim() || "Zelle Massivo";
   } else if (isPagoMovil) {
     accountLabel1 = "Titular:";
+    accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
     accountLabel2 = "Cédula / RIF:";
+    accountValue2 = targetAccount?.holderId?.trim() || "V-17102452";
     accountLabel3 = "Teléfono Pago Móvil:";
     accountValue3 = targetAccount?.phone?.trim() || targetAccount?.accountNumber?.trim() || "+58 412-0979022";
     accountLabel4 = "Banco:";
     accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Banesco Banco Universal (0134)";
+  } else {
+    if (!accountValue2) accountValue2 = "V-17102452";
+    if (!accountValue3) accountValue3 = "0134-0205-10-2053028252";
+    if (!accountValue4) accountValue4 = "Banesco Banco Universal (0134)";
   }
 
   const isForeign = inv.currency !== "VES";

@@ -60,11 +60,50 @@ export default async function ProformaPrintPage({
 
   const website = "www.massivocreativo.com";
 
-  const targetAccountId = prof.targetAccountId || config.pdfProformaTargetAccountId;
+  const targetAccountId = prof.targetAccountId;
   let targetAccount = targetAccountId ? accounts.find((a) => a.id === targetAccountId) : null;
 
-  if (!targetAccount && prof.targetAccountName) {
-    targetAccount = accounts.find((a) => a.name.toLowerCase().includes(prof.targetAccountName!.toLowerCase())) || null;
+  // Si no se encontró por ID, buscar por nombre guardado o en las notas originales
+  let savedNameCandidate = prof.targetAccountName || "";
+  if (!savedNameCandidate && prof.rawNotes) {
+    const cuentaMatch = prof.rawNotes.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || prof.rawNotes.match(/\[Cuenta:\s*([^\]]+)\]/i);
+    if (cuentaMatch) {
+      savedNameCandidate = cuentaMatch[1];
+    }
+  }
+
+  if (!targetAccount && savedNameCandidate) {
+    const savedName = savedNameCandidate.toLowerCase();
+    targetAccount = accounts.find((a) => a.name.toLowerCase() === savedName.split("(")[0].trim()) || null;
+    if (!targetAccount) {
+      targetAccount = accounts.find((a) => savedName.includes(a.name.toLowerCase()) || a.name.toLowerCase().includes(savedName.split("(")[0].trim())) || null;
+    }
+    if (!targetAccount) {
+      const isSavedCrypto = savedName.includes("binance") || savedName.includes("usdt") || savedName.includes("crypto") || savedName.includes("trc") || savedName.includes("btc");
+      const isSavedZelle = savedName.includes("zelle");
+      const isSavedPagoMovil = savedName.includes("pago móvil") || savedName.includes("pago movil");
+      if (isSavedCrypto) {
+        targetAccount = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || (a.name && a.name.toLowerCase().includes("binance"))) || null;
+      } else if (isSavedZelle) {
+        targetAccount = accounts.find((a) => a.accountType === "zelle" || (a.name && a.name.toLowerCase().includes("zelle"))) || null;
+      } else if (isSavedPagoMovil) {
+        targetAccount = accounts.find((a) => a.accountType === "pago_movil") || null;
+      }
+    }
+  }
+
+  // Si aún no se encuentra pero la moneda o notas indican Binance/USDT
+  if (!targetAccount) {
+    const isCryptoHint = (prof.rawNotes && (prof.rawNotes.toLowerCase().includes("binance") || prof.rawNotes.toLowerCase().includes("usdt") || prof.rawNotes.toLowerCase().includes("trc"))) ||
+      (prof.currency as string) === "USDT";
+    if (isCryptoHint) {
+      targetAccount = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || (a.name && a.name.toLowerCase().includes("binance"))) || null;
+    }
+  }
+
+  // Fallback de configuración o default
+  if (!targetAccount && config.pdfProformaTargetAccountId) {
+    targetAccount = accounts.find((a) => a.id === config.pdfProformaTargetAccountId) || null;
   }
 
   if (!targetAccount) {
@@ -83,36 +122,49 @@ export default async function ProformaPrintPage({
   let accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
 
   let accountLabel2 = "Cédula / RIF:";
-  let accountValue2 = targetAccount?.holderId?.trim() || (isCrypto ? "Red Tron (TRC-20)" : "V-17102452");
+  let accountValue2 = targetAccount?.holderId?.trim() || "";
 
   let accountLabel3 = "Número Cuenta:";
-  let accountValue3 = targetAccount?.accountNumber?.trim() || "0134-0205-10-2053028252";
+  let accountValue3 = targetAccount?.accountNumber?.trim() || "";
 
   let accountLabel4 = "Banco:";
-  let accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Banesco Banco Universal (0134)";
+  let accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "";
 
   if (isCrypto) {
     accountLabel1 = "Titular / Destino:";
+    accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
     accountLabel2 = "Red / Protocolo:";
-    accountValue2 = targetAccount?.holderId?.trim() || (targetAccount?.notes && targetAccount.notes.includes("Red") ? targetAccount.notes : "Red Tron (TRC-20)");
+    accountValue2 = targetAccount?.notes?.includes("Red")
+      ? targetAccount.notes
+      : (targetAccount?.holderId?.trim() && !targetAccount.holderId.startsWith("V-") && !targetAccount.holderId.startsWith("J-")
+          ? targetAccount.holderId.trim()
+          : "Red Tron (TRC-20)");
     accountLabel3 = "Billetera / Pay ID:";
-    accountValue3 = targetAccount?.accountNumber?.trim() || targetAccount?.email?.trim() || targetAccount?.phone?.trim() || targetAccount?.notes || "Binance Pay ID / USDT";
+    accountValue3 = targetAccount?.accountNumber?.trim() || targetAccount?.email?.trim() || targetAccount?.phone?.trim() || "Binance Pay ID / USDT";
     accountLabel4 = "Plataforma:";
     accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Binance USDT";
   } else if (isZelle) {
     accountLabel1 = "Titular:";
+    accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
     accountLabel2 = "Identificación:";
+    accountValue2 = targetAccount?.holderId?.trim() || "V-17102452";
     accountLabel3 = "Correo Zelle:";
     accountValue3 = targetAccount?.email?.trim() || targetAccount?.phone?.trim() || "massivoagencia@gmail.com";
     accountLabel4 = "Plataforma / Banco:";
     accountValue4 = targetAccount?.bankName?.trim() || "Zelle Massivo";
   } else if (isPagoMovil) {
     accountLabel1 = "Titular:";
+    accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
     accountLabel2 = "Cédula / RIF:";
+    accountValue2 = targetAccount?.holderId?.trim() || "V-17102452";
     accountLabel3 = "Teléfono Pago Móvil:";
     accountValue3 = targetAccount?.phone?.trim() || targetAccount?.accountNumber?.trim() || "+58 412-0979022";
     accountLabel4 = "Banco:";
     accountValue4 = targetAccount?.bankName?.trim() || targetAccount?.name || "Banesco Banco Universal (0134)";
+  } else {
+    if (!accountValue2) accountValue2 = "V-17102452";
+    if (!accountValue3) accountValue3 = "0134-0205-10-2053028252";
+    if (!accountValue4) accountValue4 = "Banesco Banco Universal (0134)";
   }
 
   const isForeign = prof.currency !== "VES";
