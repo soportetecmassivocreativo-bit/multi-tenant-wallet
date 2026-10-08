@@ -7,7 +7,18 @@ import {
   type TenantConfig,
 } from "@/lib/supabase/tenants-config";
 
-const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/proforma", "/factura"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/registro",
+  "/auth",
+];
+
+function isPublicRoute(pathname: string): boolean {
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return true;
+  // Solo la vista pública del comprobante /proforma/[id] y /factura/[id]
+  if (pathname.startsWith("/proforma/") || pathname.startsWith("/factura/")) return true;
+  return false;
+}
 
 /**
  * Middleware Multi-Tenant:
@@ -59,7 +70,8 @@ export async function updateSession(request: NextRequest) {
     return res;
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = isPublicRoute(pathname);
+  const isAuthRoute = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const cookiesList = request.cookies.getAll();
   const hasAuthCookie = cookiesList.some(
     (c) => c.name.includes("-auth-token") || c.name.startsWith("sb-")
@@ -173,8 +185,8 @@ export async function updateSession(request: NextRequest) {
       return redirectRes;
     }
 
-    // Con sesión en una ruta de auth → dashboard o panel master según el dominio.
-    if (user && isPublic) {
+    // Con sesión en una ruta de auth (/login, /registro) → dashboard o panel master según el dominio.
+    if (user && isAuthRoute) {
       const url = request.nextUrl.clone();
       url.pathname = isMasterPortal ? "/admin/empresas" : "/dashboard";
       const redirectRes = NextResponse.redirect(url);
