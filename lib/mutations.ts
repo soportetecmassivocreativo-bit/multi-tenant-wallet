@@ -253,21 +253,53 @@ export async function createExpense(
     vesData.ves_rate_ref = input.vesRateRef || "BCV";
   }
 
-  const { data: exp, error } = await ctx.supabase
-    .from("expenses")
-    .insert({
-      company_id: ctx.companyId,
-      category: input.category || "General",
-      note: finalNote,
-      amount: input.amount,
-      currency,
-      spent_on: input.date || today(),
-      source: resolvedSource,
-      ...vesData,
-    })
-    .select("id")
-    .single();
-  if (error) return { ok: false, error: error.message };
+  const baseExpenseData = {
+    company_id: ctx.companyId,
+    category: input.category || "General",
+    note: finalNote,
+    amount: input.amount,
+    currency,
+    spent_on: input.date || today(),
+    source: resolvedSource,
+  };
+
+  let exp: { id: string } | null = null;
+  let insertError: any = null;
+
+  if (Object.keys(vesData).length > 0) {
+    const res = await ctx.supabase
+      .from("expenses")
+      .insert({
+        ...baseExpenseData,
+        ...vesData,
+      })
+      .select("id")
+      .single();
+    if (res.error) {
+      // Si la columna ves_rate no existe en Supabase, reintentar sin vesData
+      if (res.error.message?.includes("ves_rate") || res.error.code === "PGRST204" || res.error.message?.includes("schema cache")) {
+        const fallbackRes = await ctx.supabase
+          .from("expenses")
+          .insert(baseExpenseData)
+          .select("id")
+          .single();
+        if (fallbackRes.error) return { ok: false, error: fallbackRes.error.message };
+        exp = fallbackRes.data;
+      } else {
+        return { ok: false, error: res.error.message };
+      }
+    } else {
+      exp = res.data;
+    }
+  } else {
+    const res = await ctx.supabase
+      .from("expenses")
+      .insert(baseExpenseData)
+      .select("id")
+      .single();
+    if (res.error) return { ok: false, error: res.error.message };
+    exp = res.data;
+  }
 
   await logAuditEvent({
     action: "crear_gasto",

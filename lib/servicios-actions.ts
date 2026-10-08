@@ -201,7 +201,7 @@ export async function payService(
   }
 
   // 1. Insertar en expenses general
-  const { error: expError } = await ctx.supabase.from("expenses").insert({
+  const baseServiceExpense = {
     company_id: ctx.companyId,
     category: svc.category || "Servicios",
     note,
@@ -210,8 +210,26 @@ export async function payService(
     spent_on: payDate,
     source: "servicio",
     ref_id: serviceId,
-    ...vesData,
-  });
+  };
+
+  let expError = null;
+  if (Object.keys(vesData).length > 0) {
+    const res = await ctx.supabase.from("expenses").insert({
+      ...baseServiceExpense,
+      ...vesData,
+    });
+    if (res.error) {
+      if (res.error.message?.includes("ves_rate") || res.error.code === "PGRST204" || res.error.message?.includes("schema cache")) {
+        const fallbackRes = await ctx.supabase.from("expenses").insert(baseServiceExpense);
+        expError = fallbackRes.error;
+      } else {
+        expError = res.error;
+      }
+    }
+  } else {
+    const res = await ctx.supabase.from("expenses").insert(baseServiceExpense);
+    expError = res.error;
+  }
 
   if (expError) return { ok: false, error: expError.message };
 
