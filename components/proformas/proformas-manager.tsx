@@ -135,7 +135,26 @@ export function ProformasManager({
     setEditClientId(p.clientId);
     const initialCurrency = (p.currency as "USD" | "VES" | "EUR") || "USD";
     setEditCurrency(initialCurrency);
-    setEditAccountId(p.targetAccountId || accounts[0]?.id || "");
+    
+    // Resolver cuenta inicial de manera inteligente
+    let resolvedAccId = p.targetAccountId;
+    if (!resolvedAccId && p.targetAccountName) {
+      const match = accounts.find((a) => a.name.toLowerCase().includes(p.targetAccountName!.toLowerCase()) || p.targetAccountName!.toLowerCase().includes(a.name.toLowerCase()));
+      if (match) resolvedAccId = match.id;
+    }
+    if (!resolvedAccId && p.notes) {
+      const cuentaMatch = p.notes.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || p.notes.match(/\[Cuenta:\s*([^\]]+)\]/i);
+      if (cuentaMatch) {
+        const needle = cuentaMatch[1].toLowerCase();
+        const match = accounts.find((a) => a.name.toLowerCase().includes(needle) || needle.includes(a.name.toLowerCase()));
+        if (match) resolvedAccId = match.id;
+        else if (needle.includes("binance") || needle.includes("usdt") || needle.includes("crypto")) {
+          const cryptoAcc = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || a.name.toLowerCase().includes("binance"));
+          if (cryptoAcc) resolvedAccId = cryptoAcc.id;
+        }
+      }
+    }
+    setEditAccountId(resolvedAccId || accounts[0]?.id || "");
     setEditDate(p.date ? p.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
     
     const isEur = ((p as any).vesRateRef || "").includes("EUR") || initialCurrency === "EUR";
@@ -261,19 +280,23 @@ export function ProformasManager({
 
     const computedTotal = validLines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
+    const targetAccName = selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined;
     const vesRateNum = editCurrency !== "VES" && editEnableVesConversion && typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : 0;
     const vesTotal = vesRateNum > 0 ? computedTotal * vesRateNum : undefined;
 
-    const combinedNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
+    let baseNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
+    if (targetAccName) {
+      baseNotes = `${baseNotes} [Cuenta Prevista: ${targetAccName}]`.trim();
+    }
 
     startTransition(async () => {
       const res = await updateProforma({
         id: editingProforma.id,
         clientId: editClientId,
         currency: editCurrency,
-        notes: combinedNotes || undefined,
+        notes: baseNotes || undefined,
         targetAccountId: editAccountId,
-        targetAccountName: selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined,
+        targetAccountName: targetAccName,
         date: editDate || undefined,
         vesRate: vesRateNum,
         vesRateRef: vesRateNum > 0 ? (editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD") : undefined,

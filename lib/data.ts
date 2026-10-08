@@ -212,7 +212,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data: invData, error: invErr } = await supabase
       .from("invoices")
       .select(
-        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at",
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name",
       )
       .order("created_at", { ascending: true });
 
@@ -264,6 +264,8 @@ export async function getProformas(): Promise<Proforma[]> {
             vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
             vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
             invoiceId: inv.id,
+            targetAccountId: (rawInv.targetAccountId || rawInv.target_account_id) as string | undefined,
+            targetAccountName: (rawInv.targetAccountName || rawInv.target_account_name) as string | undefined,
           } as unknown as Proforma);
         }
       }

@@ -961,6 +961,28 @@ export async function updateProforma(
         .select("id");
       if (!profError && updatedRows && updatedRows.length > 0) {
         profUpdated = true;
+      } else if (profError) {
+        // Fallback básico si alguna columna opcional no existe en proformas
+        const fallbackProfData: Record<string, unknown> = {};
+        if (input.clientId) fallbackProfData.client_id = input.clientId;
+        if (input.date) fallbackProfData.issue_date = input.date;
+        if (updateData.subtotal !== undefined) fallbackProfData.subtotal = updateData.subtotal;
+        if (updateData.discount !== undefined) fallbackProfData.discount = updateData.discount;
+        if (updateData.tax !== undefined) fallbackProfData.tax = updateData.tax;
+        if (updateData.total !== undefined) fallbackProfData.total = updateData.total;
+        // Inyectar la cuenta en las notas para que siempre se recupere
+        let notesToSave = typeof updateData.notes === "string" ? updateData.notes : "";
+        if (input.targetAccountName && !notesToSave.includes("[Cuenta Prevista:")) {
+          notesToSave = `${notesToSave} [Cuenta Prevista: ${input.targetAccountName}]`.trim();
+        }
+        if (notesToSave) fallbackProfData.notes = notesToSave;
+
+        const { data: fbRows } = await supabase
+          .from("proformas")
+          .update(fallbackProfData)
+          .eq("id", input.id)
+          .select("id");
+        if (fbRows && fbRows.length > 0) profUpdated = true;
       }
     } catch {
       profUpdated = false;
@@ -970,6 +992,8 @@ export async function updateProforma(
     const invUpdateData: Record<string, unknown> = {};
     if (input.clientId) invUpdateData.client_id = input.clientId;
     if (input.date) invUpdateData.issue_date = input.date;
+    if (input.targetAccountId !== undefined) invUpdateData.target_account_id = input.targetAccountId;
+    if (input.targetAccountName !== undefined) invUpdateData.target_account_name = input.targetAccountName;
     if (input.vesRate !== undefined && input.vesRate > 0) {
       invUpdateData.ves_rate = input.vesRate;
       invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "USD");
@@ -1026,7 +1050,7 @@ export async function updateProforma(
     // 1. Intentar actualizar tabla invoices con datos completos
     const { error: invErr } = await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
     if (invErr) {
-      // Fallback sin ves_rate_ref por si esa columna tuviese restricción
+      // Fallback sin columnas opcionales que pudieran faltar
       const minimalData: Record<string, unknown> = {};
       if (input.clientId) minimalData.client_id = input.clientId;
       if (input.date) minimalData.issue_date = input.date;
