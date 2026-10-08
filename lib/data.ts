@@ -400,11 +400,21 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       )
       .eq("id", id)
       .maybeSingle();
-    if (!error && data) row = data as Record<string, unknown>;
+    if (!error && data) {
+      row = data as Record<string, unknown>;
+    } else if (error) {
+      // Fallback a columnas básicas si alguna columna extendida aún no existe en el schema cache
+      const { data: fallbackData } = await supabase
+        .from("proformas")
+        .select("id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, notes, invoiceId:invoice_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (fallbackData) row = fallbackData as Record<string, unknown>;
+    }
   } catch (err) {}
 
   if (!row) {
-    // Buscar en invoices
+    // Buscar en invoices por id
     try {
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
@@ -416,8 +426,45 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       if (!invErr && inv) {
         row = inv as Record<string, unknown>;
         isFromInvoices = true;
+      } else if (invErr) {
+        // Fallback básico en invoices si las columnas de targetAccount o vesRate no existen
+        const { data: invFallback } = await supabase
+          .from("invoices")
+          .select("id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total")
+          .eq("id", id)
+          .maybeSingle();
+        if (invFallback) {
+          row = invFallback as Record<string, unknown>;
+          isFromInvoices = true;
+        }
       }
     } catch (err) {}
+  }
+
+  // Fallback adicional si se pasó un número en vez de UUID (ej. /proforma/15)
+  if (!row && !isNaN(Number(id))) {
+    const numId = Number(id);
+    try {
+      const { data: pByNum } = await supabase
+        .from("proformas")
+        .select("id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, notes, invoiceId:invoice_id")
+        .eq("number", numId)
+        .maybeSingle();
+      if (pByNum) row = pByNum as Record<string, unknown>;
+    } catch {}
+    if (!row) {
+      try {
+        const { data: invByNum } = await supabase
+          .from("invoices")
+          .select("id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total")
+          .eq("number", numId)
+          .maybeSingle();
+        if (invByNum) {
+          row = invByNum as Record<string, unknown>;
+          isFromInvoices = true;
+        }
+      } catch {}
+    }
   }
 
   if (!row) return null;

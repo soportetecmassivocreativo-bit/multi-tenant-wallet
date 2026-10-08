@@ -7,7 +7,7 @@ import {
   type TenantConfig,
 } from "@/lib/supabase/tenants-config";
 
-const PUBLIC_PATHS = ["/login", "/registro", "/auth"];
+const PUBLIC_PATHS = ["/login", "/registro", "/auth", "/proforma", "/factura"];
 
 /**
  * Middleware Multi-Tenant:
