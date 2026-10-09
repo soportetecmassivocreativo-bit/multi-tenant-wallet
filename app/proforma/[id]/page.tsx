@@ -137,12 +137,8 @@ export default async function ProformaPrintPage({
   if (isCrypto) {
     accountLabel1 = "Titular / Destino:";
     accountValue1 = targetAccount?.holderName?.trim() || "MIRIANNYS GUTIERREZ";
-    accountLabel2 = "Red / Protocolo:";
-    accountValue2 = targetAccount?.notes?.includes("Red")
-      ? targetAccount.notes
-      : (targetAccount?.holderId?.trim() && !targetAccount.holderId.startsWith("V-") && !targetAccount.holderId.startsWith("J-")
-          ? targetAccount.holderId.trim()
-          : "Red Tron (TRC-20)");
+    accountLabel2 = "";
+    accountValue2 = "";
     accountLabel3 = "Billetera / Pay ID:";
     accountValue3 = targetAccount?.accountNumber?.trim() || targetAccount?.email?.trim() || targetAccount?.phone?.trim() || "Binance Pay ID / USDT";
     accountLabel4 = "Plataforma:";
