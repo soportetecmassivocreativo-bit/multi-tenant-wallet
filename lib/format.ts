@@ -59,12 +59,17 @@ export function cleanConceptAndNotes(raw?: string | null): {
     return { title: "", notes: "", cleanText: "" };
   }
 
-  // 1. Quitar metadatos de cuentas
+  // 1. Quitar metadatos de cuentas y tasas BCV
   let text = raw
     .replace(/\[\[.*?\]\]/g, "")
     .replace(/\[Cuenta Prevista:.*?\]/gi, "")
     .replace(/\[CuentaID:.*?\]/gi, "")
     .replace(/\[Cuenta:.*?\]/gi, "")
+    .replace(/\[TasaBCV:.*?\]/gi, "")
+    .replace(/\[BCVRef:.*?\]/gi, "")
+    .replace(/\[VESTotal:.*?\]/gi, "")
+    .replace(/\[Tasa:.*?\]/gi, "")
+    .replace(/\[BCV:.*?\]/gi, "")
     .trim();
 
   // 2. Extraer todos los fragmentos entre corchetes
@@ -115,6 +120,11 @@ export function cleanItemDescription(raw?: string | null): string {
     .replace(/\[Cuenta Prevista:.*?\]/gi, "")
     .replace(/\[CuentaID:.*?\]/gi, "")
     .replace(/\[Cuenta:.*?\]/gi, "")
+    .replace(/\[TasaBCV:.*?\]/gi, "")
+    .replace(/\[BCVRef:.*?\]/gi, "")
+    .replace(/\[VESTotal:.*?\]/gi, "")
+    .replace(/\[Tasa:.*?\]/gi, "")
+    .replace(/\[BCV:.*?\]/gi, "")
     .replace(/\[.*?\]/g, "")
     .replace(/[\[\]]/g, "")
     .replace(/\s+/g, " ")

@@ -168,11 +168,36 @@ export default async function ProformaPrintPage({
   }
 
   const isForeign = prof.currency !== "VES";
+  let resolvedVesRate = prof.vesRate;
+  let resolvedVesRateRef = prof.vesRateRef;
+  let resolvedVesTotal = prof.vesTotal;
+
+  if ((resolvedVesRate === undefined || resolvedVesRate === null) && (prof as any).rawNotes) {
+    const rawN = (prof as any).rawNotes as string;
+    const matchRate = rawN.match(/\[TasaBCV:\s*([^\]]+)\]/i) || rawN.match(/\[Tasa:\s*([^\]]+)\]/i);
+    const matchRef = rawN.match(/\[BCVRef:\s*([^\]]+)\]/i) || rawN.match(/\[BCV:\s*([^\]]+)\]/i);
+    const matchTotal = rawN.match(/\[VESTotal:\s*([^\]]+)\]/i);
+    if (matchRate) {
+      const rNum = parseFloat(matchRate[1]);
+      if (!isNaN(rNum)) {
+        if (rNum === 0) {
+          resolvedVesRate = null;
+          resolvedVesRateRef = null;
+          resolvedVesTotal = null;
+        } else {
+          resolvedVesRate = rNum;
+          if (matchRef) resolvedVesRateRef = matchRef[1].trim();
+          if (matchTotal && !isNaN(parseFloat(matchTotal[1]))) resolvedVesTotal = parseFloat(matchTotal[1]);
+        }
+      }
+    }
+  }
+
   // Mostrar conversión a Bs. SOLO si se especificó una tasa (> 0)
-  const showVesConversion = isForeign && prof.vesRate !== undefined && prof.vesRate !== null && Number(prof.vesRate) > 0;
-  const currentRate = Number(prof.vesRate) || 0;
-  const vesTotalCalculated = prof.vesTotal && prof.vesTotal > 0
-    ? prof.vesTotal
+  const showVesConversion = isForeign && resolvedVesRate !== undefined && resolvedVesRate !== null && Number(resolvedVesRate) > 0;
+  const currentRate = Number(resolvedVesRate) || 0;
+  const vesTotalCalculated = resolvedVesTotal && resolvedVesTotal > 0
+    ? resolvedVesTotal
     : (currentRate > 0 ? prof.total * currentRate : 0);
 
   const parsedNotes = cleanConceptAndNotes(prof.notes);
@@ -468,7 +493,7 @@ export default async function ProformaPrintPage({
                     <span className="font-black text-neutral-900 text-[11px] uppercase tracking-wider">TOTAL BS</span>
                     {currentRate > 0 && (
                       <span className="text-[9.5px] text-neutral-500 font-mono whitespace-nowrap">
-                        Tasa {prof.vesRateRef || "BCV"}: {currentRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Bs.
+                        Tasa {resolvedVesRateRef || prof.vesRateRef || "BCV"}: {currentRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Bs.
                       </span>
                     )}
                   </div>

@@ -170,14 +170,26 @@ export function ProformasManager({
       }
     }
     setEditAccountId(resolvedAccId || accounts[0]?.id || "");
-    setEditDate(p.date ? p.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
-    
-    const isEur = ((p as any).vesRateRef || "").includes("EUR") || initialCurrency === "EUR";
+    let pVesRate = p.vesRate;
+    let pVesRateRef = (p as any).vesRateRef;
+    if ((pVesRate === undefined || pVesRate === null) && sourceNotes) {
+      const matchRate = sourceNotes.match(/\[TasaBCV:\s*([^\]]+)\]/i) || sourceNotes.match(/\[Tasa:\s*([^\]]+)\]/i);
+      const matchRef = sourceNotes.match(/\[BCVRef:\s*([^\]]+)\]/i) || sourceNotes.match(/\[BCV:\s*([^\]]+)\]/i);
+      if (matchRate) {
+        const rVal = parseFloat(matchRate[1]);
+        if (!isNaN(rVal)) {
+          pVesRate = rVal > 0 ? rVal : null;
+          if (matchRef) pVesRateRef = matchRef[1].trim();
+        }
+      }
+    }
+
+    const isEur = ((pVesRateRef || "").includes("EUR")) || initialCurrency === "EUR";
     setEditBcvCurrency(isEur ? "EUR" : "USD");
     
-    const hasRate = p.vesRate !== undefined && p.vesRate !== null && Number(p.vesRate) > 0;
+    const hasRate = pVesRate !== undefined && pVesRate !== null && Number(pVesRate) > 0;
     setEditEnableVesConversion(hasRate);
-    const defaultRate = hasRate ? Number(p.vesRate) : (isEur ? bcv?.eur : bcv?.usd) || "";
+    const defaultRate = hasRate ? Number(pVesRate) : (isEur ? bcv?.eur : bcv?.usd) || "";
     setEditVesRate(defaultRate);
     setEditError(null);
 
@@ -296,12 +308,18 @@ export function ProformasManager({
     const computedTotal = validLines.reduce((sum, l) => sum + l.qty * l.unitPrice, 0);
     const selectedAcc = accounts.find((a) => a.id === editAccountId);
     const targetAccName = selectedAcc ? `${selectedAcc.name} (${selectedAcc.bankName || selectedAcc.accountType})` : undefined;
-    const vesRateNum = editCurrency !== "VES" && editEnableVesConversion && typeof editVesRate === "number" && editVesRate > 0 ? editVesRate : 0;
+    const parsedVesRate = typeof editVesRate === "number" ? editVesRate : Number(editVesRate) || 0;
+    const vesRateNum = editCurrency !== "VES" && editEnableVesConversion && parsedVesRate > 0 ? parsedVesRate : 0;
     const vesTotal = vesRateNum > 0 ? computedTotal * vesRateNum : undefined;
 
     let baseNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
     if (targetAccName) {
       baseNotes = `${baseNotes} [CuentaID: ${editAccountId}] [Cuenta Prevista: ${targetAccName}]`.trim();
+    }
+    if (vesRateNum > 0) {
+      baseNotes = `${baseNotes} [TasaBCV: ${vesRateNum}] [BCVRef: ${editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD"}] [VESTotal: ${vesTotal || ""}]`.trim();
+    } else if (editEnableVesConversion === false) {
+      baseNotes = `${baseNotes} [TasaBCV: 0]`.trim();
     }
 
     startTransition(async () => {
@@ -689,9 +707,10 @@ export function ProformasManager({
           (sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0),
           0
         );
+        const numVesRate = typeof editVesRate === "number" ? editVesRate : Number(editVesRate) || 0;
         const computedVesTotal =
-          typeof editVesRate === "number" && editVesRate > 0
-            ? computedEditTotal * editVesRate
+          editEnableVesConversion && numVesRate > 0
+            ? computedEditTotal * numVesRate
             : undefined;
 
         return (
@@ -949,9 +968,12 @@ export function ProformasManager({
                           onChange={(e) => {
                             const checked = e.target.checked;
                             setEditEnableVesConversion(checked);
-                            if (checked && !editVesRate) {
-                              const r = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
-                              setEditVesRate(r > 0 ? r : "");
+                            if (checked) {
+                              const parsed = Number(editVesRate);
+                              if (!parsed || parsed <= 0) {
+                                const r = editBcvCurrency === "EUR" ? (bcv?.eur || 0) : (bcv?.usd || 0);
+                                setEditVesRate(r > 0 ? r : "");
+                              }
                             }
                           }}
                           className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"

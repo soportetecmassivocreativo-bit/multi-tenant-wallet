@@ -798,6 +798,10 @@ export async function createProforma(
     ? `[CuentaID: ${input.targetAccountId || ""}] [Cuenta Prevista: ${input.targetAccountName || ""}]`
     : "";
 
+  const vesMeta = isForeign && input.rate && input.rate > 0
+    ? `[TasaBCV: ${input.rate}] [BCVRef: ${input.rateRef || "BCV"}] [VESTotal: ${result.total * input.rate}]`
+    : "[TasaBCV: 0]";
+
   const invPayload: Record<string, unknown> = {
     company_id: companyId,
     client_id: input.clientId,
@@ -808,9 +812,9 @@ export async function createProforma(
     tax_rate: input.taxRate,
     tax: result.tax,
     total: result.total,
-    ves_rate: isForeign ? input.rate : null,
-    ves_rate_ref: isForeign ? input.rateRef : null,
-    ves_total: isForeign ? result.total * input.rate : null,
+    ves_rate: isForeign && input.rate > 0 ? input.rate : null,
+    ves_rate_ref: isForeign && input.rate > 0 ? input.rateRef : null,
+    ves_total: isForeign && input.rate > 0 ? result.total * input.rate : null,
     status: "pendiente",
     issue_date: issueDateISO,
     due_date: validUntilISO,
@@ -834,13 +838,7 @@ export async function createProforma(
 
   if (input.lines.length) {
     const rawNote = notePayload || "";
-    const cleanNote = rawNote
-      .replace(/\[\[.*?\]\]/g, "")
-      .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-      .replace(/\[CuentaID:.*?\]/gi, "")
-      .replace(/\[Cuenta:.*?\]/gi, "")
-      .replace(/[\[\]]/g, "")
-      .trim();
+    const cleanNote = cleanConceptAndNotes(rawNote).title || cleanConceptAndNotes(rawNote).cleanText;
 
     await supabase.from("invoice_items").insert(
       input.lines.map((l, idx) => {
@@ -853,6 +851,9 @@ export async function createProforma(
           }
           if (accountMeta) {
             parts.push(accountMeta);
+          }
+          if (vesMeta) {
+            parts.push(vesMeta);
           }
           finalDesc = parts.join(" ");
         }
@@ -938,6 +939,12 @@ export async function updateProforma(
       ? `[CuentaID: ${input.targetAccountId || ""}] [Cuenta Prevista: ${input.targetAccountName || ""}]`
       : "";
 
+    const vesMeta = input.vesRate !== undefined
+      ? (input.vesRate > 0
+          ? `[TasaBCV: ${input.vesRate}] [BCVRef: ${input.vesRateRef || (input.rateRef ?? "BCV")}] [VESTotal: ${input.vesTotal || (updateData.total ? Number(updateData.total) * input.vesRate : "")}]`
+          : "[TasaBCV: 0]")
+      : "";
+
     if (input.lines && input.lines.length > 0) {
       const result = computeInvoice({
         lines: input.lines,
@@ -952,13 +959,8 @@ export async function updateProforma(
       updateData.total = result.total;
 
       const rawNote = input.notes?.trim() || "";
-      const cleanNote = rawNote
-        .replace(/\[\[.*?\]\]/g, "")
-        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-        .replace(/\[CuentaID:.*?\]/gi, "")
-        .replace(/\[Cuenta:.*?\]/gi, "")
-        .replace(/[\[\]]/g, "")
-        .trim();
+      const parsedNote = cleanConceptAndNotes(rawNote);
+      const cleanNote = parsedNote.title || parsedNote.cleanText;
 
       // Actualizar items en proforma_items
       await supabase.from("proforma_items").delete().eq("proforma_id", input.id);
@@ -973,6 +975,9 @@ export async function updateProforma(
             }
             if (accountMeta) {
               parts.push(accountMeta);
+            }
+            if (vesMeta) {
+              parts.push(vesMeta);
             }
             finalDesc = parts.join(" ");
           }
@@ -1006,10 +1011,13 @@ export async function updateProforma(
         if (updateData.discount !== undefined) fallbackProfData.discount = updateData.discount;
         if (updateData.tax !== undefined) fallbackProfData.tax = updateData.tax;
         if (updateData.total !== undefined) fallbackProfData.total = updateData.total;
-        // Inyectar la cuenta en las notas para que siempre se recupere
+        // Inyectar la cuenta y tasa BCV en las notas para que siempre se recupere
         let notesToSave = typeof updateData.notes === "string" ? updateData.notes : "";
-        if (accountMeta && !notesToSave.includes("[Cuenta Prevista:")) {
+        if (accountMeta && !notesToSave.includes("[CuentaID:") && !notesToSave.includes("[Cuenta Prevista:")) {
           notesToSave = `${notesToSave} ${accountMeta}`.trim();
+        }
+        if (vesMeta && !notesToSave.includes("[TasaBCV:")) {
+          notesToSave = `${notesToSave} ${vesMeta}`.trim();
         }
         if (notesToSave) fallbackProfData.notes = notesToSave;
 
@@ -1033,7 +1041,7 @@ export async function updateProforma(
     if (input.targetAccountName !== undefined) invUpdateData.target_account_name = input.targetAccountName;
     if (input.vesRate !== undefined && input.vesRate > 0) {
       invUpdateData.ves_rate = input.vesRate;
-      invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "USD");
+      invUpdateData.ves_rate_ref = input.vesRateRef || (input.rateRef ?? "BCV");
       if (input.vesTotal !== undefined) {
         invUpdateData.ves_total = input.vesTotal;
       }
@@ -1057,13 +1065,8 @@ export async function updateProforma(
       invUpdateData.total = result.total;
 
       const rawNote = input.notes?.trim() || "";
-      const cleanNote = rawNote
-        .replace(/\[\[.*?\]\]/g, "")
-        .replace(/\[Cuenta Prevista:.*?\]/gi, "")
-        .replace(/\[CuentaID:.*?\]/gi, "")
-        .replace(/\[Cuenta:.*?\]/gi, "")
-        .replace(/[\[\]]/g, "")
-        .trim();
+      const parsedNote = cleanConceptAndNotes(rawNote);
+      const cleanNote = parsedNote.title || parsedNote.cleanText;
 
       try {
         await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
@@ -1078,6 +1081,9 @@ export async function updateProforma(
               }
               if (accountMeta) {
                 parts.push(accountMeta);
+              }
+              if (vesMeta) {
+                parts.push(vesMeta);
               }
               finalDesc = parts.join(" ");
             }

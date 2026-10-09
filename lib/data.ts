@@ -213,7 +213,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data: fullInvData, error: invErr } = await supabase
       .from("invoices")
       .select(
-        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name",
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at",
       )
       .order("created_at", { ascending: true });
 
@@ -239,6 +239,7 @@ export async function getProformas(): Promise<Proforma[]> {
 
       const descMap = new Map<string, string>();
       const accMap = new Map<string, { id?: string; name?: string }>();
+      const bcvMap = new Map<string, { rate?: number; ref?: string; total?: number }>();
       (itemsData ?? []).forEach((item) => {
         if (item.invoice_id && item.description) {
           if (!descMap.has(item.invoice_id)) {
@@ -252,6 +253,21 @@ export async function getProformas(): Promise<Proforma[]> {
                 id: mId ? mId[1].trim() : undefined,
                 name: mName ? mName[1].trim() : undefined,
               });
+            }
+          }
+          if (!bcvMap.has(item.invoice_id)) {
+            const mRate = item.description.match(/\[TasaBCV:\s*([^\]]+)\]/i) || item.description.match(/\[Tasa:\s*([^\]]+)\]/i);
+            const mRef = item.description.match(/\[BCVRef:\s*([^\]]+)\]/i) || item.description.match(/\[BCV:\s*([^\]]+)\]/i);
+            const mTotal = item.description.match(/\[VESTotal:\s*([^\]]+)\]/i);
+            if (mRate) {
+              const rVal = parseFloat(mRate[1]);
+              if (!isNaN(rVal)) {
+                bcvMap.set(item.invoice_id, {
+                  rate: rVal,
+                  ref: mRef ? mRef[1].trim() : undefined,
+                  total: mTotal && !isNaN(parseFloat(mTotal[1])) ? parseFloat(mTotal[1]) : undefined,
+                });
+              }
             }
           }
         }
@@ -276,9 +292,26 @@ export async function getProformas(): Promise<Proforma[]> {
           const parsed = cleanConceptAndNotes(rawDesc);
           const profNotes = parsed.title || parsed.cleanText || "Proforma de servicios";
           const accInfo = accMap.get(inv.id);
+          const bcvInfo = bcvMap.get(inv.id);
 
           const targetAccountId = ((rawInv.targetAccountId || rawInv.target_account_id) as string | undefined) || accInfo?.id;
           const targetAccountName = ((rawInv.targetAccountName || rawInv.target_account_name) as string | undefined) || accInfo?.name;
+
+          let resolvedVesRate = (rawInv.vesRate as number) ?? (rawInv.ves_rate as number) ?? null;
+          let resolvedVesRateRef = (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null;
+          let resolvedVesTotal = (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null;
+
+          if (bcvInfo !== undefined) {
+            if (bcvInfo.rate === 0) {
+              resolvedVesRate = null;
+              resolvedVesRateRef = null;
+              resolvedVesTotal = null;
+            } else if (bcvInfo.rate && bcvInfo.rate > 0) {
+              resolvedVesRate = bcvInfo.rate;
+              if (bcvInfo.ref) resolvedVesRateRef = bcvInfo.ref;
+              if (bcvInfo.total) resolvedVesTotal = bcvInfo.total;
+            }
+          }
 
           combinedMap.set(inv.id, {
             id: inv.id,
@@ -292,9 +325,9 @@ export async function getProformas(): Promise<Proforma[]> {
             status: "pendiente" as ProformaStatus,
             notes: profNotes,
             rawNotes: rawDesc,
-            vesRate: (rawInv.vesRate as number) ?? (rawInv.ves_rate as number) ?? null,
-            vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
-            vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
+            vesRate: resolvedVesRate,
+            vesRateRef: resolvedVesRateRef,
+            vesTotal: resolvedVesTotal,
             invoiceId: inv.id,
             targetAccountId,
             targetAccountName,
@@ -467,7 +500,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       const { data: inv, error: invErr } = await supabase
         .from("invoices")
         .select(
-          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, targetAccountId:target_account_id, targetAccountName:target_account_name",
+          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
         )
         .eq("id", id)
         .maybeSingle();
@@ -475,7 +508,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
         row = inv as Record<string, unknown>;
         isFromInvoices = true;
       } else if (invErr) {
-        // Fallback básico en invoices si las columnas de targetAccount o vesRate no existen
+        // Fallback básico en invoices si las columnas de vesRate no existen
         const { data: invFallback } = await supabase
           .from("invoices")
           .select("id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total")
@@ -495,7 +528,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     try {
       const { data: pByNum } = await supabase
         .from("proformas")
-        .select("id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, notes, invoiceId:invoice_id")
+        .select("id, number, clientId:client_id, date:issue_date, validUntil:valid_until, status, currency, subtotal, discount, tax, total, notes, invoiceId:invoice_id, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total")
         .eq("number", numId)
         .maybeSingle();
       if (pByNum) row = pByNum as Record<string, unknown>;
@@ -504,7 +537,7 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       try {
         const { data: invByNum } = await supabase
           .from("invoices")
-          .select("id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total")
+          .select("id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total")
           .eq("number", numId)
           .maybeSingle();
         if (invByNum) {
@@ -556,6 +589,10 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
   let extractedAccountId = (row.targetAccountId || (row as any).target_account_id) as string | undefined;
   let extractedAccountName = (row.targetAccountName || (row as any).target_account_name) as string | undefined;
 
+  let resolvedVesRate: number | null = (row.vesRate as number) ?? (row.ves_rate as number) ?? null;
+  let resolvedVesRateRef: string | null = (row.vesRateRef as string) ?? (row.ves_rate_ref as string) ?? null;
+  let resolvedVesTotal: number | null = (row.vesTotal as number) ?? (row.ves_total as number) ?? null;
+
   for (const it of rawItems) {
     const desc = it.description || "";
     if (!extractedAccountId) {
@@ -566,7 +603,24 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
       const matchName = desc.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || desc.match(/\[Cuenta:\s*([^\]]+)\]/i);
       if (matchName) extractedAccountName = matchName[1].trim();
     }
-    if (!rawDescWithMeta && (desc.includes("[Cuenta") || desc.includes("["))) {
+    const matchRate = desc.match(/\[TasaBCV:\s*([^\]]+)\]/i) || desc.match(/\[Tasa:\s*([^\]]+)\]/i);
+    const matchRef = desc.match(/\[BCVRef:\s*([^\]]+)\]/i) || desc.match(/\[BCV:\s*([^\]]+)\]/i);
+    const matchTotal = desc.match(/\[VESTotal:\s*([^\]]+)\]/i);
+    if (matchRate) {
+      const rVal = parseFloat(matchRate[1]);
+      if (!isNaN(rVal)) {
+        if (rVal === 0) {
+          resolvedVesRate = null;
+          resolvedVesRateRef = null;
+          resolvedVesTotal = null;
+        } else {
+          resolvedVesRate = rVal;
+          if (matchRef) resolvedVesRateRef = matchRef[1].trim();
+          if (matchTotal && !isNaN(parseFloat(matchTotal[1]))) resolvedVesTotal = parseFloat(matchTotal[1]);
+        }
+      }
+    }
+    if (!rawDescWithMeta && (desc.includes("[Cuenta") || desc.includes("[TasaBCV") || desc.includes("["))) {
       rawDescWithMeta = desc;
     }
   }
@@ -578,6 +632,25 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
   if (!extractedAccountName && rawDescWithMeta) {
     const matchName = rawDescWithMeta.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || rawDescWithMeta.match(/\[Cuenta:\s*([^\]]+)\]/i);
     if (matchName) extractedAccountName = matchName[1].trim();
+  }
+  if (resolvedVesRate === null && rawDescWithMeta) {
+    const matchRate = rawDescWithMeta.match(/\[TasaBCV:\s*([^\]]+)\]/i) || rawDescWithMeta.match(/\[Tasa:\s*([^\]]+)\]/i);
+    const matchRef = rawDescWithMeta.match(/\[BCVRef:\s*([^\]]+)\]/i) || rawDescWithMeta.match(/\[BCV:\s*([^\]]+)\]/i);
+    const matchTotal = rawDescWithMeta.match(/\[VESTotal:\s*([^\]]+)\]/i);
+    if (matchRate) {
+      const rVal = parseFloat(matchRate[1]);
+      if (!isNaN(rVal)) {
+        if (rVal === 0) {
+          resolvedVesRate = null;
+          resolvedVesRateRef = null;
+          resolvedVesTotal = null;
+        } else {
+          resolvedVesRate = rVal;
+          if (matchRef) resolvedVesRateRef = matchRef[1].trim();
+          if (matchTotal && !isNaN(parseFloat(matchTotal[1]))) resolvedVesTotal = parseFloat(matchTotal[1]);
+        }
+      }
+    }
   }
 
   let extractedNote: string | undefined = (row.notes as string) || undefined;
@@ -633,9 +706,9 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     discount: Number(row.discount) || 0,
     tax: Number(row.tax) || 0,
     total: Number(row.total) || 0,
-    vesRate: (row.vesRate as number) ?? (row.ves_rate as number) ?? null,
-    vesRateRef: (row.vesRateRef as string) ?? (row.ves_rate_ref as string) ?? null,
-    vesTotal: (row.vesTotal as number) ?? (row.ves_total as number) ?? null,
+    vesRate: resolvedVesRate,
+    vesRateRef: resolvedVesRateRef,
+    vesTotal: resolvedVesTotal,
     notes: extractedNote,
     rawNotes: (row.notes as string) || rawDescWithMeta || undefined,
     items: cleanItems,
