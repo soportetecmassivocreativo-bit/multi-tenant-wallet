@@ -49,7 +49,11 @@ export default async function FacturaPage({
           : "massivoagencia@gmail.com";
   const website = "www.massivocreativo.com";
 
-  const targetAccountId = inv.targetAccountId;
+  let targetAccountId = inv.targetAccountId;
+  if (!targetAccountId && (inv as any).rawNotes) {
+    const idMatch = (inv as any).rawNotes.match(/\[CuentaID:\s*([^\]]+)\]/i);
+    if (idMatch) targetAccountId = idMatch[1].trim();
+  }
   let targetAccount = targetAccountId ? accounts.find((a) => a.id === targetAccountId) : null;
 
   let savedNameCandidate = inv.targetAccountName || "";

@@ -794,37 +794,50 @@ export async function createProforma(
     notePayload = `${notePayload} [Cuenta Prevista: ${input.targetAccountName}]`.trim();
   }
 
-  const { data: inv, error: invErr } = await supabase
-    .from("invoices")
-    .insert({
-      company_id: companyId,
-      client_id: input.clientId,
-      number,
-      currency: input.currency,
-      subtotal: result.subtotal,
-      discount: result.discount,
-      tax_rate: input.taxRate,
-      tax: result.tax,
-      total: result.total,
-      ves_rate: isForeign ? input.rate : null,
-      ves_rate_ref: isForeign ? input.rateRef : null,
-      ves_total: isForeign ? result.total * input.rate : null,
-      status: "pendiente",
-      issue_date: issueDateISO,
-      due_date: validUntilISO,
-      target_account_id: input.targetAccountId || null,
-      target_account_name: input.targetAccountName || null,
-    })
-    .select("id")
-    .single();
+  const accountMeta = input.targetAccountId || input.targetAccountName
+    ? `[CuentaID: ${input.targetAccountId || ""}] [Cuenta Prevista: ${input.targetAccountName || ""}]`
+    : "";
 
-  if (invErr || !inv) return { ok: false, error: invErr?.message ?? "Error al emitir la proforma." };
+  const invPayload: Record<string, unknown> = {
+    company_id: companyId,
+    client_id: input.clientId,
+    number,
+    currency: input.currency,
+    subtotal: result.subtotal,
+    discount: result.discount,
+    tax_rate: input.taxRate,
+    tax: result.tax,
+    total: result.total,
+    ves_rate: isForeign ? input.rate : null,
+    ves_rate_ref: isForeign ? input.rateRef : null,
+    ves_total: isForeign ? result.total * input.rate : null,
+    status: "pendiente",
+    issue_date: issueDateISO,
+    due_date: validUntilISO,
+  };
+  if (input.targetAccountId) invPayload.target_account_id = input.targetAccountId;
+  if (input.targetAccountName) invPayload.target_account_name = input.targetAccountName;
+
+  let inv: { id: string } | null = null;
+  const res = await supabase.from("invoices").insert(invPayload).select("id").single();
+  if (res.error) {
+    delete invPayload.target_account_id;
+    delete invPayload.target_account_name;
+    const retryRes = await supabase.from("invoices").insert(invPayload).select("id").single();
+    if (retryRes.error) return { ok: false, error: retryRes.error.message };
+    inv = retryRes.data;
+  } else {
+    inv = res.data;
+  }
+
+  if (!inv) return { ok: false, error: "Error al emitir la proforma." };
 
   if (input.lines.length) {
     const rawNote = notePayload || "";
     const cleanNote = rawNote
       .replace(/\[\[.*?\]\]/g, "")
       .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+      .replace(/\[CuentaID:.*?\]/gi, "")
       .replace(/\[Cuenta:.*?\]/gi, "")
       .replace(/[\[\]]/g, "")
       .trim();
@@ -832,9 +845,17 @@ export async function createProforma(
     await supabase.from("invoice_items").insert(
       input.lines.map((l, idx) => {
         const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
-        const finalDesc = idx === 0 && cleanNote
-          ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
-          : cleanDesc;
+        let finalDesc = cleanDesc;
+        if (idx === 0) {
+          const parts = [cleanDesc];
+          if (cleanNote && cleanDesc.toLowerCase() !== cleanNote.toLowerCase()) {
+            parts.push(`[${cleanNote}]`);
+          }
+          if (accountMeta) {
+            parts.push(accountMeta);
+          }
+          finalDesc = parts.join(" ");
+        }
         return {
           company_id: companyId,
           invoice_id: inv.id,
@@ -892,6 +913,7 @@ export async function updateProforma(
   try {
     const updateData: Record<string, unknown> = {};
     if (input.clientId) updateData.client_id = input.clientId;
+    if (input.currency) updateData.currency = input.currency;
     if (input.notes !== undefined) updateData.notes = input.notes;
     if (input.targetAccountId !== undefined) updateData.target_account_id = input.targetAccountId;
     if (input.targetAccountName !== undefined) updateData.target_account_name = input.targetAccountName;
@@ -912,6 +934,10 @@ export async function updateProforma(
       updateData.ves_total = null;
     }
 
+    const accountMeta = input.targetAccountId || input.targetAccountName
+      ? `[CuentaID: ${input.targetAccountId || ""}] [Cuenta Prevista: ${input.targetAccountName || ""}]`
+      : "";
+
     if (input.lines && input.lines.length > 0) {
       const result = computeInvoice({
         lines: input.lines,
@@ -929,6 +955,7 @@ export async function updateProforma(
       const cleanNote = rawNote
         .replace(/\[\[.*?\]\]/g, "")
         .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+        .replace(/\[CuentaID:.*?\]/gi, "")
         .replace(/\[Cuenta:.*?\]/gi, "")
         .replace(/[\[\]]/g, "")
         .trim();
@@ -938,9 +965,17 @@ export async function updateProforma(
       await supabase.from("proforma_items").insert(
         input.lines.map((l, idx) => {
           const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
-          const finalDesc = idx === 0 && cleanNote
-            ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
-            : cleanDesc;
+          let finalDesc = cleanDesc;
+          if (idx === 0) {
+            const parts = [cleanDesc];
+            if (cleanNote && cleanDesc.toLowerCase() !== cleanNote.toLowerCase()) {
+              parts.push(`[${cleanNote}]`);
+            }
+            if (accountMeta) {
+              parts.push(accountMeta);
+            }
+            finalDesc = parts.join(" ");
+          }
           return {
             company_id: companyId,
             proforma_id: input.id,
@@ -965,6 +1000,7 @@ export async function updateProforma(
         // Fallback básico si alguna columna opcional no existe en proformas
         const fallbackProfData: Record<string, unknown> = {};
         if (input.clientId) fallbackProfData.client_id = input.clientId;
+        if (input.currency) fallbackProfData.currency = input.currency;
         if (input.date) fallbackProfData.issue_date = input.date;
         if (updateData.subtotal !== undefined) fallbackProfData.subtotal = updateData.subtotal;
         if (updateData.discount !== undefined) fallbackProfData.discount = updateData.discount;
@@ -972,8 +1008,8 @@ export async function updateProforma(
         if (updateData.total !== undefined) fallbackProfData.total = updateData.total;
         // Inyectar la cuenta en las notas para que siempre se recupere
         let notesToSave = typeof updateData.notes === "string" ? updateData.notes : "";
-        if (input.targetAccountName && !notesToSave.includes("[Cuenta Prevista:")) {
-          notesToSave = `${notesToSave} [Cuenta Prevista: ${input.targetAccountName}]`.trim();
+        if (accountMeta && !notesToSave.includes("[Cuenta Prevista:")) {
+          notesToSave = `${notesToSave} ${accountMeta}`.trim();
         }
         if (notesToSave) fallbackProfData.notes = notesToSave;
 
@@ -991,6 +1027,7 @@ export async function updateProforma(
     // Actualizar SIEMPRE también la tabla 'invoices' (para proformas puente o existentes)
     const invUpdateData: Record<string, unknown> = {};
     if (input.clientId) invUpdateData.client_id = input.clientId;
+    if (input.currency) invUpdateData.currency = input.currency;
     if (input.date) invUpdateData.issue_date = input.date;
     if (input.targetAccountId !== undefined) invUpdateData.target_account_id = input.targetAccountId;
     if (input.targetAccountName !== undefined) invUpdateData.target_account_name = input.targetAccountName;
@@ -1023,6 +1060,7 @@ export async function updateProforma(
       const cleanNote = rawNote
         .replace(/\[\[.*?\]\]/g, "")
         .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+        .replace(/\[CuentaID:.*?\]/gi, "")
         .replace(/\[Cuenta:.*?\]/gi, "")
         .replace(/[\[\]]/g, "")
         .trim();
@@ -1032,9 +1070,17 @@ export async function updateProforma(
         await supabase.from("invoice_items").insert(
           input.lines.map((l, idx) => {
             const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
-            const finalDesc = idx === 0 && cleanNote
-              ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
-              : cleanDesc;
+            let finalDesc = cleanDesc;
+            if (idx === 0) {
+              const parts = [cleanDesc];
+              if (cleanNote && cleanDesc.toLowerCase() !== cleanNote.toLowerCase()) {
+                parts.push(`[${cleanNote}]`);
+              }
+              if (accountMeta) {
+                parts.push(accountMeta);
+              }
+              finalDesc = parts.join(" ");
+            }
             return {
               company_id: companyId,
               invoice_id: input.id,
@@ -1050,12 +1096,18 @@ export async function updateProforma(
     // 1. Intentar actualizar tabla invoices con datos completos
     const { error: invErr } = await supabase.from("invoices").update(invUpdateData).eq("id", input.id);
     if (invErr) {
-      // Fallback sin columnas opcionales que pudieran faltar
+      // Fallback sin columnas opcionales que pudieran faltar (como target_account_id / target_account_name)
       const minimalData: Record<string, unknown> = {};
       if (input.clientId) minimalData.client_id = input.clientId;
+      if (input.currency) minimalData.currency = input.currency;
       if (input.date) minimalData.issue_date = input.date;
-      if (input.vesRate) minimalData.ves_rate = input.vesRate;
+      if (invUpdateData.subtotal !== undefined) minimalData.subtotal = invUpdateData.subtotal;
+      if (invUpdateData.discount !== undefined) minimalData.discount = invUpdateData.discount;
+      if (invUpdateData.tax !== undefined) minimalData.tax = invUpdateData.tax;
       if (invUpdateData.total !== undefined) minimalData.total = invUpdateData.total;
+      if (invUpdateData.ves_rate !== undefined) minimalData.ves_rate = invUpdateData.ves_rate;
+      if (invUpdateData.ves_rate_ref !== undefined) minimalData.ves_rate_ref = invUpdateData.ves_rate_ref;
+      if (invUpdateData.ves_total !== undefined) minimalData.ves_total = invUpdateData.ves_total;
       await supabase.from("invoices").update(minimalData).eq("id", input.id);
     }
 

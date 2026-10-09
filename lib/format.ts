@@ -63,6 +63,7 @@ export function cleanConceptAndNotes(raw?: string | null): {
   let text = raw
     .replace(/\[\[.*?\]\]/g, "")
     .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+    .replace(/\[CuentaID:.*?\]/gi, "")
     .replace(/\[Cuenta:.*?\]/gi, "")
     .trim();
 
@@ -112,6 +113,7 @@ export function cleanItemDescription(raw?: string | null): string {
   return raw
     .replace(/\[\[.*?\]\]/g, "")
     .replace(/\[Cuenta Prevista:.*?\]/gi, "")
+    .replace(/\[CuentaID:.*?\]/gi, "")
     .replace(/\[Cuenta:.*?\]/gi, "")
     .replace(/\[.*?\]/g, "")
     .replace(/[\[\]]/g, "")

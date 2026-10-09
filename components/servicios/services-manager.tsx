@@ -120,11 +120,23 @@ export function ServicesManager({ services, serviceExpenses = [], bcv }: Service
             {Object.keys(monthlyTotals).length === 0 ? (
               <p className="text-lg font-medium text-hint">—</p>
             ) : (
-              Object.entries(monthlyTotals).map(([cur, amt]) => (
-                <p key={cur} className="tnum text-xl font-bold text-overdue">
-                  {formatCurrency(amt, cur as CurrencyCode)}
-                </p>
-              ))
+              Object.entries(monthlyTotals).map(([cur, amt]) => {
+                const vesEq = bcv && cur !== "VES" && enableVesConversion
+                  ? amt * (cur === "EUR" ? bcv.eur : bcv.usd)
+                  : null;
+                return (
+                  <div key={cur} className="flex flex-col">
+                    <p className="tnum text-xl font-bold text-overdue">
+                      {formatCurrency(amt, cur as CurrencyCode)}
+                    </p>
+                    {vesEq !== null && (
+                      <p className="tnum text-[11px] font-mono text-muted">
+                        ≈ {vesEq.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                      </p>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
           <p className="mt-1 text-[11px] text-hint">
@@ -136,12 +148,24 @@ export function ServicesManager({ services, serviceExpenses = [], bcv }: Service
           <div className="rounded-2xl border border-line bg-card p-4 shadow-sm">
             <p className="text-xs text-muted font-medium">Total Servicios Anuales</p>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-              {Object.entries(annualTotals).map(([cur, amt]) => (
-                <p key={cur} className="tnum text-xl font-bold text-accent">
-                  {formatCurrency(amt, cur as CurrencyCode)}
-                  <span className="text-xs font-normal text-muted ml-1">/ año</span>
-                </p>
-              ))}
+              {Object.entries(annualTotals).map(([cur, amt]) => {
+                const vesEq = bcv && cur !== "VES" && enableVesConversion
+                  ? amt * (cur === "EUR" ? bcv.eur : bcv.usd)
+                  : null;
+                return (
+                  <div key={cur} className="flex flex-col">
+                    <p className="tnum text-xl font-bold text-accent">
+                      {formatCurrency(amt, cur as CurrencyCode)}
+                      <span className="text-xs font-normal text-muted ml-1">/ año</span>
+                    </p>
+                    {vesEq !== null && (
+                      <p className="tnum text-[11px] font-mono text-muted">
+                        ≈ {vesEq.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <p className="mt-1 text-[11px] text-hint">
               {annualServices.length} {annualServices.length === 1 ? "servicio anual activo" : "servicios anuales activos"} · Facturación anual
@@ -192,6 +216,30 @@ export function ServicesManager({ services, serviceExpenses = [], bcv }: Service
                 placeholder="Buscar servicio por nombre, categoría o código..."
                 className="w-full rounded-xl border border-line bg-card pl-10 pr-4 py-2 text-xs outline-none focus:border-accent"
               />
+            </div>
+
+            {/* Toggle de Control de Moneda / Conversión BCV */}
+            <div className="flex items-center gap-2 bg-card border border-line rounded-xl px-3 py-1.5 shadow-2xs">
+              <span className="text-xs font-semibold text-muted">Conversión a Bs. (BCV):</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={enableVesConversion}
+                onClick={() => setEnableVesConversion((v) => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                  enableVesConversion ? "bg-accent" : "bg-line"
+                }`}
+                title="Activar o desactivar cálculo de conversión a Bolívares en servicios"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    enableVesConversion ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
+              <span className={`text-[11px] font-bold ${enableVesConversion ? "text-accent" : "text-hint"}`}>
+                {enableVesConversion ? "Activo" : "Inactivo"}
+              </span>
             </div>
 
             {!formOpen && (
@@ -355,9 +403,16 @@ export function ServicesManager({ services, serviceExpenses = [], bcv }: Service
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-3 pl-13 sm:pl-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-line">
-                      <span className="tnum text-sm font-semibold text-foreground">
-                        {formatCurrency(s.amount, s.currency)}
-                      </span>
+                      <div className="text-right">
+                        <span className="tnum text-sm font-semibold text-foreground">
+                          {formatCurrency(s.amount, s.currency)}
+                        </span>
+                        {enableVesConversion && bcv && s.currency !== "VES" && (
+                          <span className="tnum block text-[10px] font-mono text-muted">
+                            ≈ {((s.amount) * (s.currency === "EUR" ? bcv.eur : bcv.usd)).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
+                          </span>
+                        )}
+                      </div>
 
                       <div className="flex items-center gap-1.5">
                         {/* Botón Descargar Comprobante Individual PDF */}

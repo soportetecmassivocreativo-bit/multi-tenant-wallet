@@ -142,16 +142,31 @@ export function ProformasManager({
       const match = accounts.find((a) => a.name.toLowerCase().includes(p.targetAccountName!.toLowerCase()) || p.targetAccountName!.toLowerCase().includes(a.name.toLowerCase()));
       if (match) resolvedAccId = match.id;
     }
-    if (!resolvedAccId && p.notes) {
-      const cuentaMatch = p.notes.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || p.notes.match(/\[Cuenta:\s*([^\]]+)\]/i);
-      if (cuentaMatch) {
-        const needle = cuentaMatch[1].toLowerCase();
-        const match = accounts.find((a) => a.name.toLowerCase().includes(needle) || needle.includes(a.name.toLowerCase()));
-        if (match) resolvedAccId = match.id;
-        else if (needle.includes("binance") || needle.includes("usdt") || needle.includes("crypto")) {
-          const cryptoAcc = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || a.name.toLowerCase().includes("binance"));
-          if (cryptoAcc) resolvedAccId = cryptoAcc.id;
+    const sourceNotes = `${p.notes || ""} ${(p as any).rawNotes || ""}`;
+    if (!resolvedAccId && sourceNotes) {
+      const matchId = sourceNotes.match(/\[CuentaID:\s*([^\]]+)\]/i);
+      if (matchId) {
+        const found = accounts.find((a) => a.id === matchId[1].trim());
+        if (found) resolvedAccId = found.id;
+      }
+      if (!resolvedAccId) {
+        const cuentaMatch = sourceNotes.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || sourceNotes.match(/\[Cuenta:\s*([^\]]+)\]/i);
+        if (cuentaMatch) {
+          const needle = cuentaMatch[1].toLowerCase();
+          const match = accounts.find((a) => a.name.toLowerCase().includes(needle) || needle.includes(a.name.toLowerCase()));
+          if (match) resolvedAccId = match.id;
+          else if (needle.includes("binance") || needle.includes("usdt") || needle.includes("crypto")) {
+            const cryptoAcc = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || a.name.toLowerCase().includes("binance"));
+            if (cryptoAcc) resolvedAccId = cryptoAcc.id;
+          }
         }
+      }
+    }
+    if (!resolvedAccId && sourceNotes) {
+      const lower = sourceNotes.toLowerCase();
+      if (lower.includes("binance") || lower.includes("usdt") || lower.includes("crypto")) {
+        const cryptoAcc = accounts.find((a) => a.accountType === "crypto" || a.currency === "USDT" || a.name.toLowerCase().includes("binance"));
+        if (cryptoAcc) resolvedAccId = cryptoAcc.id;
       }
     }
     setEditAccountId(resolvedAccId || accounts[0]?.id || "");
@@ -286,7 +301,7 @@ export function ProformasManager({
 
     let baseNotes = [editProjectTitle.trim(), editNotes.trim()].filter(Boolean).join("\n\n");
     if (targetAccName) {
-      baseNotes = `${baseNotes} [Cuenta Prevista: ${targetAccName}]`.trim();
+      baseNotes = `${baseNotes} [CuentaID: ${editAccountId}] [Cuenta Prevista: ${targetAccName}]`.trim();
     }
 
     startTransition(async () => {

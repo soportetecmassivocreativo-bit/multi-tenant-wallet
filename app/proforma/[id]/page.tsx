@@ -60,7 +60,11 @@ export default async function ProformaPrintPage({
 
   const website = "www.massivocreativo.com";
 
-  const targetAccountId = prof.targetAccountId;
+  let targetAccountId = prof.targetAccountId;
+  if (!targetAccountId && prof.rawNotes) {
+    const idMatch = prof.rawNotes.match(/\[CuentaID:\s*([^\]]+)\]/i);
+    if (idMatch) targetAccountId = idMatch[1].trim();
+  }
   let targetAccount = targetAccountId ? accounts.find((a) => a.id === targetAccountId) : null;
 
   // Si no se encontró por ID, buscar por nombre guardado o en las notas originales

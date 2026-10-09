@@ -238,9 +238,22 @@ export async function getProformas(): Promise<Proforma[]> {
         .in("invoice_id", invIds);
 
       const descMap = new Map<string, string>();
+      const accMap = new Map<string, { id?: string; name?: string }>();
       (itemsData ?? []).forEach((item) => {
-        if (item.invoice_id && !descMap.has(item.invoice_id) && item.description) {
-          descMap.set(item.invoice_id, item.description);
+        if (item.invoice_id && item.description) {
+          if (!descMap.has(item.invoice_id)) {
+            descMap.set(item.invoice_id, item.description);
+          }
+          if (!accMap.has(item.invoice_id)) {
+            const mId = item.description.match(/\[CuentaID:\s*([^\]]+)\]/i);
+            const mName = item.description.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || item.description.match(/\[Cuenta:\s*([^\]]+)\]/i);
+            if (mId || mName) {
+              accMap.set(item.invoice_id, {
+                id: mId ? mId[1].trim() : undefined,
+                name: mName ? mName[1].trim() : undefined,
+              });
+            }
+          }
         }
       });
 
@@ -262,6 +275,10 @@ export async function getProformas(): Promise<Proforma[]> {
           const rawDesc = descMap.get(inv.id) || "Proforma de servicios";
           const parsed = cleanConceptAndNotes(rawDesc);
           const profNotes = parsed.title || parsed.cleanText || "Proforma de servicios";
+          const accInfo = accMap.get(inv.id);
+
+          const targetAccountId = ((rawInv.targetAccountId || rawInv.target_account_id) as string | undefined) || accInfo?.id;
+          const targetAccountName = ((rawInv.targetAccountName || rawInv.target_account_name) as string | undefined) || accInfo?.name;
 
           combinedMap.set(inv.id, {
             id: inv.id,
@@ -274,12 +291,13 @@ export async function getProformas(): Promise<Proforma[]> {
             currency: (inv.currency as CurrencyCode) || "USD",
             status: "pendiente" as ProformaStatus,
             notes: profNotes,
+            rawNotes: rawDesc,
             vesRate: (rawInv.vesRate as number) ?? (rawInv.ves_rate as number) ?? null,
             vesRateRef: (rawInv.vesRateRef as string) ?? (rawInv.ves_rate_ref as string) ?? null,
             vesTotal: (rawInv.vesTotal as number) ?? (rawInv.ves_total as number) ?? null,
             invoiceId: inv.id,
-            targetAccountId: (rawInv.targetAccountId || rawInv.target_account_id) as string | undefined,
-            targetAccountName: (rawInv.targetAccountName || rawInv.target_account_name) as string | undefined,
+            targetAccountId,
+            targetAccountName,
           } as unknown as Proforma);
         }
       }
@@ -534,6 +552,34 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
   ]);
 
   const rawItems = (itemsRes.data ?? []) as unknown as ProformaItem[];
+  let rawDescWithMeta = (row.notes as string) || "";
+  let extractedAccountId = (row.targetAccountId || (row as any).target_account_id) as string | undefined;
+  let extractedAccountName = (row.targetAccountName || (row as any).target_account_name) as string | undefined;
+
+  for (const it of rawItems) {
+    const desc = it.description || "";
+    if (!extractedAccountId) {
+      const matchId = desc.match(/\[CuentaID:\s*([^\]]+)\]/i);
+      if (matchId) extractedAccountId = matchId[1].trim();
+    }
+    if (!extractedAccountName) {
+      const matchName = desc.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || desc.match(/\[Cuenta:\s*([^\]]+)\]/i);
+      if (matchName) extractedAccountName = matchName[1].trim();
+    }
+    if (!rawDescWithMeta && (desc.includes("[Cuenta") || desc.includes("["))) {
+      rawDescWithMeta = desc;
+    }
+  }
+
+  if (!extractedAccountId && rawDescWithMeta) {
+    const matchId = rawDescWithMeta.match(/\[CuentaID:\s*([^\]]+)\]/i);
+    if (matchId) extractedAccountId = matchId[1].trim();
+  }
+  if (!extractedAccountName && rawDescWithMeta) {
+    const matchName = rawDescWithMeta.match(/\[Cuenta Prevista:\s*([^\]]+)\]/i) || rawDescWithMeta.match(/\[Cuenta:\s*([^\]]+)\]/i);
+    if (matchName) extractedAccountName = matchName[1].trim();
+  }
+
   let extractedNote: string | undefined = (row.notes as string) || undefined;
   if (extractedNote) {
     const parsedNote = cleanConceptAndNotes(extractedNote);
@@ -591,11 +637,11 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     vesRateRef: (row.vesRateRef as string) ?? (row.ves_rate_ref as string) ?? null,
     vesTotal: (row.vesTotal as number) ?? (row.ves_total as number) ?? null,
     notes: extractedNote,
-    rawNotes: (row.notes as string) || undefined,
+    rawNotes: (row.notes as string) || rawDescWithMeta || undefined,
     items: cleanItems,
     invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
-    targetAccountId: (row.targetAccountId || (row as any).target_account_id) as string | undefined,
-    targetAccountName: (row.targetAccountName || (row as any).target_account_name) as string | undefined,
+    targetAccountId: extractedAccountId,
+    targetAccountName: extractedAccountName,
     hasConditions: (row.hasConditions ?? (row as any).has_conditions) as boolean | undefined,
     conditions: typeof row.conditions === "string" ? (() => { try { return JSON.parse(row.conditions as string); } catch { return undefined; } })() : (row.conditions as any) || undefined,
   };
