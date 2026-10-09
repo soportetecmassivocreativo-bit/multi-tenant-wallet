@@ -209,14 +209,28 @@ export async function getProformas(): Promise<Proforma[]> {
 
   // 1. Obtener facturas de invoices ordenadas cronológicamente para detectar correlativos
   try {
-    const { data: invData, error: invErr } = await supabase
+    let invData: any[] | null = null;
+    const { data: fullInvData, error: invErr } = await supabase
       .from("invoices")
       .select(
         "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, ves_rate, ves_rate_ref, ves_total, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name",
       )
       .order("created_at", { ascending: true });
 
-    if (!invErr && invData && invData.length > 0) {
+    if (!invErr && fullInvData) {
+      invData = fullInvData;
+    } else {
+      // Fallback a columnas estándar sin columnas extendidas si no existen en el schema cache
+      const { data: basicInvData } = await supabase
+        .from("invoices")
+        .select(
+          "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, created_at",
+        )
+        .order("created_at", { ascending: true });
+      if (basicInvData) invData = basicInvData;
+    }
+
+    if (invData && invData.length > 0) {
       const invIds = invData.map((i) => i.id);
       const { data: itemsData } = await supabase
         .from("invoice_items")
@@ -274,14 +288,28 @@ export async function getProformas(): Promise<Proforma[]> {
 
   // 2. Consultar tabla proformas reales
   try {
-    const { data: profData, error } = await supabase
+    let profData: any[] | null = null;
+    const { data: fullProfData, error } = await supabase
       .from("proformas")
       .select(
         "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
       )
       .order("created_at", { ascending: true });
 
-    if (!error && profData && profData.length > 0) {
+    if (!error && fullProfData && fullProfData.length > 0) {
+      profData = fullProfData;
+    } else {
+      // Fallback a columnas estándar de proformas si no existen columnas extendidas
+      const { data: basicProfData } = await supabase
+        .from("proformas")
+        .select(
+          "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at",
+        )
+        .order("created_at", { ascending: true });
+      if (basicProfData) profData = basicProfData;
+    }
+
+    if (profData && profData.length > 0) {
       for (const p of profData) {
         let num = Number(p.number);
 
