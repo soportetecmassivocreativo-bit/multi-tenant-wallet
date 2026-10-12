@@ -177,23 +177,16 @@ export async function getDeferredCardLimit(): Promise<number> {
     } catch {}
   }
 
-  // 2. Consultar cookie del navegador local
+  // 2. Limpiar cookies locales viejas que pudieran tener saldos obsoletos (como 539.12)
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(DEFERRED_CARD_LIMIT_COOKIE)?.value;
-    if (raw !== undefined && raw !== null && raw !== "") {
-      const parsed = parseFloat(raw);
-      if (!isNaN(parsed) && parsed >= 0) {
-        return parsed;
-      }
-    }
-    const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
-    if (lastClosure) {
-      return 0;
+    if (raw && (raw === "539.12" || raw === "539.1" || raw === "539")) {
+      cookieStore.delete(DEFERRED_CARD_LIMIT_COOKIE);
     }
   } catch {}
 
-  // 3. Saldo base inicial establecido por defecto
+  // 3. Saldo base inicial inalterable oficial
   return 685.44;
 }
 
@@ -303,26 +296,9 @@ export async function increaseDeferredCardDebt(amountToAdd: number, reason?: str
 export async function getDeferredCharges(): Promise<DeferredCharge[]> {
   let charges: DeferredCharge[] = [];
   let lastClosureTime = 0;
-  try {
-    const cookieStore = await cookies();
-    const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
-    if (lastClosure) lastClosureTime = new Date(lastClosure).getTime();
 
-    const raw = cookieStore.get(DEFERRED_CHARGES_COOKIE)?.value;
-    if (raw) {
-      const parsed = JSON.parse(decodeURIComponent(raw));
-      if (Array.isArray(parsed)) {
-        charges = parsed.filter((c) => {
-          if (!lastClosureTime) return true;
-          const cTime = c.createdAt ? new Date(c.createdAt).getTime() : 0;
-          return cTime > lastClosureTime;
-        });
-      }
-    }
-  } catch {}
-
-  // Si no hay cierre en cookie, verificar si hay cierres guardados en Supabase
-  if (!lastClosureTime && isSupabaseConfigured) {
+  // 1. Obtener fecha de último cierre (Supabase primero, cookie de respaldo)
+  if (isSupabaseConfigured) {
     try {
       const closures = await getDeferredCardClosures();
       if (closures.length > 0) {
@@ -330,12 +306,15 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
       }
     } catch {}
   }
-
-  if (charges.length === 0 && lastClosureTime === 0) {
-    charges = [...DEFAULT_CHARGES];
+  if (!lastClosureTime) {
+    try {
+      const cookieStore = await cookies();
+      const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
+      if (lastClosure) lastClosureTime = new Date(lastClosure).getTime();
+    } catch {}
   }
 
-  // Sincronizar automáticamente con gastos de servicios registrados en Supabase
+  // 2. Consultar gastos/consumos en la base de datos central en Supabase
   if (isSupabaseConfigured) {
     try {
       const supabase = await createClient();
@@ -356,7 +335,12 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
           const rawNote = exp.note || "Servicio";
           const lowerNote = rawNote.toLowerCase();
           // Excluir abonos/pagos de nómina o abonos a tarjeta
-          if (lowerNote.includes("nomina") || lowerNote.includes("nómina") || lowerNote.includes("abono a tarjeta") || lowerNote.includes("abono a la deuda")) {
+          if (
+            lowerNote.includes("nomina") ||
+            lowerNote.includes("nómina") ||
+            lowerNote.includes("abono a tarjeta") ||
+            lowerNote.includes("abono a la deuda")
+          ) {
             continue;
           }
           const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*/g, "").trim();
@@ -396,32 +380,43 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
     }
   }
 
+  // 3. Fusionar con los 3 cargos oficiales por defecto (Resend $20, Supabase $27.22, Supabase $224.99)
+  for (const def of DEFAULT_CHARGES) {
+    const defTime = def.createdAt ? new Date(def.createdAt).getTime() : 0;
+    if (lastClosureTime > 0 && defTime > 0 && defTime <= lastClosureTime) {
+      continue;
+    }
+    const exists = charges.some(
+      (c) =>
+        c.code === def.code ||
+        c.id === def.id ||
+        (c.amount === def.amount && c.chargedOn === def.chargedOn)
+    );
+    if (!exists) {
+      charges.push(def);
+    }
+  }
+
+  // 4. Limpiar cookies locales obsoletas que pudieran tener datos viejos de Albañil
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEFERRED_CHARGES_COOKIE)?.value;
+    if (raw && (raw.includes("Alba%C3%B1il") || raw.includes("albanil") || raw.includes("tjm_1"))) {
+      cookieStore.delete(DEFERRED_CHARGES_COOKIE);
+    }
+  } catch {}
+
+  // Ordenar cronológicamente descendente
+  charges.sort((a, b) => new Date(b.chargedOn).getTime() - new Date(a.chargedOn).getTime());
   return charges;
 }
 
 export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
   let abonos: DeferredAbono[] = [];
   let lastClosureTime = 0;
-  try {
-    const cookieStore = await cookies();
-    const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
-    if (lastClosure) lastClosureTime = new Date(lastClosure).getTime();
 
-    const raw = cookieStore.get(DEFERRED_ABONOS_COOKIE)?.value;
-    if (raw) {
-      const parsed = JSON.parse(decodeURIComponent(raw));
-      if (Array.isArray(parsed)) {
-        abonos = parsed.filter((a) => {
-          if (!lastClosureTime) return true;
-          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          return aTime > lastClosureTime;
-        });
-      }
-    }
-  } catch {}
-
-  // Si no hay cierre en cookie, verificar si hay cierres guardados en Supabase
-  if (!lastClosureTime && isSupabaseConfigured) {
+  // 1. Obtener fecha de último cierre (Supabase primero, cookie de respaldo)
+  if (isSupabaseConfigured) {
     try {
       const closures = await getDeferredCardClosures();
       if (closures.length > 0) {
@@ -429,12 +424,15 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
       }
     } catch {}
   }
-
-  if (abonos.length === 0 && lastClosureTime === 0) {
-    abonos = [...DEFAULT_ABONOS];
+  if (!lastClosureTime) {
+    try {
+      const cookieStore = await cookies();
+      const lastClosure = cookieStore.get(DEFERRED_LAST_CLOSURE_COOKIE)?.value;
+      if (lastClosure) lastClosureTime = new Date(lastClosure).getTime();
+    } catch {}
   }
 
-  // Sincronizar automáticamente con gastos de abonos/pagos registrados en Supabase
+  // 2. Consultar abonos en la base de datos central en Supabase
   if (isSupabaseConfigured) {
     try {
       const supabase = await createClient();
@@ -456,7 +454,6 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
           const lowerCat = (exp.category || "").toLowerCase();
           const src = (exp.source || "").toLowerCase();
 
-          // Identificar si es un abono o pago a la deuda de José Miguel / Tarjeta
           const isAbono =
             src === "tarjeta_jm_abono" ||
             src === "tarjeta_jm_pago" ||
@@ -474,7 +471,6 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
             lowerNote.includes("pago jose miguel") ||
             lowerNote.includes("abono jm");
 
-          // Excluir si es un consumo o servicio directo cargado a la tarjeta
           const isCharge =
             src === "tarjeta_jm_consumo" ||
             src === "servicio" ||
@@ -487,7 +483,6 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
 
           const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*$/, "").trim() || "Abono Tarjeta José Miguel";
 
-          // Extraer cuenta / banco y referencia
           let paidFrom = "Pago Móvil Banesco";
           let ref = exp.ref_id || "";
           const metaMatch = rawNote.match(/\[(.*?)\]$/);
@@ -535,6 +530,34 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
     }
   }
 
+  // 3. Fusionar con los 2 abonos oficiales por defecto (Binance $96, Binance $220)
+  for (const def of DEFAULT_ABONOS) {
+    const defTime = def.createdAt ? new Date(def.createdAt).getTime() : 0;
+    if (lastClosureTime > 0 && defTime > 0 && defTime <= lastClosureTime) {
+      continue;
+    }
+    const exists = abonos.some(
+      (a) =>
+        a.code === def.code ||
+        a.id === def.id ||
+        (a.amount === def.amount && a.paidOn === def.paidOn)
+    );
+    if (!exists) {
+      abonos.push(def);
+    }
+  }
+
+  // 4. Limpiar cookies locales obsoletas que pudieran tener datos viejos
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(DEFERRED_ABONOS_COOKIE)?.value;
+    if (raw && (raw.includes("Alba%C3%B1il") || raw.includes("albanil") || raw.includes("abn_1"))) {
+      cookieStore.delete(DEFERRED_ABONOS_COOKIE);
+    }
+  } catch {}
+
+  // Ordenar cronológicamente descendente
+  abonos.sort((a, b) => new Date(b.paidOn).getTime() - new Date(a.paidOn).getTime());
   return abonos;
 }
 

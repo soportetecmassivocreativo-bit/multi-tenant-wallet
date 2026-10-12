@@ -35,7 +35,7 @@ interface GastosEspecialesTabProps {
 export function GastosEspecialesTab({
   charges,
   abonos = [],
-  cardLimit = 539.12,
+  cardLimit = 685.44,
   accounts,
   bcv,
   admin,

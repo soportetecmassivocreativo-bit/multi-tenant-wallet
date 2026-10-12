@@ -27,7 +27,7 @@ export function GastosView({
   expenses,
   deferredCharges = [],
   deferredAbonos = [],
-  cardLimit = 539.12,
+  cardLimit = 685.44,
   admin,
   accounts,
   bcv,
