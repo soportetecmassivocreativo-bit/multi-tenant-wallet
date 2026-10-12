@@ -38,7 +38,7 @@ export function HeroBalance({
       ref={ref}
       className="tnum mt-1 text-[38px] font-medium leading-none tracking-tight"
     >
-      {formatMoney(0, currency)}
+      {formatMoney(value, currency)}
     </p>
   );
 }

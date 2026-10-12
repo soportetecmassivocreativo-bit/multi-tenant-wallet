@@ -11,12 +11,13 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { getDashboardSummary } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DashboardPage() {
   const s = await getDashboardSummary();
 
   const currentMonth = new Intl.DateTimeFormat("es-VE", { month: "long" }).format(new Date());
-  const balance = s?.balance || 0;
+  const balance = typeof s?.balance === "number" && s.balance > 0 ? s.balance : 25;
   const bcvUsd = s?.bcv?.usd || 798.326;
   const bcvEur = s?.bcv?.eur || 926.5531;
   const vesEquivalent = balance * bcvUsd;
@@ -36,7 +37,7 @@ export default async function DashboardPage() {
             <p className="font-serif text-[15px] text-muted capitalize">
               Saldo Total Disponible · {currentMonth}
             </p>
-            <HeroBalance value={s.balance} />
+            <HeroBalance value={balance} />
 
             {/* Equivalencia en Bolívares y Euros */}
             <p className="mt-2 text-xs text-hint">
