@@ -154,9 +154,11 @@ export function isExcludedFromExpenseTotals(e: {
     return false; // NO excluir -> SÍ SUMA
   }
 
-  // 2. Cargos y consumos cargados a la Tarjeta de José Miguel: NO DEBEN INCIDIR
+  // 2. Cargos, ajustes de deuda base y cierres de la Tarjeta de José Miguel: NO DEBEN INCIDIR
   const isCardCharge =
     src === "tarjeta_jm_consumo" ||
+    src === "tarjeta_jm_deuda_base" ||
+    src === "tarjeta_jm_cierre" ||
     src === "tarjeta" ||
     note.includes("[tarjeta josé miguel]") ||
     note.includes("[tarjeta jose miguel]") ||
@@ -165,7 +167,9 @@ export function isExcludedFromExpenseTotals(e: {
     note.includes("consumo tarjeta") ||
     cat.includes("tarjeta de crédito") ||
     cat.includes("tarjeta de credito") ||
-    cat === "gastos especiales";
+    cat === "gastos especiales" ||
+    cat === "ajuste deuda tarjeta jm" ||
+    cat === "cierre mensual tarjeta jm";
 
   if (isCardCharge) {
     return true; // EXCLUIR -> NO SUMA

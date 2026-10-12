@@ -96,47 +96,88 @@ const DEFERRED_LAST_CLOSURE_COOKIE = "m_wallet_deferred_last_closure_at";
 
 const DEFAULT_CHARGES: DeferredCharge[] = [
   {
-    id: "tjm_supabase",
+    id: "tjm_resend_4",
+    code: "Mas-Corp-TJM-0004",
+    description: "Servicio · Resend",
+    category: "Correos",
+    amount: 20.00,
+    currency: "USD",
+    chargedOn: "2026-10-09",
+    status: "pendiente",
+    notes: "Correos · Cargo en Tarjeta: 09/10/2026",
+    createdAt: "2026-10-09T10:00:00.000Z",
+  },
+  {
+    id: "tjm_supabase_3",
+    code: "Mas-Corp-TJM-0003",
+    description: "Servicio · Supabase",
+    category: "Base de Datos",
+    amount: 27.22,
+    currency: "USD",
+    chargedOn: "2026-10-09",
+    status: "pendiente",
+    notes: "Base de Datos · Cargo en Tarjeta: 09/10/2026",
+    createdAt: "2026-10-09T09:00:00.000Z",
+  },
+  {
+    id: "tjm_supabase_1",
     code: "Mas-Corp-TJM-0001",
     description: "Servicio · Supabase",
     category: "Base de Datos",
-    amount: 216.18,
+    amount: 224.99,
     currency: "USD",
-    chargedOn: "2026-08-29",
+    chargedOn: "2026-10-03",
     status: "pendiente",
-    notes: "Suscripción Base de Datos Cloud",
-    createdAt: "2026-08-29T10:00:00.000Z",
-  },
-  {
-    id: "tjm_claude",
-    code: "Mas-Corp-TJM-0002",
-    description: "Servicio · Claude",
-    category: "IA",
-    amount: 217.75,
-    currency: "USD",
-    chargedOn: "2026-09-01",
-    status: "pendiente",
-    notes: "Suscripción Inteligencia Artificial Pro",
-    createdAt: "2026-09-01T10:00:00.000Z",
+    notes: "Base de Datos · Cargo en Tarjeta: 03/10/2026",
+    createdAt: "2026-10-03T10:00:00.000Z",
   },
 ];
 
 const DEFAULT_ABONOS: DeferredAbono[] = [
   {
-    id: "abono_albanil_jm",
-    code: "Mas-Corp-ABN-0001",
-    description: "Pago Albañil Jose Miguel Arias",
-    amount: 39.00,
+    id: "abn_pago_jm_2",
+    code: "Mas-Corp-ABN-0002",
+    description: "Pago Jose Miguel",
+    amount: 96.00,
     currency: "USD",
-    paidOn: "2026-09-03",
-    paidFrom: "Banesco Corriente Nacional",
-    reference: "67689643",
-    notes: "Abono parcial descontado de deuda de tarjeta",
-    createdAt: "2026-09-03T12:00:00.000Z",
+    paidOn: "2026-10-09",
+    paidFrom: "Binance USDT TRC20",
+    notes: "Abonado a Deuda · Binance USDT TRC20",
+    createdAt: "2026-10-09T12:00:00.000Z",
+  },
+  {
+    id: "abn_pago_jm_1",
+    code: "Mas-Corp-ABN-0001",
+    description: "Pago Jose Miguel",
+    amount: 220.00,
+    currency: "USD",
+    paidOn: "2026-10-02",
+    paidFrom: "Binance USDT TRC20",
+    notes: "Abonado a Deuda · Binance USDT TRC20",
+    createdAt: "2026-10-02T12:00:00.000Z",
   },
 ];
 
 export async function getDeferredCardLimit(): Promise<number> {
+  // 1. Consultar base de datos central en Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: dbDebt } = await supabase
+        .from("expenses")
+        .select("amount, created_at")
+        .eq("source", "tarjeta_jm_deuda_base")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (dbDebt && typeof dbDebt.amount === "number" && dbDebt.amount >= 0) {
+        return dbDebt.amount;
+      }
+    } catch {}
+  }
+
+  // 2. Consultar cookie del navegador local
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(DEFERRED_CARD_LIMIT_COOKIE)?.value;
@@ -151,13 +192,44 @@ export async function getDeferredCardLimit(): Promise<number> {
       return 0;
     }
   } catch {}
-  return 539.12;
+
+  // 3. Saldo base inicial establecido por defecto
+  return 685.44;
 }
 
 export async function updateDeferredCardLimit(limit: number): Promise<MutationResult> {
   if (isNaN(limit) || limit < 0) {
     return { ok: false, error: "Ingresa un límite válido." };
   }
+
+  // Persistir en Supabase para sincronización multi-dispositivo
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      let companyId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        companyId = profile?.company_id;
+      }
+      await supabase.from("expenses").insert({
+        company_id: companyId || undefined,
+        category: "Ajuste Deuda Tarjeta JM",
+        source: "tarjeta_jm_deuda_base",
+        amount: limit,
+        currency: "USD",
+        spent_on: new Date().toISOString().slice(0, 10),
+        note: `Deuda Base Inicial Tarjeta José Miguel: ${limit.toFixed(2)} USD`,
+      });
+    } catch (e) {
+      console.warn("Could not persist card limit to Supabase:", e);
+    }
+  }
+
   const cookieStore = await cookies();
   cookieStore.set(DEFERRED_CARD_LIMIT_COOKIE, String(limit), {
     maxAge: 60 * 60 * 24 * 365,
@@ -176,6 +248,34 @@ export async function increaseDeferredCardDebt(amountToAdd: number, reason?: str
   const current = await getDeferredCardLimit();
   const newLimit = Math.round((current + amountToAdd) * 100) / 100;
   
+  // Persistir en Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      let companyId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        companyId = profile?.company_id;
+      }
+      await supabase.from("expenses").insert({
+        company_id: companyId || undefined,
+        category: "Ajuste Deuda Tarjeta JM",
+        source: "tarjeta_jm_deuda_base",
+        amount: newLimit,
+        currency: "USD",
+        spent_on: new Date().toISOString().slice(0, 10),
+        note: `Aumento de deuda en +${amountToAdd.toFixed(2)} USD (Nueva deuda: ${newLimit.toFixed(2)} USD)${reason ? ` - ${reason}` : ""}`,
+      });
+    } catch (e) {
+      console.warn("Could not persist debt increase to Supabase:", e);
+    }
+  }
+
   const cookieStore = await cookies();
   cookieStore.set(DEFERRED_CARD_LIMIT_COOKIE, String(newLimit), {
     maxAge: 60 * 60 * 24 * 365,
@@ -221,6 +321,16 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
     }
   } catch {}
 
+  // Si no hay cierre en cookie, verificar si hay cierres guardados en Supabase
+  if (!lastClosureTime && isSupabaseConfigured) {
+    try {
+      const closures = await getDeferredCardClosures();
+      if (closures.length > 0) {
+        lastClosureTime = new Date(closures[0].closedAt).getTime();
+      }
+    } catch {}
+  }
+
   if (charges.length === 0 && lastClosureTime === 0) {
     charges = [...DEFAULT_CHARGES];
   }
@@ -231,7 +341,7 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
       const supabase = await createClient();
       const { data: svcExpenses } = await supabase
         .from("expenses")
-        .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id, code")
+        .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id")
         .or("source.eq.servicio,source.eq.tarjeta_jm_consumo,source.eq.tarjeta_jm,note.ilike.%servicio%")
         .order("created_at", { ascending: false });
 
@@ -263,7 +373,8 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
 
           if (!alreadyExists) {
             const nextNum = charges.length + 1;
-            const code = exp.code || formatEntityCode("Mas-Corp-TJM-", nextNum, 4);
+            const codeMatch = exp.note?.match(/\[(Mas-Corp-TJM-\d+)/i);
+            const code = codeMatch ? codeMatch[1] : formatEntityCode("Mas-Corp-TJM-", nextNum, 4);
             charges.unshift({
               id: `tjm_exp_${exp.id}`,
               code,
@@ -309,6 +420,16 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
     }
   } catch {}
 
+  // Si no hay cierre en cookie, verificar si hay cierres guardados en Supabase
+  if (!lastClosureTime && isSupabaseConfigured) {
+    try {
+      const closures = await getDeferredCardClosures();
+      if (closures.length > 0) {
+        lastClosureTime = new Date(closures[0].closedAt).getTime();
+      }
+    } catch {}
+  }
+
   if (abonos.length === 0 && lastClosureTime === 0) {
     abonos = [...DEFAULT_ABONOS];
   }
@@ -319,7 +440,7 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
       const supabase = await createClient();
       const { data: expRows } = await supabase
         .from("expenses")
-        .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id, code")
+        .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id")
         .order("created_at", { ascending: false });
 
       if (expRows && expRows.length > 0) {
@@ -390,7 +511,8 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
 
           if (!alreadyExists) {
             const nextNum = abonos.length + 1;
-            const code = exp.code || formatEntityCode("Mas-Corp-ABN-", nextNum, 4);
+            const codeMatch = exp.note?.match(/\[(Mas-Corp-ABN-\d+)/i);
+            const code = codeMatch ? codeMatch[1] : formatEntityCode("Mas-Corp-ABN-", nextNum, 4);
             abonos.unshift({
               id: `abn_exp_${exp.id}`,
               code,
@@ -447,8 +569,47 @@ export async function addDeferredCharge(
   const nextNum = charges.length + 1;
   const code = formatEntityCode("Mas-Corp-TJM-", nextNum, 4);
 
+  let createdExpenseId = `tjm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+  // Persistir en Supabase para sincronización entre dispositivos
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      let companyId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        companyId = profile?.company_id;
+      }
+      const noteWithCode = `${input.description.trim()} [${code}${input.notes?.trim() ? ` · ${input.notes.trim()}` : ""}]`;
+      const { data: expData } = await supabase
+        .from("expenses")
+        .insert({
+          company_id: companyId || undefined,
+          category: input.category?.trim() || "Servicios",
+          source: "tarjeta_jm_consumo",
+          amount: input.amount,
+          currency: input.currency || "USD",
+          spent_on: input.chargedOn || new Date().toISOString().slice(0, 10),
+          note: noteWithCode,
+        })
+        .select("id")
+        .maybeSingle();
+
+      if (expData?.id) {
+        createdExpenseId = expData.id;
+      }
+    } catch (e) {
+      console.warn("Could not persist charge to Supabase:", e);
+    }
+  }
+
   const newCharge: DeferredCharge = {
-    id: `tjm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: createdExpenseId,
     code,
     description: input.description.trim(),
     category: input.category?.trim() || "Servicios",
@@ -457,6 +618,7 @@ export async function addDeferredCharge(
     chargedOn: input.chargedOn || new Date().toISOString().slice(0, 10),
     status: "pendiente",
     notes: input.notes?.trim() || "",
+    expenseId: createdExpenseId,
     createdAt: new Date().toISOString(),
   };
 
@@ -733,17 +895,50 @@ export async function deleteDeferredAbono(id: string): Promise<MutationResult> {
 }
 
 export async function getDeferredCardClosures(): Promise<DeferredCardClosure[]> {
+  const closures: DeferredCardClosure[] = [];
+
+  // 1. Consultar base de datos central en Supabase
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: dbClosures } = await supabase
+        .from("expenses")
+        .select("note, created_at, id")
+        .eq("source", "tarjeta_jm_cierre")
+        .order("created_at", { ascending: false });
+
+      if (dbClosures && dbClosures.length > 0) {
+        for (const row of dbClosures) {
+          try {
+            if (row.note && row.note.startsWith("{")) {
+              const parsed = JSON.parse(row.note);
+              if (parsed && (parsed.id || parsed.code)) {
+                closures.push(parsed);
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Cookie fallback / merge
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(DEFERRED_CARD_CLOSURES_COOKIE)?.value;
     if (raw) {
       const parsed = JSON.parse(decodeURIComponent(raw));
       if (Array.isArray(parsed)) {
-        return parsed.sort((a, b) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime());
+        for (const item of parsed) {
+          if (!closures.some((c) => c.id === item.id || c.code === item.code)) {
+            closures.push(item);
+          }
+        }
       }
     }
   } catch {}
-  return [];
+
+  return closures.sort((a, b) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime());
 }
 
 async function saveDeferredCardClosures(closures: DeferredCardClosure[]) {
@@ -797,7 +992,7 @@ export async function executeDeferredCardClosure(input: {
     createdAt: closureTime,
   };
 
-  // Guardar en histórico de cierres
+  // Guardar en histórico de cierres (cookies)
   closures.unshift(newClosure);
   await saveDeferredCardClosures(closures);
 
@@ -830,6 +1025,45 @@ export async function executeDeferredCardClosure(input: {
     secure: process.env.NODE_ENV === "production",
   });
 
+  // Guardar en Supabase para sincronización multi-dispositivo
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      let companyId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("company_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        companyId = profile?.company_id;
+      }
+      await supabase.from("expenses").insert({
+        company_id: companyId || undefined,
+        category: "Cierre Tarjeta JM",
+        source: "tarjeta_jm_cierre",
+        amount: finalBalance,
+        currency: "USD",
+        spent_on: closureTime.slice(0, 10),
+        note: JSON.stringify(newClosure),
+      });
+
+      // Actualizar deuda base de tarjeta en Supabase para el nuevo ciclo
+      await supabase.from("expenses").insert({
+        company_id: companyId || undefined,
+        category: "Ajuste Deuda Tarjeta JM",
+        source: "tarjeta_jm_deuda_base",
+        amount: nextLimit,
+        currency: "USD",
+        spent_on: closureTime.slice(0, 10),
+        note: `Reinicio tras cierre ${newClosure.period}: ${nextLimit.toFixed(2)} USD`,
+      });
+    } catch (e) {
+      console.warn("Could not persist closure to Supabase:", e);
+    }
+  }
+
   await logAuditEvent({
     action: "cierre_mensual_tarjeta_jose_miguel",
     entityType: "gasto",
@@ -855,6 +1089,23 @@ export async function executeDeferredCardClosure(input: {
 }
 
 export async function deleteDeferredCardClosure(id: string): Promise<MutationResult> {
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await createClient();
+      const { data: rows } = await supabase
+        .from("expenses")
+        .select("id, note")
+        .eq("source", "tarjeta_jm_cierre");
+      if (rows) {
+        for (const r of rows) {
+          if (r.note && r.note.includes(id)) {
+            await supabase.from("expenses").delete().eq("id", r.id);
+          }
+        }
+      }
+    } catch {}
+  }
+
   const closures = await getDeferredCardClosures();
   const updated = closures.filter((c) => c.id !== id);
   await saveDeferredCardClosures(updated);
