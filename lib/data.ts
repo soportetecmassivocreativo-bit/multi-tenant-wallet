@@ -910,9 +910,14 @@ export async function getInvoiceDetail(
   };
 }
 
+// Mismo punto de reinicio contable que getExpenses(): solo se cuentan cobros desde esta fecha.
+const PAYMENTS_RESET_TIMESTAMP = "2026-09-23T15:30:00.000Z";
+
 export async function getPayments(): Promise<Payment[]> {
   if (!isSupabaseConfigured) return [];
   const supabase = await createClient();
+  const resetThreshold = new Date(PAYMENTS_RESET_TIMESTAMP).getTime();
+
   const [paymentsRes, proformasRes] = await Promise.all([
     supabase
       .from("payments")
@@ -923,7 +928,12 @@ export async function getPayments(): Promise<Payment[]> {
       .select("id, number, total, status, invoice_id, date:issue_date, paid_amount, created_at, client_id"),
   ]);
 
-  const rawPayments = (paymentsRes.data ?? []) as unknown as Payment[];
+  // Filtrar pagos directos que sean desde el reinicio contable
+  const allRawPayments = (paymentsRes.data ?? []) as unknown as Payment[];
+  const rawPayments = allRawPayments.filter((p) => {
+    if (!p.paidOn) return false;
+    return new Date(p.paidOn).getTime() >= resetThreshold;
+  });
   const invoiceIdsWithPayment = new Set(rawPayments.map((p) => p.invoiceId).filter(Boolean));
 
   const extraProformaPayments: Payment[] = [];
@@ -931,6 +941,11 @@ export async function getPayments(): Promise<Payment[]> {
     for (const p of proformasRes.data as any[]) {
       const isPaid = p.status === "pagada" || (Number(p.paid_amount) > 0);
       if (isPaid) {
+        // Filtrar por fecha de reinicio contable (issue_date o created_at)
+        const proformaDate = p.date || (p.created_at ? String(p.created_at).slice(0, 10) : null);
+        if (proformaDate && new Date(proformaDate).getTime() < resetThreshold) {
+          continue; // Proforma anterior al reinicio contable — ignorar
+        }
         // Si la proforma ya fue convertida a factura y esa factura ya tiene un pago registrado en payments, no duplicar
         if (p.invoice_id && invoiceIdsWithPayment.has(p.invoice_id)) {
           continue;
@@ -1484,7 +1499,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const operationalExpenses = expenses.filter((e) => !isExcludedFromExpenseTotals(e));
   const gastos = operationalExpenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
   const balance = Math.max(0, cobrado - gastos);
-  const cobradoMes = cobrado;
+  // cobradoMes: solo los cobros del mes actual (para el stat card del dashboard)
+  const nowY = new Date().getFullYear();
+  const nowM = new Date().getMonth();
+  const cobradoMes = payments
+    .filter((p) => { const d = new Date(p.paidOn); return d.getFullYear() === nowY && d.getMonth() === nowM; })
+    .reduce((s, p) => s + Number(p.amount), 0);
 
   const hasMovements = isSupabaseConfigured
     ? payments.length + expenses.length > 0
