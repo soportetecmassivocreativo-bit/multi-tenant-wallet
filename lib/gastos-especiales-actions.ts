@@ -314,14 +314,14 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
     } catch {}
   }
 
-  // 2. Consultar gastos/consumos en la base de datos central en Supabase
+  // 2. Consultar consumos registrados específicamente para la tarjeta en Supabase
   if (isSupabaseConfigured) {
     try {
       const supabase = await createClient();
       const { data: svcExpenses } = await supabase
         .from("expenses")
         .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id")
-        .or("source.eq.servicio,source.eq.tarjeta_jm_consumo,source.eq.tarjeta_jm,note.ilike.%servicio%")
+        .eq("source", "tarjeta_jm_consumo")
         .order("created_at", { ascending: false });
 
       if (svcExpenses && svcExpenses.length > 0) {
@@ -333,16 +333,6 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
           }
 
           const rawNote = exp.note || "Servicio";
-          const lowerNote = rawNote.toLowerCase();
-          // Excluir abonos/pagos de nómina o abonos a tarjeta
-          if (
-            lowerNote.includes("nomina") ||
-            lowerNote.includes("nómina") ||
-            lowerNote.includes("abono a tarjeta") ||
-            lowerNote.includes("abono a la deuda")
-          ) {
-            continue;
-          }
           const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*/g, "").trim();
 
           const alreadyExists = charges.some(
@@ -376,7 +366,7 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
         }
       }
     } catch (e) {
-      console.error("Error al sincronizar cargos de servicios en Tarjeta José Miguel:", e);
+      console.error("Error al sincronizar cargos de tarjeta en Supabase:", e);
     }
   }
 
@@ -432,13 +422,14 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
     } catch {}
   }
 
-  // 2. Consultar abonos en la base de datos central en Supabase
+  // 2. Consultar abonos registrados específicamente para la tarjeta en Supabase
   if (isSupabaseConfigured) {
     try {
       const supabase = await createClient();
       const { data: expRows } = await supabase
         .from("expenses")
         .select("id, category, note, amount, currency, spent_on, created_at, source, ref_id")
+        .eq("source", "tarjeta_jm_abono")
         .order("created_at", { ascending: false });
 
       if (expRows && expRows.length > 0) {
@@ -450,40 +441,9 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
           }
 
           const rawNote = exp.note || "";
-          const lowerNote = rawNote.toLowerCase();
-          const lowerCat = (exp.category || "").toLowerCase();
-          const src = (exp.source || "").toLowerCase();
-
-          const isAbono =
-            src === "tarjeta_jm_abono" ||
-            src === "tarjeta_jm_pago" ||
-            src === "tarjeta_jm" ||
-            lowerCat === "abono a tarjeta" ||
-            lowerCat.includes("abono") ||
-            lowerNote.includes("abono a la deuda") ||
-            lowerNote.includes("abono a tarjeta") ||
-            lowerNote.includes("abono tarjeta") ||
-            lowerNote.includes("liquidación tarjeta") ||
-            lowerNote.includes("liquidacion tarjeta") ||
-            lowerNote.includes("pago a tarjeta") ||
-            lowerNote.includes("pago de tarjeta") ||
-            lowerNote.includes("pago josé miguel") ||
-            lowerNote.includes("pago jose miguel") ||
-            lowerNote.includes("abono jm");
-
-          const isCharge =
-            src === "tarjeta_jm_consumo" ||
-            src === "servicio" ||
-            lowerNote.includes("cargo en tarjeta") ||
-            lowerNote.includes("consumo tarjeta");
-
-          if (!isAbono || isCharge) {
-            continue;
-          }
-
           const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*$/, "").trim() || "Abono Tarjeta José Miguel";
 
-          let paidFrom = "Pago Móvil Banesco";
+          let paidFrom = "Binance USDT TRC20";
           let ref = exp.ref_id || "";
           const metaMatch = rawNote.match(/\[(.*?)\]$/);
           if (metaMatch) {
@@ -526,7 +486,7 @@ export async function getDeferredAbonos(): Promise<DeferredAbono[]> {
         }
       }
     } catch (e) {
-      console.error("Error al sincronizar abonos en Tarjeta José Miguel:", e);
+      console.error("Error al sincronizar abonos de tarjeta en Supabase:", e);
     }
   }
 
