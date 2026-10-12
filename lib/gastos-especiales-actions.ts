@@ -608,10 +608,9 @@ export async function addDeferredCharge(
   charges.unshift(newCharge);
   await saveDeferredCharges(charges);
 
-  // Incrementar automáticamente la deuda total de la tarjeta
-  try {
-    await increaseDeferredCardDebt(newCharge.amount, `Consumo: ${newCharge.description}`);
-  } catch {}
+  // NOTA: NO se incrementa automáticamente la deuda base (tarjeta_jm_deuda_base).
+  // La deuda base es un valor fijo manual que solo se actualiza en cierres de ciclo.
+  // Los consumos individuales se suman y restan en la vista, no modifican la base.
 
   await logAuditEvent({
     action: "cargo_tarjeta_jose_miguel",
@@ -1097,3 +1096,152 @@ export async function deleteDeferredCardClosure(id: string): Promise<MutationRes
   revalidatePath("/gastos");
   return { ok: true };
 }
+
+/**
+ * Limpieza y siembra de datos correctos en Supabase para la Tarjeta José Miguel.
+ * 
+ * Ejecutar UNA SOLA VEZ desde /api/cleanup-card-data para corregir el estado de la base de datos:
+ * 1. Elimina filas duplicadas de tarjeta_jm_deuda_base (mantiene solo la más antigua ~ $685.44)
+ * 2. Elimina filas duplicadas de tarjeta_jm_consumo insertas por error (las 3 reales ya son DEFAULT_CHARGES)
+ * 3. Inserta los 2 abonos reales (Mas-Corp-ABN-0001 $220 y Mas-Corp-ABN-0002 $96) en expenses
+ *    para que el dashboard los reste del balance correctamente en todos los dispositivos.
+ */
+export async function cleanupCardDataInSupabase(): Promise<{
+  ok: boolean;
+  deleted: { deudaBase: number; consumos: number };
+  inserted: { abonos: number };
+  message: string;
+}> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, deleted: { deudaBase: 0, consumos: 0 }, inserted: { abonos: 0 }, message: "Supabase no configurado" };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, deleted: { deudaBase: 0, consumos: 0 }, inserted: { abonos: 0 }, message: "Usuario no autenticado" };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  const companyId = profile?.company_id;
+  if (!companyId) {
+    return { ok: false, deleted: { deudaBase: 0, consumos: 0 }, inserted: { abonos: 0 }, message: "Empresa no encontrada" };
+  }
+
+  let deletedDeudaBase = 0;
+  let deletedConsumos = 0;
+  let insertedAbonos = 0;
+
+  // ── 1. Limpiar tarjeta_jm_deuda_base: mantener solo la fila más antigua (la original $685.44) ──
+  try {
+    const { data: deudaRows } = await supabase
+      .from("expenses")
+      .select("id, amount, created_at")
+      .eq("source", "tarjeta_jm_deuda_base")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: true });
+
+    if (deudaRows && deudaRows.length > 1) {
+      // Guardar solo el primero (más antiguo = el original)
+      const toDelete = deudaRows.slice(1).map((r: { id: string }) => r.id);
+      if (toDelete.length > 0) {
+        await supabase.from("expenses").delete().in("id", toDelete);
+        deletedDeudaBase = toDelete.length;
+      }
+    }
+  } catch (e) {
+    console.error("Error limpiando tarjeta_jm_deuda_base:", e);
+  }
+
+  // ── 2. Limpiar tarjeta_jm_consumo: eliminar todos los rows (son DEFAULT_CHARGES hardcoded) ──
+  // Los consumos de tarjeta NO deben estar en Supabase porque ya vienen de DEFAULT_CHARGES
+  // y tampoco deben afectar el balance del dashboard (están excluidos por isExcludedFromExpenseTotals)
+  try {
+    const { data: consumoRows } = await supabase
+      .from("expenses")
+      .select("id, amount, note, created_at")
+      .eq("source", "tarjeta_jm_consumo")
+      .eq("company_id", companyId);
+
+    if (consumoRows && consumoRows.length > 0) {
+      const toDelete = consumoRows.map((r: { id: string }) => r.id);
+      await supabase.from("expenses").delete().in("id", toDelete);
+      deletedConsumos = toDelete.length;
+    }
+  } catch (e) {
+    console.error("Error limpiando tarjeta_jm_consumo:", e);
+  }
+
+  // ── 3. Insertar abonos reales en Supabase si no existen ──
+  // Estos abonos reducen la deuda y deben aparecer en el balance del dashboard
+  const abonosToEnsure = [
+    {
+      code: "Mas-Corp-ABN-0001",
+      description: "Pago Jose Miguel",
+      amount: 220.00,
+      currency: "USD" as const,
+      spent_on: "2026-10-02",
+      note: "Pago Jose Miguel [Binance USDT TRC20]",
+      created_at_approx: "2026-10-02T12:00:00.000Z",
+    },
+    {
+      code: "Mas-Corp-ABN-0002",
+      description: "Pago Jose Miguel",
+      amount: 96.00,
+      currency: "USD" as const,
+      spent_on: "2026-10-09",
+      note: "Pago Jose Miguel [Binance USDT TRC20]",
+      created_at_approx: "2026-10-09T12:00:00.000Z",
+    },
+  ];
+
+  try {
+    const { data: existingAbonos } = await supabase
+      .from("expenses")
+      .select("id, amount, spent_on, note")
+      .eq("source", "tarjeta_jm_abono")
+      .eq("company_id", companyId);
+
+    for (const abono of abonosToEnsure) {
+      const alreadyExists = (existingAbonos || []).some(
+        (row: { amount: number; spent_on: string }) =>
+          Math.abs(Number(row.amount) - abono.amount) < 0.01 &&
+          row.spent_on === abono.spent_on
+      );
+
+      if (!alreadyExists) {
+        await supabase.from("expenses").insert({
+          company_id: companyId,
+          category: "Abono a Tarjeta",
+          note: abono.note,
+          amount: abono.amount,
+          currency: abono.currency,
+          spent_on: abono.spent_on,
+          source: "tarjeta_jm_abono",
+        });
+        insertedAbonos++;
+      }
+    }
+  } catch (e) {
+    console.error("Error insertando abonos:", e);
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/gastos");
+
+  const message = `Limpieza completada: eliminadas ${deletedDeudaBase} fila(s) de deuda_base, ${deletedConsumos} fila(s) de consumos. Insertados ${insertedAbonos} abono(s) faltante(s).`;
+  console.log(message);
+
+  return {
+    ok: true,
+    deleted: { deudaBase: deletedDeudaBase, consumos: deletedConsumos },
+    inserted: { abonos: insertedAbonos },
+    message,
+  };
+}
+

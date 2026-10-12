@@ -56,7 +56,7 @@ export async function payPayroll(periodId: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-import { addDeferredCharge } from "@/lib/gastos-especiales-actions";
+
 
 /** Registra el pago de un servicio recurrente y avanza su próxima fecha de cobro. */
 export async function payService(serviceId: string): Promise<ActionResult> {
@@ -85,18 +85,11 @@ export async function payService(serviceId: string): Promise<ActionResult> {
     code,
   });
 
-  try {
-    await addDeferredCharge({
-      description: `Servicio · ${svc.name}`,
-      category: svc.category || "Servicios",
-      amount: svc.amount,
-      currency: svc.currency,
-      chargedOn: today,
-      notes: `Pago recurrente de ${svc.name}`,
-    });
-  } catch (err) {
-    console.error("Error al registrar cargo diferido:", err);
-  }
+  // NOTA: NO se llama addDeferredCharge aquí.
+  // El gasto ya queda registrado en expenses con source='servicio' (línea de arriba).
+  // Llamar addDeferredCharge crearía un duplicado en tarjeta_jm_consumo Y dispararía
+  // la inflación de deuda base. Los servicios se visualizan en Gastos > Servicios,
+  // no en el módulo de Tarjeta JM.
 
   await supabase
     .from("services")
