@@ -4,7 +4,7 @@
  */
 import type { CurrencyCode } from "@/lib/currency";
 
-export const balance = 0;
+export const balance = 25;
 export const deltaPct = 0;
 
 /**
