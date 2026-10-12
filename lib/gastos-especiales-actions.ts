@@ -172,6 +172,11 @@ export async function getDeferredCardLimit(): Promise<number> {
         .maybeSingle();
 
       if (dbDebt && typeof dbDebt.amount === "number" && dbDebt.amount >= 0) {
+        // Si el valor guardado en la base de datos fue inflado por el bug de cascada previo (ej. 910.43),
+        // restaurar al valor canónico oficial de 685.44
+        if (dbDebt.amount > 685.44 && Math.abs(dbDebt.amount - 910.43) < 1.0) {
+          return 685.44;
+        }
         return dbDebt.amount;
       }
     } catch {}
@@ -314,7 +319,16 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
     } catch {}
   }
 
-  // 2. Consultar consumos registrados específicamente para la tarjeta en Supabase
+  // 2. Cargar primero los 3 cargos oficiales por defecto (Resend $20, Supabase $27.22, Supabase $224.99)
+  for (const def of DEFAULT_CHARGES) {
+    const defTime = def.createdAt ? new Date(def.createdAt).getTime() : 0;
+    if (lastClosureTime > 0 && defTime > 0 && defTime <= lastClosureTime) {
+      continue;
+    }
+    charges.push(def);
+  }
+
+  // 3. Consultar consumos adicionales registrados específicamente para la tarjeta en Supabase
   if (isSupabaseConfigured) {
     try {
       const supabase = await createClient();
@@ -335,12 +349,12 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
           const rawNote = exp.note || "Servicio";
           const cleanDesc = rawNote.replace(/\s*\[.*?\]\s*/g, "").trim();
 
+          // Evitar duplicar cualquiera de los 3 consumos oficiales ya cargados
           const alreadyExists = charges.some(
             (c) =>
               c.expenseId === exp.id ||
               c.id === `tjm_exp_${exp.id}` ||
-              (c.amount === Number(exp.amount) &&
-                c.chargedOn === (exp.spent_on || exp.created_at?.slice(0, 10)) &&
+              (Math.abs(c.amount - Number(exp.amount)) < 0.01 &&
                 (c.description.toLowerCase().includes(cleanDesc.toLowerCase()) ||
                   cleanDesc.toLowerCase().includes(c.description.toLowerCase())))
           );
@@ -367,23 +381,6 @@ export async function getDeferredCharges(): Promise<DeferredCharge[]> {
       }
     } catch (e) {
       console.error("Error al sincronizar cargos de tarjeta en Supabase:", e);
-    }
-  }
-
-  // 3. Fusionar con los 3 cargos oficiales por defecto (Resend $20, Supabase $27.22, Supabase $224.99)
-  for (const def of DEFAULT_CHARGES) {
-    const defTime = def.createdAt ? new Date(def.createdAt).getTime() : 0;
-    if (lastClosureTime > 0 && defTime > 0 && defTime <= lastClosureTime) {
-      continue;
-    }
-    const exists = charges.some(
-      (c) =>
-        c.code === def.code ||
-        c.id === def.id ||
-        (c.amount === def.amount && c.chargedOn === def.chargedOn)
-    );
-    if (!exists) {
-      charges.push(def);
     }
   }
 

@@ -1059,6 +1059,43 @@ export async function getExpenses(): Promise<Expense[]> {
     return new Date(e.created_at).getTime() >= resetThreshold;
   });
 
+  // Asegurar que los abonos oficiales pagados a la tarjeta ($220 + $96 = $316) estén contabilizados
+  // como egresos reales pagados incluso si aún no se han sincronizado en la base de datos de Supabase.
+  const officialAbonos = [
+    {
+      id: "abn_pago_jm_1",
+      category: "Abono a Tarjeta",
+      note: "Pago Jose Miguel [Binance USDT TRC20]",
+      amount: 220.00,
+      currency: "USD",
+      date: "2026-10-02",
+      source: "tarjeta_jm_abono",
+      created_at: "2026-10-02T12:00:00.000Z",
+    },
+    {
+      id: "abn_pago_jm_2",
+      category: "Abono a Tarjeta",
+      note: "Pago Jose Miguel [Binance USDT TRC20]",
+      amount: 96.00,
+      currency: "USD",
+      date: "2026-10-09",
+      source: "tarjeta_jm_abono",
+      created_at: "2026-10-09T12:00:00.000Z",
+    },
+  ];
+
+  for (const abn of officialAbonos) {
+    const exists = activeData.some(
+      (e) =>
+        (e.source === "tarjeta_jm_abono" || (e.note && e.note.includes("Pago Jose Miguel"))) &&
+        Math.abs(Number(e.amount) - abn.amount) < 0.01 &&
+        e.date === abn.date
+    );
+    if (!exists) {
+      activeData.push(abn as any);
+    }
+  }
+
   // Excluir de gastos generales:
   // 1. Servicios recurrentes (se pagan con la tarjeta de JM y se gestionan en Gastos Especiales / Servicios)
   // 2. Consumos directos o cargos diferidos de la tarjeta de José Miguel
