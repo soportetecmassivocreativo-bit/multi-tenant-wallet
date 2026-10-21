@@ -921,7 +921,7 @@ export async function getPayments(): Promise<Payment[]> {
   const [paymentsRes, proformasRes] = await Promise.all([
     supabase
       .from("payments")
-      .select("id, amount, paidOn:paid_on, method, invoiceId:invoice_id")
+      .select("id, amount, paidOn:paid_on, method, invoiceId:invoice_id, created_at")
       .order("paid_on", { ascending: false }),
     supabase
       .from("proformas")
@@ -1498,9 +1498,30 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const cobrado = payments.reduce((s, p) => s + Number(p.amount), 0);
   const operationalExpenses = expenses.filter((e) => !isExcludedFromExpenseTotals(e));
   const gastos = operationalExpenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
-  // Saldo real disponible en caja / billetera verificado: $25.00 USD
-  // Garantiza que el hero de Inicio muestre con precisión los $25 reales disponibles en caja.
-  const balance = 25;
+  // Saldo base auditado en caja/wallet: $25.00 fijado el 12/10/2026.
+  // Cualquier nuevo cobro registrado incrementa el disponible;
+  // cualquier nuevo egreso operativo pagado lo descuenta dinámicamente en tiempo real.
+  const baseBalance = 25.0;
+  const baseAuditThreshold = new Date("2026-10-12T19:00:00.000Z").getTime();
+
+  const isPostAudit = (dateStr?: string | null, createdAtStr?: string | null) => {
+    if (createdAtStr) {
+      const t = new Date(createdAtStr).getTime();
+      if (!isNaN(t)) return t > baseAuditThreshold;
+    }
+    if (dateStr) {
+      return dateStr > "2026-10-12";
+    }
+    return false;
+  };
+
+  const newPayments = payments.filter((p) => isPostAudit(p.paidOn, (p as any).created_at));
+  const newIncome = newPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+  const newExpenses = operationalExpenses.filter((e) => isPostAudit(e.date, (e as any).created_at));
+  const newExpensesPaid = newExpenses.reduce((s, e) => s + getExpenseBreakdown(e).paidAmount, 0);
+
+  const balance = Math.max(0, baseBalance + newIncome - newExpensesPaid);
   // cobradoMes: solo los cobros del mes actual (para el stat card del dashboard)
   const nowY = new Date().getFullYear();
   const nowM = new Date().getMonth();
