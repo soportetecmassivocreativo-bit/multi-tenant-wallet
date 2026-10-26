@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { getCurrentProfile, getBcvRates } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
@@ -62,11 +63,13 @@ export default async function ConfiguracionPage({ searchParams }: Props) {
       </section>
 
       {/* Selector interactivo de Empresa a Personalizar */}
-      <TenantConfigSelector
-        variant="page"
-        activeSlug={activeSlug}
-        initialTenants={allTenants}
-      />
+      <Suspense fallback={<div className="h-20 rounded-2xl bg-card border border-line animate-pulse" />}>
+        <TenantConfigSelector
+          variant="page"
+          activeSlug={activeSlug}
+          initialTenants={allTenants}
+        />
+      </Suspense>
 
       <ConfiguracionTabs
         key={activeSlug}

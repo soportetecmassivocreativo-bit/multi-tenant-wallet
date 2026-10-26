@@ -98,8 +98,8 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   servicePrefix: "Mas-Corp-Serv-",
   serviceCounter: 1,
 
-  systemLogoUrl: "/logo-massivo-creativo.png",
-  pdfLogoUrl: "/logo-massivo-creativo.png",
+  systemLogoUrl: "/logo-massivo-corp.png",
+  pdfLogoUrl: "/logo-massivo-corp.png",
   brandPrimaryColor: "#2C21FF",
   brandAccentColor: "#3b82f6",
   defaultCurrency: "USD",
@@ -124,6 +124,8 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pdfConditionsDelivery: "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente.",
   pdfConditionsIP: "La propiedad intelectual de todos los elementos del proyecto, incluyendo el código fuente, el diseño gráfico, los contenidos y la marca, corresponderá al cliente.",
   pdfConditionsConfidentiality: "Todas las partes se comprometen a mantener la confidencialidad de toda la información relacionada con el proyecto.",
+  pdfInvoiceConditionsText: "• Forma de Pago: Se requiere un anticipo del 50% al inicio y 50% al finalizar a satisfacción.\n\n• Tiempo de Entrega: 2 semanas aproximadamente a partir de la recepción del anticipo.\n\n• Propiedad Intelectual: La propiedad intelectual corresponderá al cliente.\n\n• Confidencialidad: Ambas partes mantendrán confidencialidad de la información.",
+  pdfProformaConditionsText: "• Forma de Pago: Se requiere un anticipo del 50% al inicio y 50% al finalizar a satisfacción.\n\n• Tiempo de Entrega: 2 semanas aproximadamente a partir de la recepción del anticipo.\n\n• Propiedad Intelectual: La propiedad intelectual corresponderá al cliente.\n\n• Confidencialidad: Ambas partes mantendrán confidencialidad de la información.",
 
   // Facturas
   pdfInvoiceTemplateUrl: "",

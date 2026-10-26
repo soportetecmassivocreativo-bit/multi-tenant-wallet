@@ -79,10 +79,7 @@ export function ProformasManager({
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
   const [editHasConditions, setEditHasConditions] = useState<boolean>(true);
-  const [editCondPayment, setEditCondPayment] = useState("");
-  const [editCondDelivery, setEditCondDelivery] = useState("");
-  const [editCondIP, setEditCondIP] = useState("");
-  const [editCondConfidentiality, setEditCondConfidentiality] = useState("");
+  const [editConditionsText, setEditConditionsText] = useState("");
 
   const [pending, startTransition] = useTransition();
 
@@ -212,10 +209,8 @@ export function ProformasManager({
 
     const pHasConditions = p.hasConditions !== undefined ? Boolean(p.hasConditions) : true;
     setEditHasConditions(pHasConditions);
-    setEditCondPayment(p.conditions?.payment || DEFAULT_COND_PAYMENT);
-    setEditCondDelivery(p.conditions?.delivery || DEFAULT_COND_DELIVERY);
-    setEditCondIP(p.conditions?.ip || DEFAULT_COND_IP);
-    setEditCondConfidentiality(p.conditions?.confidentiality || DEFAULT_COND_CONFIDENTIALITY);
+    const existingText = formatConditionsText(p.conditions);
+    setEditConditionsText(existingText || "• Forma de Pago: Se requiere un anticipo del 50% al inicio y 50% al finalizar.\n\n• Tiempo de Entrega: 2 semanas aproximadamente.\n\n• Propiedad Intelectual: Corresponderá al cliente.\n\n• Confidencialidad: Se mantendrá estricta confidencialidad.");
 
     // Separar Concepto General del Proyecto de las notas / coordenadas bancarias
     const parsed = cleanConceptAndNotes(p.notes);
@@ -360,12 +355,7 @@ export function ProformasManager({
         vesTotal,
         lines: validLines,
         hasConditions: editHasConditions,
-        conditions: editHasConditions ? {
-          payment: editCondPayment.trim(),
-          delivery: editCondDelivery.trim(),
-          ip: editCondIP.trim(),
-          confidentiality: editCondConfidentiality.trim(),
-        } : null,
+        conditions: editHasConditions ? { text: editConditionsText.trim() } : null,
       });
 
       if (res.ok) {

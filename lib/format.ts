@@ -135,3 +135,21 @@ export function cleanItemDescription(raw?: string | null): string {
     .trim();
 }
 
+
+/**
+ * Convierte cualquier formato de condiciones (texto unico o campos estructurados)
+ * en un texto editable y fluido con saltos de linea.
+ */
+export function formatConditionsText(cond?: any): string {
+  if (!cond) return "";
+  if (typeof cond === "string") return cond.trim();
+  if (cond.text && typeof cond.text === "string" && cond.text.trim()) {
+    return cond.text.trim();
+  }
+  const parts: string[] = [];
+  if (cond.payment && cond.payment.trim()) parts.push(`• Forma de Pago: ${cond.payment.trim()}`);
+  if (cond.delivery && cond.delivery.trim()) parts.push(`• Tiempo de Entrega: ${cond.delivery.trim()}`);
+  if (cond.ip && cond.ip.trim()) parts.push(`• Propiedad Intelectual: ${cond.ip.trim()}`);
+  if (cond.confidentiality && cond.confidentiality.trim()) parts.push(`• Confidencialidad: ${cond.confidentiality.trim()}`);
+  return parts.join("\n\n");
+}

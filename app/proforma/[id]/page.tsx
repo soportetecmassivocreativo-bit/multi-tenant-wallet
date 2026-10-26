@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/factura/print-button";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
+import { formatDate, cleanConceptAndNotes, cleanItemDescription, formatConditionsText } from "@/lib/format";
 import { getProformaDetail, getBcvRates, getCompany } from "@/lib/data";
 import { getSystemConfig } from "@/lib/config-actions";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
@@ -313,18 +313,13 @@ export default async function ProformaPrintPage({
             
             {/* Bloque Azul con Logo y Contacto */}
             <div className="bg-[#0050D8] rounded-xl p-3 sm:p-3.5 text-white flex items-center gap-3.5 sm:gap-5 shadow-sm min-w-[300px]">
-              <div className="flex items-center gap-2">
-                {/* Logo Massivo "M" */}
+              <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/logo-m-mark.svg"
-                  alt="Massivo Creativo"
-                  className="h-8 w-auto brightness-0 invert"
+                  src="/logo-massivo-corp.png"
+                  alt="Massivo Corp"
+                  className="h-8 sm:h-9 w-auto object-contain"
                 />
-                <div className="leading-none">
-                  <span className="block font-sans text-xs font-black tracking-wider uppercase">MASSIVO</span>
-                  <span className="block font-sans text-[10px] font-bold tracking-widest uppercase text-blue-200">CREATIVO</span>
-                </div>
               </div>
 
               {/* Píldoras de contacto */}
@@ -565,17 +560,13 @@ export default async function ProformaPrintPage({
             {/* Header de Segunda Hoja */}
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-3">
-                <div className="bg-[#0050D8] rounded-xl px-3.5 py-2 text-white flex items-center gap-2.5 shadow-sm">
+                <div className="bg-white rounded-xl px-3 py-1.5 shadow-xs border border-neutral-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/logo-m-mark.svg"
-                    alt="Massivo Creativo"
-                    className="h-6 w-auto brightness-0 invert"
+                    src="/logo-massivo-corp.png"
+                    alt="Massivo Corp"
+                    className="h-6 w-auto object-contain"
                   />
-                  <div className="leading-none">
-                    <span className="block font-sans text-[10px] font-black tracking-wider uppercase">MASSIVO</span>
-                    <span className="block font-sans text-[8.5px] font-bold tracking-widest uppercase text-blue-200">CREATIVO</span>
-                  </div>
                 </div>
 
                 <div className="text-right">

@@ -1,6 +1,7 @@
 "use client";
 
 import { exportSamplePdf } from "@/lib/pdf-export";
+import { formatConditionsText } from "@/lib/format";
 import { DownloadIcon, FileTextIcon } from "@/components/ui/icons";
 import type { SystemConfig } from "@/lib/config";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
@@ -302,34 +303,27 @@ export function PdfLivePreview({ config, target = "general", accounts = [], bcv 
           </div>
         )}
 
-        {/* Bloque de Condiciones Estructuradas */}
+        {/* Bloque de Condiciones del Proyecto */}
         {showConditions && (isFacturas || isProformas) && (
           <div className="rounded-lg bg-gray-50/80 p-2.5 text-gray-800 space-y-1.5 text-[8.5px] border border-gray-200">
             <p className="font-bold text-gray-900 uppercase tracking-wider text-[9px]">Condiciones del Proyecto</p>
-            {conditions.payment && (
-              <div>
-                <p className="text-gray-900 font-semibold">Forma de Pago:</p>
-                <p className="text-gray-600 leading-tight line-clamp-2">{conditions.payment}</p>
-              </div>
-            )}
-            {conditions.delivery && (
-              <div>
-                <p className="text-gray-900 font-semibold">Tiempo de entrega:</p>
-                <p className="text-gray-600 leading-tight line-clamp-1">{conditions.delivery}</p>
-              </div>
-            )}
-            {conditions.ip && (
-              <div>
-                <p className="text-gray-900 font-semibold">Propiedad Intelectual:</p>
-                <p className="text-gray-600 leading-tight line-clamp-1">{conditions.ip}</p>
-              </div>
-            )}
-            {conditions.confidentiality && (
-              <div>
-                <p className="text-gray-900 font-semibold">Confidencialidad:</p>
-                <p className="text-gray-600 leading-tight line-clamp-1">{conditions.confidentiality}</p>
-              </div>
-            )}
+            <div className="text-gray-700 leading-relaxed whitespace-pre-line text-[8.5px]">
+              {formatConditionsText(
+                isFacturas
+                  ? (config.pdfInvoiceConditionsText || {
+                      payment: config.pdfInvoiceConditionsPayment,
+                      delivery: config.pdfInvoiceConditionsDelivery,
+                      ip: config.pdfInvoiceConditionsIP,
+                      confidentiality: config.pdfInvoiceConditionsConfidentiality,
+                    })
+                  : (config.pdfProformaConditionsText || {
+                      payment: config.pdfProformaConditionsPayment,
+                      delivery: config.pdfProformaConditionsDelivery,
+                      ip: config.pdfProformaConditionsIP,
+                      confidentiality: config.pdfProformaConditionsConfidentiality,
+                    })
+              )}
+            </div>
           </div>
         )}
 

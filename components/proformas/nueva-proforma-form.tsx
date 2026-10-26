@@ -72,19 +72,10 @@ export function NuevaProformaForm({
   const [projectTitle, setProjectTitle] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Condiciones Estructuradas (según requerimiento)
+  // Condiciones Editables del Proyecto
   const [hasConditions, setHasConditions] = useState(true);
-  const [condPayment, setCondPayment] = useState(
-    "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente."
-  );
-  const [condDelivery, setCondDelivery] = useState(
-    "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente."
-  );
-  const [condIP, setCondIP] = useState(
-    "La propiedad intelectual de todos los elementos del proyecto, incluyendo el código fuente, el diseño gráfico, los contenidos y la marca, corresponderá al cliente."
-  );
-  const [condConfidentiality, setCondConfidentiality] = useState(
-    "Todas las partes se comprometen a mantener la confidencialidad de toda la información relacionada con el proyecto."
+  const [conditionsText, setConditionsText] = useState(
+    "• Forma de Pago: Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente.\n\n• Tiempo de Entrega: El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa.\n\n• Propiedad Intelectual: La propiedad intelectual de todos los elementos del proyecto corresponderá al cliente.\n\n• Confidencialidad: Todas las partes se comprometen a mantener la confidencialidad de la información."
   );
 
   const [saved, setSaved] = useState(false);

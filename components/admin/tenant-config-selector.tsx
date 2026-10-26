@@ -43,7 +43,7 @@ export function TenantConfigSelector({
     initialTenants && initialTenants.length > 0 ? initialTenants : DEFAULT_PRESETS
   );
   const [selectedSlug, setSelectedSlug] = useState<string>(
-    propActiveSlug || searchParams.get("empresa") || "massivo"
+    propActiveSlug || searchParams?.get("empresa") || "massivo"
   );
 
   useEffect(() => {

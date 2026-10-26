@@ -7,7 +7,7 @@ import { RegistrarPagoForm } from "@/components/cobros/registrar-pago-form";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteInvoice } from "@/lib/mutations";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatConditionsText } from "@/lib/format";
 import { getInvoiceDetail, isAdmin } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { getSystemConfig } from "@/lib/config-actions";
@@ -148,31 +148,10 @@ export default async function InvoiceDetailPage({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-            {conditions.payment && (
-              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
-                <span className="font-semibold text-foreground text-[11px] block">Forma de Pago:</span>
-                <span className="text-muted leading-relaxed text-[11px]">{conditions.payment}</span>
-              </div>
-            )}
-            {conditions.delivery && (
-              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
-                <span className="font-semibold text-foreground text-[11px] block">Tiempo de Entrega:</span>
-                <span className="text-muted leading-relaxed text-[11px]">{conditions.delivery}</span>
-              </div>
-            )}
-            {conditions.ip && (
-              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
-                <span className="font-semibold text-foreground text-[11px] block">Propiedad Intelectual:</span>
-                <span className="text-muted leading-relaxed text-[11px]">{conditions.ip}</span>
-              </div>
-            )}
-            {conditions.confidentiality && (
-              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
-                <span className="font-semibold text-foreground text-[11px] block">Confidencialidad:</span>
-                <span className="text-muted leading-relaxed text-[11px]">{conditions.confidentiality}</span>
-              </div>
-            )}
+          <div className="rounded-xl border border-line/60 bg-soft/30 p-3.5 text-xs">
+            <div className="text-foreground leading-relaxed whitespace-pre-line">
+              {formatConditionsText(inv.conditions) || formatConditionsText(conditions)}
+            </div>
           </div>
         </section>
       )}

@@ -12,6 +12,7 @@ import {
   BuildingIcon,
 } from "@/components/ui/icons";
 import { type SystemConfig, applyBrandColor } from "@/lib/config";
+import { formatConditionsText } from "@/lib/format";
 
 const BRAND_PALETTES = [
   { label: "Azul Índigo (Massivo)", primary: "#2C21FF", accent: "#3B82F6" },
@@ -779,10 +780,17 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                       </div>
                     </div>
 
-                    {/* BLOQUE DE CONDICIONES ESTRUCTURADAS */}
+                    {/* BLOQUE DE CONDICIONES EDITABLES FACTURA */}
                     <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-foreground">Condiciones del Proyecto en Facturas</span>
+                        <div>
+                          <span className="text-xs font-bold text-foreground block">
+                            Condiciones Comerciales en Facturas
+                          </span>
+                          <span className="text-[11px] text-muted">
+                            Cuadro editable con las condiciones que se aplicarán por defecto
+                          </span>
+                        </div>
                         <input
                           type="checkbox"
                           checked={config.pdfInvoiceShowConditions ?? true}
@@ -791,43 +799,28 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                         />
                       </div>
                       {config.pdfInvoiceShowConditions && (
-                        <div className="space-y-2.5 pt-1">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Forma de Pago:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfInvoiceConditionsPayment || ""}
-                              onChange={(e) => updateField("pdfInvoiceConditionsPayment", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Tiempo de entrega:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfInvoiceConditionsDelivery || ""}
-                              onChange={(e) => updateField("pdfInvoiceConditionsDelivery", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Propiedad Intelectual:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfInvoiceConditionsIP || ""}
-                              onChange={(e) => updateField("pdfInvoiceConditionsIP", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Confidencialidad:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfInvoiceConditionsConfidentiality || ""}
-                              onChange={(e) => updateField("pdfInvoiceConditionsConfidentiality", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
+                        <div className="space-y-2 pt-1">
+                          <label className="block text-[11px] font-semibold text-foreground">
+                            Términos y Condiciones del Proyecto:
+                          </label>
+                          <textarea
+                            rows={7}
+                            value={config.pdfInvoiceConditionsText !== undefined ? config.pdfInvoiceConditionsText : formatConditionsText({
+                              payment: config.pdfInvoiceConditionsPayment,
+                              delivery: config.pdfInvoiceConditionsDelivery,
+                              ip: config.pdfInvoiceConditionsIP,
+                              confidentiality: config.pdfInvoiceConditionsConfidentiality,
+                            })}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              updateField("pdfInvoiceConditionsText", val);
+                            }}
+                            placeholder="Escribe aquí las condiciones necesarias (forma de pago, tiempos de entrega, acuerdos comerciales)..."
+                            className="w-full rounded-xl border border-line bg-card p-3 text-xs leading-relaxed outline-none focus:border-accent font-mono"
+                          />
+                          <p className="text-[10px] text-hint">
+                            Puedes redactar las condiciones libremente o modificarlas según cada caso particular.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1066,10 +1059,17 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                       </div>
                     </div>
 
-                    {/* BLOQUE DE CONDICIONES ESTRUCTURADAS PROFORMA */}
+                    {/* BLOQUE DE CONDICIONES EDITABLES PROFORMA */}
                     <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-foreground">Condiciones del Proyecto en Proformas</span>
+                        <div>
+                          <span className="text-xs font-bold text-foreground block">
+                            Condiciones del Proyecto en Proformas
+                          </span>
+                          <span className="text-[11px] text-muted">
+                            Cuadro editable con las condiciones que se aplicarán por defecto
+                          </span>
+                        </div>
                         <input
                           type="checkbox"
                           checked={config.pdfProformaShowConditions ?? true}
@@ -1078,43 +1078,28 @@ export function ConfiguracionTabs({ initialConfig, canEdit, tenantSlug, accounts
                         />
                       </div>
                       {config.pdfProformaShowConditions && (
-                        <div className="space-y-2.5 pt-1">
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Forma de Pago:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfProformaConditionsPayment || ""}
-                              onChange={(e) => updateField("pdfProformaConditionsPayment", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Tiempo de entrega:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfProformaConditionsDelivery || ""}
-                              onChange={(e) => updateField("pdfProformaConditionsDelivery", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Propiedad Intelectual:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfProformaConditionsIP || ""}
-                              onChange={(e) => updateField("pdfProformaConditionsIP", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-semibold text-foreground">Confidencialidad:</label>
-                            <textarea
-                              rows={2}
-                              value={config.pdfProformaConditionsConfidentiality || ""}
-                              onChange={(e) => updateField("pdfProformaConditionsConfidentiality", e.target.value)}
-                              className="w-full rounded-lg border border-line bg-card p-2 text-xs"
-                            />
-                          </div>
+                        <div className="space-y-2 pt-1">
+                          <label className="block text-[11px] font-semibold text-foreground">
+                            Términos y Condiciones del Proyecto:
+                          </label>
+                          <textarea
+                            rows={7}
+                            value={config.pdfProformaConditionsText !== undefined ? config.pdfProformaConditionsText : formatConditionsText({
+                              payment: config.pdfProformaConditionsPayment,
+                              delivery: config.pdfProformaConditionsDelivery,
+                              ip: config.pdfProformaConditionsIP,
+                              confidentiality: config.pdfProformaConditionsConfidentiality,
+                            })}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              updateField("pdfProformaConditionsText", val);
+                            }}
+                            placeholder="Escribe aquí las condiciones necesarias (forma de pago, tiempos de entrega, acuerdos comerciales)..."
+                            className="w-full rounded-xl border border-line bg-card p-3 text-xs leading-relaxed outline-none focus:border-accent font-mono"
+                          />
+                          <p className="text-[10px] text-hint">
+                            Puedes redactar las condiciones libremente o modificarlas según cada caso particular.
+                          </p>
                         </div>
                       )}
                     </div>

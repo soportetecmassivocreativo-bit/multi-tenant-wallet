@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/cobros/status-badge";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { deleteProforma } from "@/lib/mutations";
 import { formatCurrency } from "@/lib/currency";
-import { formatDate, cleanConceptAndNotes, cleanItemDescription } from "@/lib/format";
+import { formatDate, cleanConceptAndNotes, cleanItemDescription, formatConditionsText } from "@/lib/format";
 import { getProformaDetail, isAdmin } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
 import { getSystemConfig } from "@/lib/config-actions";
@@ -175,31 +175,10 @@ export default async function ProformaDetailPage({
             <p className="text-[11px] font-bold text-foreground uppercase tracking-wider border-b border-line/40 pb-1.5">
               Condiciones del Proyecto
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {conditions.payment && (
-                <div>
-                  <span className="font-semibold text-foreground text-[11px] block">Forma de Pago:</span>
-                  <span className="text-muted leading-relaxed text-[11px]">{conditions.payment}</span>
-                </div>
-              )}
-              {conditions.delivery && (
-                <div>
-                  <span className="font-semibold text-foreground text-[11px] block">Tiempo de Entrega:</span>
-                  <span className="text-muted leading-relaxed text-[11px]">{conditions.delivery}</span>
-                </div>
-              )}
-              {conditions.ip && (
-                <div>
-                  <span className="font-semibold text-foreground text-[11px] block">Propiedad Intelectual:</span>
-                  <span className="text-muted leading-relaxed text-[11px]">{conditions.ip}</span>
-                </div>
-              )}
-              {conditions.confidentiality && (
-                <div>
-                  <span className="font-semibold text-foreground text-[11px] block">Confidencialidad:</span>
-                  <span className="text-muted leading-relaxed text-[11px]">{conditions.confidentiality}</span>
-                </div>
-              )}
+            <div className="rounded-xl border border-line/60 bg-soft/30 p-3.5 text-xs">
+              <div className="text-foreground leading-relaxed whitespace-pre-line">
+                {formatConditionsText(prof.conditions) || formatConditionsText(conditions)}
+              </div>
             </div>
           </div>
         )}

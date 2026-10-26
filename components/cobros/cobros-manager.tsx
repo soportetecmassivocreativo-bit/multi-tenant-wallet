@@ -80,10 +80,7 @@ export function CobrosManager({
   const [editVesRate, setEditVesRate] = useState<number | "">("");
   const [editError, setEditError] = useState<string | null>(null);
   const [editHasConditions, setEditHasConditions] = useState<boolean>(true);
-  const [editCondPayment, setEditCondPayment] = useState("");
-  const [editCondDelivery, setEditCondDelivery] = useState("");
-  const [editCondIP, setEditCondIP] = useState("");
-  const [editCondConfidentiality, setEditCondConfidentiality] = useState("");
+  const [editConditionsText, setEditConditionsText] = useState("");
 
   const [pending, startTransition] = useTransition();
 
@@ -174,10 +171,8 @@ export function CobrosManager({
 
     const invHasConditions = (inv as any).hasConditions !== undefined ? Boolean((inv as any).hasConditions) : true;
     setEditHasConditions(invHasConditions);
-    setEditCondPayment((inv as any).conditions?.payment || DEFAULT_COND_PAYMENT);
-    setEditCondDelivery((inv as any).conditions?.delivery || DEFAULT_COND_DELIVERY);
-    setEditCondIP((inv as any).conditions?.ip || DEFAULT_COND_IP);
-    setEditCondConfidentiality((inv as any).conditions?.confidentiality || DEFAULT_COND_CONFIDENTIALITY);
+    const existingText = formatConditionsText((inv as any).conditions);
+    setEditConditionsText(existingText || "• Forma de Pago: Se requiere un anticipo del 50% al inicio y 50% al finalizar.\n\n• Tiempo de Entrega: 2 semanas aproximadamente.\n\n• Propiedad Intelectual: Corresponderá al cliente.\n\n• Confidencialidad: Se mantendrá estricta confidencialidad.");
 
     // Separar Concepto General del Proyecto de las notas / coordenadas
     const parsed = cleanConceptAndNotes(inv.notes || "");
@@ -302,12 +297,7 @@ export function CobrosManager({
         vesTotal,
         lines: validLines,
         hasConditions: editHasConditions,
-        conditions: editHasConditions ? {
-          payment: editCondPayment.trim(),
-          delivery: editCondDelivery.trim(),
-          ip: editCondIP.trim(),
-          confidentiality: editCondConfidentiality.trim(),
-        } : null,
+        conditions: editHasConditions ? { text: editConditionsText.trim() } : null,
       });
 
       if (res.ok) {
