@@ -100,6 +100,13 @@ export interface Invoice {
   discount?: number;
   tax?: number;
   items?: Array<{ id: string; description: string; qty: number; unitPrice: number }>;
+  hasConditions?: boolean;
+  conditions?: {
+    payment?: string;
+    delivery?: string;
+    ip?: string;
+    confidentiality?: string;
+  };
 }
 
 export const invoices: Invoice[] = [

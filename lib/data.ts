@@ -71,15 +71,27 @@ export async function getInvoices(): Promise<Invoice[]> {
       .sort((a, b) => Number(b.number) - Number(a.number));
   }
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("invoices")
-    .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at",
-    )
-    .order("created_at", { ascending: true });
+  let rows: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from("invoices")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at, hasConditions:has_conditions, conditions",
+      )
+      .order("created_at", { ascending: true });
+    if (!error && data) rows = data;
+    else throw error;
+  } catch {
+    const { data } = await supabase
+      .from("invoices")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, total, status, currency, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, created_at",
+      )
+      .order("created_at", { ascending: true });
+    rows = data ?? [];
+  }
 
-  const rows = data ?? [];
-  const seenNumbers = new Set<number>();
+    const seenNumbers = new Set<number>();
   let maxNum = 0;
   const processed: Invoice[] = [];
 
@@ -132,12 +144,30 @@ export async function getInvoices(): Promise<Invoice[]> {
       };
     });
 
+    let hasConditions: boolean | undefined = (inv as any).hasConditions ?? (inv as any).has_conditions;
+    let conditions = typeof (inv as any).conditions === "string" ? (() => { try { return JSON.parse((inv as any).conditions); } catch { return undefined; } })() : (inv as any).conditions || undefined;
+    if (hasConditions === undefined || !conditions) {
+      for (const it of rawItems) {
+        const desc = it.description || "";
+        const matchCond = desc.match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/);
+        if (matchCond) {
+          try {
+            const parsed = JSON.parse(matchCond[1]);
+            if (hasConditions === undefined && parsed.hasConditions !== undefined) hasConditions = parsed.hasConditions;
+            if (!conditions && parsed.conditions) conditions = parsed.conditions;
+          } catch {}
+        }
+      }
+    }
+
     processed.push({
       ...inv,
       number: num,
       code: formatEntityCode(prefix, num, digits),
       notes: extractedNote,
       items: cleanItems,
+      hasConditions,
+      conditions,
     } as unknown as Invoice);
   }
 
@@ -343,7 +373,7 @@ export async function getProformas(): Promise<Proforma[]> {
     const { data: fullProfData, error } = await supabase
       .from("proformas")
       .select(
-        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total",
+        "id, number, clientId:client_id, date:issue_date, validUntil:valid_until, total, status, currency, notes, invoiceId:invoice_id, created_at, targetAccountId:target_account_id, targetAccountName:target_account_name, paidAmount:paid_amount, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, hasConditions:has_conditions, conditions",
       )
       .order("created_at", { ascending: true });
 
@@ -374,10 +404,25 @@ export async function getProformas(): Promise<Proforma[]> {
           if (num > maxNum) maxNum = num;
         }
 
+        let pHasCond: boolean | undefined = (p as any).hasConditions ?? (p as any).has_conditions;
+        let pCond = typeof (p as any).conditions === "string" ? (() => { try { return JSON.parse((p as any).conditions); } catch { return undefined; } })() : (p as any).conditions || undefined;
+        if (pHasCond === undefined || !pCond) {
+          const matchCond = ((p.notes as string) || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/);
+          if (matchCond) {
+            try {
+              const parsed = JSON.parse(matchCond[1]);
+              if (pHasCond === undefined && parsed.hasConditions !== undefined) pHasCond = parsed.hasConditions;
+              if (!pCond && parsed.conditions) pCond = parsed.conditions;
+            } catch {}
+          }
+        }
+
         combinedMap.set(p.id, {
           ...p,
           number: num,
           code: formatEntityCode(prefix, num, digits),
+          hasConditions: pHasCond,
+          conditions: pCond,
         } as unknown as Proforma);
       }
     }
@@ -715,8 +760,22 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     invoiceId: isFromInvoices ? (row.id as string) : (row.invoiceId as string),
     targetAccountId: extractedAccountId,
     targetAccountName: extractedAccountName,
-    hasConditions: (row.hasConditions ?? (row as any).has_conditions) as boolean | undefined,
-    conditions: typeof row.conditions === "string" ? (() => { try { return JSON.parse(row.conditions as string); } catch { return undefined; } })() : (row.conditions as any) || undefined,
+    hasConditions: (() => {
+      let hc = (row.hasConditions ?? (row as any).has_conditions) as boolean | undefined;
+      if (hc === undefined) {
+        const m = ((row.notes as string) || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/) || (rawDescWithMeta || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/);
+        if (m) { try { hc = JSON.parse(m[1]).hasConditions; } catch {} }
+      }
+      return hc;
+    })(),
+    conditions: (() => {
+      let c = typeof row.conditions === "string" ? (() => { try { return JSON.parse(row.conditions as string); } catch { return undefined; } })() : (row.conditions as any) || undefined;
+      if (!c) {
+        const m = ((row.notes as string) || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/) || (rawDescWithMeta || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/);
+        if (m) { try { c = JSON.parse(m[1]).conditions; } catch {} }
+      }
+      return c;
+    })(),
   };
 }
 
@@ -790,6 +849,13 @@ export interface InvoiceDetail {
   balance: number;
   targetAccountId?: string;
   targetAccountName?: string;
+  hasConditions?: boolean;
+  conditions?: {
+    payment?: string;
+    delivery?: string;
+    ip?: string;
+    confidentiality?: string;
+  };
 }
 
 export async function getInvoiceDetail(
@@ -830,15 +896,29 @@ export async function getInvoiceDetail(
   }
 
   const supabase = await createClient();
-  const { data: inv } = await supabase
-    .from("invoices")
-    .select(
-      "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, targetAccountId:target_account_id, targetAccountName:target_account_name",
-    )
-    .eq("id", id)
-    .single();
-  if (!inv) return null;
-  const row = inv as Record<string, unknown>;
+  let row: Record<string, unknown> | null = null;
+  try {
+    const { data: invWithCond, error: condErr } = await supabase
+      .from("invoices")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, targetAccountId:target_account_id, targetAccountName:target_account_name, hasConditions:has_conditions, conditions",
+      )
+      .eq("id", id)
+      .single();
+    if (!condErr && invWithCond) row = invWithCond as Record<string, unknown>;
+  } catch {}
+
+  if (!row) {
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select(
+        "id, number, clientId:client_id, date:issue_date, dueDate:due_date, status, currency, subtotal, discount, tax, total, vesRate:ves_rate, vesRateRef:ves_rate_ref, vesTotal:ves_total, targetAccountId:target_account_id, targetAccountName:target_account_name",
+      )
+      .eq("id", id)
+      .single();
+    if (!inv) return null;
+    row = inv as Record<string, unknown>;
+  }
 
   const clientId = (row.clientId || (row as any).client_id) as string;
 
@@ -907,6 +987,26 @@ export async function getInvoiceDetail(
     payments,
     paidTotal,
     balance: Number(row.total) - paidTotal,
+    hasConditions: (() => {
+      let hc = (row.hasConditions ?? (row as any).has_conditions) as boolean | undefined;
+      if (hc === undefined) {
+        for (const it of items) {
+          const m = (it.description || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/);
+          if (m) { try { hc = JSON.parse(m[1]).hasConditions; break; } catch {} }
+        }
+      }
+      return hc;
+    })(),
+    conditions: (() => {
+      let c = typeof row.conditions === "string" ? (() => { try { return JSON.parse(row.conditions as string); } catch { return undefined; } })() : (row.conditions as any) || undefined;
+      if (!c) {
+        for (const it of items) {
+          const m = (it.description || "").match(/\[Condiciones:\s*(\{[\s\S]*?\})\]/);
+          if (m) { try { c = JSON.parse(m[1]).conditions; break; } catch {} }
+        }
+      }
+      return c;
+    })(),
   };
 }
 

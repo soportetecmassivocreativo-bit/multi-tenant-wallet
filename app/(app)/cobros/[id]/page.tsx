@@ -10,6 +10,8 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/format";
 import { getInvoiceDetail, isAdmin } from "@/lib/data";
 import { getCompanyAccounts } from "@/lib/cuentas-actions";
+import { getSystemConfig } from "@/lib/config-actions";
+import { DEFAULT_SYSTEM_CONFIG } from "@/lib/config";
 import type { InvoiceStatus } from "@/lib/mock-data";
 
 export default async function InvoiceDetailPage({
@@ -18,14 +20,26 @@ export default async function InvoiceDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [inv, admin, accounts] = await Promise.all([
+  const [inv, admin, accounts, config] = await Promise.all([
     getInvoiceDetail(id),
     isAdmin(),
     getCompanyAccounts(),
+    getSystemConfig(),
   ]);
   if (!inv) notFound();
 
   const isForeign = inv.currency !== "VES";
+
+  const showConditions = inv.hasConditions !== undefined ? Boolean(inv.hasConditions) : false;
+  const conditions = {
+    payment: inv.conditions?.payment || config.pdfInvoiceConditionsPayment || config.pdfProformaConditionsPayment || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsPayment,
+    delivery: inv.conditions?.delivery || config.pdfInvoiceConditionsDelivery || config.pdfProformaConditionsDelivery || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsDelivery,
+    ip: inv.conditions?.ip || config.pdfInvoiceConditionsIP || config.pdfProformaConditionsIP || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsIP,
+    confidentiality: inv.conditions?.confidentiality || config.pdfInvoiceConditionsConfidentiality || config.pdfProformaConditionsConfidentiality || DEFAULT_SYSTEM_CONFIG.pdfProformaConditionsConfidentiality,
+  };
+  const hasAnyCondition = Boolean(
+    conditions.payment || conditions.delivery || conditions.ip || conditions.confidentiality
+  );
 
   return (
     <div className="space-y-6">
@@ -116,6 +130,52 @@ export default async function InvoiceDetailPage({
           </div>
         )}
       </section>
+
+      {/* Términos y Condiciones Comerciales */}
+      {showConditions && hasAnyCondition && (
+        <section className="rounded-2xl border border-line bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-line pb-2">
+            <div>
+              <h3 className="font-semibold text-foreground text-xs">
+                Condiciones del Proyecto & Términos Comerciales
+              </h3>
+              <p className="text-[11px] text-muted">
+                Cláusulas de pago, entrega y confidencialidad acordadas
+              </p>
+            </div>
+            <span className="rounded-full bg-soft px-2.5 py-0.5 text-[10px] font-bold text-accent">
+              Vigentes
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+            {conditions.payment && (
+              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
+                <span className="font-semibold text-foreground text-[11px] block">Forma de Pago:</span>
+                <span className="text-muted leading-relaxed text-[11px]">{conditions.payment}</span>
+              </div>
+            )}
+            {conditions.delivery && (
+              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
+                <span className="font-semibold text-foreground text-[11px] block">Tiempo de Entrega:</span>
+                <span className="text-muted leading-relaxed text-[11px]">{conditions.delivery}</span>
+              </div>
+            )}
+            {conditions.ip && (
+              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
+                <span className="font-semibold text-foreground text-[11px] block">Propiedad Intelectual:</span>
+                <span className="text-muted leading-relaxed text-[11px]">{conditions.ip}</span>
+              </div>
+            )}
+            {conditions.confidentiality && (
+              <div className="rounded-xl border border-line/60 bg-soft/30 p-2.5">
+                <span className="font-semibold text-foreground text-[11px] block">Confidencialidad:</span>
+                <span className="text-muted leading-relaxed text-[11px]">{conditions.confidentiality}</span>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Pagos */}
       <section>

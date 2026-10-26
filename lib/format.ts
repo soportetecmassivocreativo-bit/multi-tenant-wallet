@@ -70,6 +70,7 @@ export function cleanConceptAndNotes(raw?: string | null): {
     .replace(/\[VESTotal:.*?\]/gi, "")
     .replace(/\[Tasa:.*?\]/gi, "")
     .replace(/\[BCV:.*?\]/gi, "")
+    .replace(/\[Condiciones:[\s\S]*?\]/gi, "")
     .trim();
 
   // 2. Extraer todos los fragmentos entre corchetes
@@ -125,6 +126,7 @@ export function cleanItemDescription(raw?: string | null): string {
     .replace(/\[VESTotal:.*?\]/gi, "")
     .replace(/\[Tasa:.*?\]/gi, "")
     .replace(/\[BCV:.*?\]/gi, "")
+    .replace(/\[Condiciones:[\s\S]*?\]/gi, "")
     .replace(/\[.*?\]/g, "")
     .replace(/[\[\]]/g, "")
     .replace(/\s+/g, " ")

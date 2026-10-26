@@ -1,5 +1,11 @@
 "use client";
 
+const DEFAULT_COND_PAYMENT = "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente.";
+const DEFAULT_COND_DELIVERY = "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente.";
+const DEFAULT_COND_IP = "La propiedad intelectual de todos los elementos del proyecto, incluyendo el código fuente, el diseño gráfico, los contenidos y la marca, corresponderá al cliente.";
+const DEFAULT_COND_CONFIDENTIALITY = "Todas las partes se comprometen a mantener la confidencialidad de toda la información relacionada con el proyecto.";
+
+
 import { useState, useTransition, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,6 +78,11 @@ export function ProformasManager({
   const [editVesRate, setEditVesRate] = useState<number | "">("");
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editHasConditions, setEditHasConditions] = useState<boolean>(true);
+  const [editCondPayment, setEditCondPayment] = useState("");
+  const [editCondDelivery, setEditCondDelivery] = useState("");
+  const [editCondIP, setEditCondIP] = useState("");
+  const [editCondConfidentiality, setEditCondConfidentiality] = useState("");
 
   const [pending, startTransition] = useTransition();
 
@@ -192,6 +203,13 @@ export function ProformasManager({
     const defaultRate = hasRate ? Number(pVesRate) : (isEur ? bcv?.eur : bcv?.usd) || "";
     setEditVesRate(defaultRate);
     setEditError(null);
+
+    const pHasConditions = p.hasConditions !== undefined ? Boolean(p.hasConditions) : true;
+    setEditHasConditions(pHasConditions);
+    setEditCondPayment(p.conditions?.payment || DEFAULT_COND_PAYMENT);
+    setEditCondDelivery(p.conditions?.delivery || DEFAULT_COND_DELIVERY);
+    setEditCondIP(p.conditions?.ip || DEFAULT_COND_IP);
+    setEditCondConfidentiality(p.conditions?.confidentiality || DEFAULT_COND_CONFIDENTIALITY);
 
     // Separar Concepto General del Proyecto de las notas / coordenadas bancarias
     const parsed = cleanConceptAndNotes(p.notes);
@@ -335,6 +353,13 @@ export function ProformasManager({
         vesRateRef: vesRateNum > 0 ? (editBcvCurrency === "EUR" ? "BCV EUR" : "BCV USD") : undefined,
         vesTotal,
         lines: validLines,
+        hasConditions: editHasConditions,
+        conditions: editHasConditions ? {
+          payment: editCondPayment.trim(),
+          delivery: editCondDelivery.trim(),
+          ip: editCondIP.trim(),
+          confidentiality: editCondConfidentiality.trim(),
+        } : null,
       });
 
       if (res.ok) {
@@ -934,6 +959,63 @@ export function ProformasManager({
                         </span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Condiciones Estructuradas del Proyecto */}
+                  <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-foreground block">Condiciones del Proyecto</span>
+                        <span className="text-[11px] text-muted">Incluye forma de pago, tiempos de entrega, propiedad intelectual y confidencialidad</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={editHasConditions}
+                        onChange={(e) => setEditHasConditions(e.target.checked)}
+                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                      />
+                    </div>
+
+                    {editHasConditions && (
+                      <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Forma de Pago:</label>
+                          <textarea
+                            rows={2}
+                            value={editCondPayment}
+                            onChange={(e) => setEditCondPayment(e.target.value)}
+                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Tiempo de entrega:</label>
+                          <textarea
+                            rows={2}
+                            value={editCondDelivery}
+                            onChange={(e) => setEditCondDelivery(e.target.value)}
+                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Propiedad Intelectual:</label>
+                          <textarea
+                            rows={2}
+                            value={editCondIP}
+                            onChange={(e) => setEditCondIP(e.target.value)}
+                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Confidencialidad:</label>
+                          <textarea
+                            rows={2}
+                            value={editCondConfidentiality}
+                            onChange={(e) => setEditCondConfidentiality(e.target.value)}
+                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Notas / Observaciones */}

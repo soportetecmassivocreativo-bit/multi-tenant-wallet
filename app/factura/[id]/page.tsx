@@ -172,6 +172,17 @@ export default async function FacturaPage({
   const generalProjectConcept = parsedNotes.title;
   const extraNotes = parsedNotes.notes;
 
+  const showConditions = inv.hasConditions !== undefined ? Boolean(inv.hasConditions) : false;
+  const conditions = {
+    payment: inv.conditions?.payment || config.pdfInvoiceConditionsPayment || config.pdfProformaConditionsPayment || "Se requiere un anticipo del 50% del precio total al inicio del proyecto. El 50% restante se pagará al finalizar el proyecto y a satisfacción del cliente.",
+    delivery: inv.conditions?.delivery || config.pdfInvoiceConditionsDelivery || config.pdfProformaConditionsDelivery || "El proyecto se entregará en un plazo de 2 semanas aproximadamente, a partir de la recepción del anticipo y la información completa por parte del cliente.",
+    ip: inv.conditions?.ip || config.pdfInvoiceConditionsIP || config.pdfProformaConditionsIP || "La propiedad intelectual de todos los elementos del proyecto, incluyendo el código fuente, el diseño gráfico, los contenidos y la marca, corresponderá al cliente.",
+    confidentiality: inv.conditions?.confidentiality || config.pdfInvoiceConditionsConfidentiality || config.pdfProformaConditionsConfidentiality || "Todas las partes se comprometen a mantener la confidencialidad de toda la información relacionada con el proyecto.",
+  };
+  const hasAnyCondition = Boolean(
+    conditions.payment || conditions.delivery || conditions.ip || conditions.confidentiality
+  );
+
   const paperSize = config.pdfInvoicePaperSize || "letter";
   const showRif = config.pdfInvoiceShowRif ?? false;
 
@@ -199,6 +210,10 @@ export default async function FacturaPage({
             width: 100% !important;
             max-width: 100% !important;
             border-radius: 0 !important;
+          }
+          .page-break-sheet {
+            page-break-before: always !important;
+            break-before: page !important;
           }
         }
       `}</style>
@@ -473,6 +488,112 @@ export default async function FacturaPage({
         </div>
 
       </div>
+
+      {/* HOJA 2: CONDICIONES DEL PROYECTO / DOCUMENTO ANEXO */}
+      {showConditions && hasAnyCondition && (
+        <div className="invoice-sheet page-break-sheet mx-auto w-full max-w-[760px] bg-white rounded-2xl shadow-xl border border-neutral-200 overflow-hidden flex flex-col justify-between relative text-neutral-900 min-h-[1050px] p-8 sm:p-10 mt-6">
+          
+          {/* CUERPO HOJA 2 */}
+          <div className="space-y-3.5 flex-1 flex flex-col justify-start">
+            
+            {/* Header de Segunda Hoja */}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+                <div className="bg-[#0050D8] rounded-xl px-3.5 py-2 text-white flex items-center gap-2.5 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/logo-m-mark.svg"
+                    alt="Massivo Creativo"
+                    className="h-6 w-auto brightness-0 invert"
+                  />
+                  <div className="leading-none">
+                    <span className="block font-sans text-[10px] font-black tracking-wider uppercase">MASSIVO</span>
+                    <span className="block font-sans text-[8.5px] font-bold tracking-widest uppercase text-blue-200">CREATIVO</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-neutral-400 block">DOCUMENTO ANEXO</span>
+                  <h2 className="font-sans text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
+                    Condiciones del Proyecto
+                  </h2>
+                  <p className="text-[11px] font-mono text-neutral-500 mt-0.5">
+                    Factura #{inv.number} · {inv.clientName || "Cliente"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Banner de términos */}
+              <div className="rounded-xl bg-blue-50/80 border border-blue-200/80 p-3">
+                <p className="text-[11px] font-bold text-blue-950 uppercase tracking-wider">
+                  Términos, Cláusulas y Acuerdos Comerciales
+                </p>
+                <p className="text-[10.5px] text-blue-800/90 mt-0.5 leading-snug">
+                  Las siguientes condiciones rigen la ejecución, entrega, propiedad y términos de pago para los servicios descritos en la Factura #{inv.number}.
+                </p>
+              </div>
+
+              {/* Rejilla de 4 Condiciones */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-0.5">
+                {conditions.payment && (
+                  <div className="rounded-xl bg-neutral-50 border border-neutral-200/90 p-3 space-y-1 flex flex-col justify-start">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#0050D8] text-[9px] font-black text-white font-mono shrink-0">1</span>
+                      <p className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">Forma de Pago:</p>
+                    </div>
+                    <p className="text-[10.5px] text-neutral-700 leading-relaxed pt-0.5 whitespace-pre-line">
+                      {conditions.payment}
+                    </p>
+                  </div>
+                )}
+
+                {conditions.delivery && (
+                  <div className="rounded-xl bg-neutral-50 border border-neutral-200/90 p-3 space-y-1 flex flex-col justify-start">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#0050D8] text-[9px] font-black text-white font-mono shrink-0">2</span>
+                      <p className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">Tiempo de Entrega:</p>
+                    </div>
+                    <p className="text-[10.5px] text-neutral-700 leading-relaxed pt-0.5 whitespace-pre-line">
+                      {conditions.delivery}
+                    </p>
+                  </div>
+                )}
+
+                {conditions.ip && (
+                  <div className="rounded-xl bg-neutral-50 border border-neutral-200/90 p-3 space-y-1 flex flex-col justify-start">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#0050D8] text-[9px] font-black text-white font-mono shrink-0">3</span>
+                      <p className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">Propiedad Intelectual:</p>
+                    </div>
+                    <p className="text-[10.5px] text-neutral-700 leading-relaxed pt-0.5 whitespace-pre-line">
+                      {conditions.ip}
+                    </p>
+                  </div>
+                )}
+
+                {conditions.confidentiality && (
+                  <div className="rounded-xl bg-neutral-50 border border-neutral-200/90 p-3 space-y-1 flex flex-col justify-start">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#0050D8] text-[9px] font-black text-white font-mono shrink-0">4</span>
+                      <p className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">Confidencialidad:</p>
+                    </div>
+                    <p className="text-[10.5px] text-neutral-700 leading-relaxed pt-0.5 whitespace-pre-line">
+                      {conditions.confidentiality}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* PIE DE PÁGINA HOJA 2 */}
+          <div className="pt-3 mt-auto border-t border-neutral-200 flex items-center justify-between text-[9.5px] text-neutral-400 shrink-0">
+            <span>{config.pdfInvoiceFooterText || config.pdfProformaFooterText || "Massivo Corp · Factura Oficial"}</span>
+            <span className="font-mono font-bold">Página 2 de 2</span>
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }

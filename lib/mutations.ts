@@ -694,7 +694,7 @@ export interface CreateProformaInput {
     delivery?: string;
     ip?: string;
     confidentiality?: string;
-  };
+  } | null;
 }
 
 export async function createProforma(
@@ -893,6 +893,12 @@ export interface UpdateProformaInput {
   targetAccountId?: string;
   targetAccountName?: string;
   hasConditions?: boolean;
+  conditions?: {
+    payment?: string;
+    delivery?: string;
+    ip?: string;
+    confidentiality?: string;
+  } | null;
   /** Fecha de emisión de la proforma (YYYY-MM-DD) */
   date?: string;
   /** Tasa BCV referencial al momento de emitir/actualizar (Bs./USD o Bs./EUR) */
@@ -919,6 +925,7 @@ export async function updateProforma(
     if (input.targetAccountId !== undefined) updateData.target_account_id = input.targetAccountId;
     if (input.targetAccountName !== undefined) updateData.target_account_name = input.targetAccountName;
     if (input.hasConditions !== undefined) updateData.has_conditions = input.hasConditions;
+    if (input.conditions !== undefined) updateData.conditions = input.conditions;
     if (input.date) updateData.issue_date = input.date;
     // vesRate explícito: si se proporciona y es > 0, guardar; si es 0/undefined, LIMPIAR (null) para quitar conversión
     if (input.vesRate !== undefined && input.vesRate > 0) {
@@ -939,6 +946,7 @@ export async function updateProforma(
       ? `[CuentaID: ${input.targetAccountId || ""}] [Cuenta Prevista: ${input.targetAccountName || ""}]`
       : "";
 
+    const condMeta = (input.hasConditions !== undefined || input.conditions) ? `[Condiciones: ${JSON.stringify({ hasConditions: input.hasConditions, conditions: input.conditions })}]` : "";
     const vesMeta = input.vesRate !== undefined
       ? (input.vesRate > 0
           ? `[TasaBCV: ${input.vesRate}] [BCVRef: ${input.vesRateRef || (input.rateRef ?? "BCV")}] [VESTotal: ${input.vesTotal || (updateData.total ? Number(updateData.total) * input.vesRate : "")}]`
@@ -978,6 +986,9 @@ export async function updateProforma(
             }
             if (vesMeta) {
               parts.push(vesMeta);
+            }
+            if (condMeta) {
+              parts.push(condMeta);
             }
             finalDesc = parts.join(" ");
           }
@@ -1352,6 +1363,13 @@ export interface UpdateInvoiceInput {
   vesRate?: number;
   vesRateRef?: string;
   vesTotal?: number;
+  hasConditions?: boolean;
+  conditions?: {
+    payment?: string;
+    delivery?: string;
+    ip?: string;
+    confidentiality?: string;
+  } | null;
 }
 
 export async function updateInvoice(
@@ -1366,6 +1384,8 @@ export async function updateInvoice(
     const updateData: Record<string, unknown> = {};
     if (input.clientId) updateData.client_id = input.clientId;
     if (input.status) updateData.status = input.status;
+    if (input.hasConditions !== undefined) updateData.has_conditions = input.hasConditions;
+    if (input.conditions !== undefined) updateData.conditions = input.conditions;
     if (input.date) updateData.issue_date = input.date;
     if (input.vesRate !== undefined && input.vesRate > 0) {
       updateData.ves_rate = input.vesRate;
@@ -1396,13 +1416,21 @@ export async function updateInvoice(
         .replace(/[\[\]]/g, "")
         .trim();
 
+      const condMeta = (input.hasConditions !== undefined || input.conditions)
+        ? `[Condiciones: ${JSON.stringify({ hasConditions: input.hasConditions, conditions: input.conditions })}]`
+        : "";
+
       await supabase.from("invoice_items").delete().eq("invoice_id", input.id);
       await supabase.from("invoice_items").insert(
         input.lines.map((l, idx) => {
           const cleanDesc = cleanItemDescription(l.description) || l.description.trim();
-          const finalDesc = idx === 0 && cleanNote
-            ? (cleanDesc.toLowerCase() === cleanNote.toLowerCase() ? cleanDesc : `${cleanDesc} [${cleanNote}]`)
-            : cleanDesc;
+          let finalDesc = cleanDesc;
+          if (idx === 0) {
+            const parts = [cleanDesc];
+            if (cleanNote && cleanDesc.toLowerCase() !== cleanNote.toLowerCase()) parts.push(`[${cleanNote}]`);
+            if (condMeta) parts.push(condMeta);
+            finalDesc = parts.join(" ");
+          }
           return {
             company_id: companyId,
             invoice_id: input.id,
@@ -1414,7 +1442,20 @@ export async function updateInvoice(
       );
     }
 
-    await supabase.from("invoices").update(updateData).eq("id", input.id);
+    try {
+      const { error: invErr } = await supabase.from("invoices").update(updateData).eq("id", input.id);
+      if (invErr) {
+        const fallbackData = { ...updateData };
+        delete fallbackData.has_conditions;
+        delete fallbackData.conditions;
+        await supabase.from("invoices").update(fallbackData).eq("id", input.id);
+      }
+    } catch {
+      const fallbackData = { ...updateData };
+      delete fallbackData.has_conditions;
+      delete fallbackData.conditions;
+      await supabase.from("invoices").update(fallbackData).eq("id", input.id);
+    }
 
     await logAuditEvent({
       action: "editar_factura",
