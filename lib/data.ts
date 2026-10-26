@@ -209,6 +209,9 @@ export interface ProformaDetail {
   targetAccountId?: string;
   targetAccountName?: string;
   paidAmount?: number;
+  payments?: Payment[];
+  paidTotal?: number;
+  balance?: number;
   hasConditions?: boolean;
   conditions?: {
     payment?: string;
@@ -352,7 +355,7 @@ export async function getProformas(): Promise<Proforma[]> {
             validUntil: inv.dueDate,
             total: inv.total,
             currency: (inv.currency as CurrencyCode) || "USD",
-            status: "pendiente" as ProformaStatus,
+            status: ((inv.status === "pagada" ? "pagada" : inv.status === "parcial" ? "parcial" : "pendiente") as ProformaStatus),
             notes: profNotes,
             rawNotes: rawDesc,
             vesRate: resolvedVesRate,
@@ -417,10 +420,21 @@ export async function getProformas(): Promise<Proforma[]> {
           }
         }
 
+        const paidVal = Number(p.paidAmount || (p as any).paid_amount) || 0;
+        const totalVal = Number(p.total) || 0;
+        let pStatus: ProformaStatus = (p.status as ProformaStatus) || "pendiente";
+        if (pStatus === "parcial" || (paidVal > 0 && paidVal < totalVal)) {
+          pStatus = "parcial";
+        } else if (paidVal >= totalVal && totalVal > 0) {
+          pStatus = "pagada";
+        }
+
         combinedMap.set(p.id, {
           ...p,
           number: num,
           code: formatEntityCode(prefix, num, digits),
+          status: pStatus,
+          paidAmount: paidVal,
           hasConditions: pHasCond,
           conditions: pCond,
         } as unknown as Proforma);
@@ -615,7 +629,10 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
 
   const clientId = (row.clientId || (row as any).client_id) as string;
 
-  const [itemsRes, clientRes] = await Promise.all([
+  const linkedInvoiceId = isFromInvoices ? (row.id as string) : (row.invoiceId as string || (row as any).invoice_id as string);
+  const idsToQuery = [linkedInvoiceId, row.id as string, id].filter(Boolean);
+
+  const [itemsRes, clientRes, paymentsRes] = await Promise.all([
     supabase
       .from(isFromInvoices ? "invoice_items" : "proforma_items")
       .select("id, description, qty, unitPrice:unit_price")
@@ -627,6 +644,13 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
           .eq("id", clientId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    idsToQuery.length > 0
+      ? supabase
+          .from("payments")
+          .select("id, amount, paidOn:paid_on, method, invoice_id")
+          .in("invoice_id", idsToQuery)
+          .order("paid_on")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const rawItems = (itemsRes.data ?? []) as unknown as ProformaItem[];
@@ -736,6 +760,20 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
 
   const rawDate = (row.date as string) || (row.issue_date as string);
 
+  const payments = (paymentsRes.data ?? []) as unknown as Payment[];
+  const totalVal = Number(row.total) || 0;
+  let paidTotal = payments.reduce((s, p) => s + Number(p.amount), 0);
+  if (paidTotal === 0 && Number(row.paidAmount || (row as any).paid_amount) > 0) {
+    paidTotal = Number(row.paidAmount || (row as any).paid_amount);
+  }
+  const balance = Math.max(0, totalVal - paidTotal);
+  let resolvedStatus: ProformaStatus = (row.status as ProformaStatus) || "pendiente";
+  if (paidTotal >= totalVal && totalVal > 0) {
+    resolvedStatus = "pagada";
+  } else if (paidTotal > 0 && paidTotal < totalVal) {
+    resolvedStatus = "parcial";
+  }
+
   return {
     id: row.id as string,
     number: resolvedNumber,
@@ -745,7 +783,11 @@ export async function getProformaDetail(id: string): Promise<ProformaDetail | nu
     clientRif: (clientRif && clientRif !== "J-00000000-0" && clientRif !== "J-0000000-0") ? clientRif.trim() : "",
     date: rawDate ? rawDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     validUntil: (row.validUntil as string) || (row.dueDate as string) || (row.due_date as string),
-    status: (row.status as ProformaStatus) || "pendiente",
+    status: resolvedStatus,
+    paidAmount: paidTotal,
+    payments,
+    paidTotal,
+    balance,
     currency: (row.currency as CurrencyCode) || "USD",
     subtotal: Number(row.subtotal) || Number(row.total) || 0,
     discount: Number(row.discount) || 0,
@@ -1219,10 +1261,46 @@ export async function getExpenses(): Promise<Expense[]> {
     return !isExcludedFromExpenseTotals(e);
   });
 
-  const withPermanentCodes = filtered.map((e, idx) => ({
-    ...e,
-    code: formatEntityCode(prefix, startNum + idx, digits),
-  }));
+  const withPermanentCodes = filtered.map((e, idx) => {
+    const breakdown = getExpenseBreakdown(e);
+    let expensePayments: Array<{
+      id: string;
+      amount: number;
+      paidOn: string;
+      method?: string;
+      accountName?: string;
+      reference?: string;
+      notes?: string;
+    }> = [];
+
+    const matchHist = (e.note || "").match(/\[HistorialPagos:\s*(\[[\s\S]*?\])\]/);
+    if (matchHist) {
+      try {
+        expensePayments = JSON.parse(matchHist[1]);
+      } catch {}
+    } else if (breakdown.paidAmount > 0) {
+      expensePayments = [
+        {
+          id: `pay_${e.id}_init`,
+          amount: breakdown.paidAmount,
+          paidOn: (e.date as string) || (e.created_at ? String(e.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10)),
+          notes: "Abono / Pago inicial registrado",
+        },
+      ];
+    }
+
+    const expStatus: "pagado" | "parcial" | "pendiente" = breakdown.isPending
+      ? (breakdown.isPartial ? "parcial" : "pendiente")
+      : "pagado";
+
+    return {
+      ...e,
+      code: formatEntityCode(prefix, startNum + idx, digits),
+      status: expStatus,
+      paidAmount: breakdown.paidAmount,
+      payments: expensePayments,
+    };
+  });
 
   // Retornamos de forma fija y correlativa descendente (el más reciente arriba)
   return withPermanentCodes.reverse() as unknown as Expense[];

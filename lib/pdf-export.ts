@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { DEFAULT_SYSTEM_CONFIG, type SystemConfig } from "@/lib/config";
 import { MASSIVO_LOGO_BASE64 } from "@/lib/logo-base64";
+import { getExpenseBreakdown } from "@/lib/cuentas-helpers";
 
 export interface PdfReportColumn {
   header: string;
@@ -44,6 +45,7 @@ function hexToRgb(hex: string): [number, number, number] {
  */
 export function cleanExpenseNote(note: string): string {
   return (note || "")
+    .replace(/\[HistorialPagos:[\s\S]*?\]/gi, "")
     .replace(/Corriente Nacional/gi, "")
     .replace(/Cuenta Corriente/gi, "")
     .replace(/Cuenta Nacional/gi, "")
@@ -402,23 +404,40 @@ export function exportSamplePdf(branding: Partial<SystemConfig>): void {
  * Genera y previsualiza el Comprobante Individual de Gasto / Egreso en PDF.
  */
 export function exportExpenseVoucherPdf(
-  expense: { id: string; code?: string; category: string; note: string; amount: number; date: string; currency?: string },
+  expense: { id: string; code?: string; category: string; note: string; amount: number; date: string; currency?: string; payments?: any[] },
   branding?: Partial<SystemConfig>
 ): void {
   const code = expense.code || "Mas-Corp-GAS-0001";
   const noteClean = cleanExpenseNote(expense.note);
+  const breakdown = getExpenseBreakdown(expense);
+
+  const kpis: PdfReportKpi[] = [
+    { label: "Código de Registro", value: code },
+    { label: "Categoría", value: expense.category },
+    { label: "Monto del Egreso", value: `$ ${expense.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+    {
+      label: "Estado",
+      value: breakdown.isPartial
+        ? "Parcialmente Pagado / Abonado"
+        : breakdown.isPending
+        ? "Por Pagar / Pendiente"
+        : "Aprobado / Contabilizado",
+    },
+  ];
+
+  if (breakdown.isPartial) {
+    kpis.push(
+      { label: "Total Abonado", value: `$ ${breakdown.paidAmount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
+      { label: "Saldo Pendiente", value: `$ ${breakdown.pendingAmount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` }
+    );
+  }
 
   previewPdfReport({
     title: "Comprobante de Egreso / Gasto",
     subtitle: `Comprobante Nº: ${code} · Fecha: ${expense.date}`,
     filename: `Comprobante_Gasto_${code}`,
     branding,
-    kpis: [
-      { label: "Código de Registro", value: code },
-      { label: "Categoría", value: expense.category },
-      { label: "Monto del Egreso", value: `$ ${expense.amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })}` },
-      { label: "Estado", value: "Aprobado / Contabilizado" },
-    ],
+    kpis,
     columns: [
       { header: "Código", dataKey: "code", align: "left" },
       { header: "Concepto / Detalle del Gasto", dataKey: "note", align: "left" },

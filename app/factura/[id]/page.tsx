@@ -428,6 +428,32 @@ export default async function FacturaPage({
                 </div>
               </div>
             )}
+
+            {/* Historial de Pagos & Abonos si hay abonos registrados */}
+            {inv.payments && inv.payments.length > 0 && (
+              <div className="pt-2 text-xs space-y-1.5">
+                <div className="flex items-center justify-between border-b border-neutral-200 pb-1">
+                  <span className="font-bold text-neutral-900 text-[11px] uppercase tracking-wider">
+                    Historial de Pagos & Abonos Recibidos:
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${inv.balance > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                    {inv.balance > 0 ? "PAGO PARCIAL" : "PAGADO COMPLETO"}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50/60 p-2.5 space-y-1.5 divide-y divide-neutral-200/50">
+                  {inv.payments.map((p, pIdx) => (
+                    <div key={p.id || pIdx} className="flex justify-between items-center text-[11px] pt-1.5 first:pt-0">
+                      <span className="text-neutral-700">
+                        <strong>Abono #{pIdx + 1}:</strong> {formatDate(p.paidOn)} {p.method ? `· ${p.method}` : ""}
+                      </span>
+                      <span className="font-mono font-bold text-neutral-900">
+                        + {formatCurrency(p.amount, inv.currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 6. BLOQUE INFERIOR: POLÍTICA DE REEMBOLSO + RESUMEN DE PAGO */}
@@ -447,11 +473,22 @@ export default async function FacturaPage({
             {/* Resumen PAGADO, TOTAL y TOTAL BS */}
             <div className="space-y-1.5 sm:pl-8 text-right text-xs">
               <div className="flex justify-between items-center py-1 border-b border-neutral-200">
-                <span className="font-bold text-neutral-800 uppercase tracking-wider">PAGADO</span>
+                <span className="font-bold text-neutral-800 uppercase tracking-wider">
+                  {inv.balance > 0 ? "ABONADO / PAGADO" : "PAGADO"}
+                </span>
                 <span className="font-mono font-bold text-neutral-900 whitespace-nowrap">
                   {formatCurrency(inv.paidTotal || 0, inv.currency)}
                 </span>
               </div>
+
+              {inv.balance > 0 && (
+                <div className="flex justify-between items-center py-1 border-b border-neutral-200">
+                  <span className="font-bold text-amber-600 uppercase tracking-wider">SALDO PENDIENTE</span>
+                  <span className="font-mono font-bold text-amber-600 whitespace-nowrap">
+                    {formatCurrency(inv.balance, inv.currency)}
+                  </span>
+                </div>
+              )}
               
               <div className="flex justify-between items-center py-1.5 border-b-2 border-neutral-900">
                 <span className="font-black text-neutral-900 text-sm uppercase tracking-wider">TOTAL</span>

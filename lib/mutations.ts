@@ -597,6 +597,14 @@ export async function registerPayment(
     paid >= Number(inv.total) ? "pagada" : paid > 0 ? "parcial" : "pendiente";
   await ctx.supabase.from("invoices").update({ status }).eq("id", invoiceId);
 
+  try {
+    const profStatus = status === "pagada" ? "pagada" : status === "parcial" ? "parcial" : "pendiente";
+    await ctx.supabase
+      .from("proformas")
+      .update({ status: profStatus, paid_amount: paid })
+      .eq("invoice_id", invoiceId);
+  } catch {}
+
   await logAuditEvent({
     action: "registrar_pago",
     entityType: "pago",
@@ -1191,7 +1199,56 @@ export async function convertProformaToInvoiceAndPay(
       .single();
 
     if (prof) {
-      // Obtener siguiente número de factura
+      const totalVal = Number(prof.total);
+      const payAmount = input.amount && input.amount > 0 ? input.amount : totalVal;
+
+      // Si la proforma ya fue vinculada a una factura (abono previo), registrar el nuevo pago sobre esa misma factura
+      if (prof.invoice_id) {
+        const invId = prof.invoice_id;
+        await supabase.from("payments").insert({
+          company_id: companyId,
+          invoice_id: invId,
+          amount: payAmount,
+          currency: prof.currency,
+          paid_on: issueDateISO,
+          method: formattedMethod,
+        });
+
+        const { data: pays } = await supabase
+          .from("payments")
+          .select("amount")
+          .eq("invoice_id", invId);
+        const totalPaidSoFar = (pays ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+        const isFullNow = totalPaidSoFar >= totalVal;
+        const newStatus = isFullNow ? "pagada" : "parcial";
+
+        await supabase.from("invoices").update({ status: newStatus }).eq("id", invId);
+        await supabase.from("proformas").update({ status: newStatus, paid_amount: totalPaidSoFar }).eq("id", prof.id);
+
+        await logAuditEvent({
+          action: "abono_proforma_factura",
+          entityType: "pago",
+          entityId: invId,
+          description: `Abono de ${payAmount} ${prof.currency} registrado para Proforma #${prof.number} (Total abonado: ${totalPaidSoFar} / ${totalVal})`,
+          details: { proformaId: prof.id, invoiceId: invId, amount: payAmount, totalPaidSoFar, isFullNow },
+          customUser: {
+            id: ctx.userId,
+            name: ctx.userName,
+            role: ctx.role,
+            companyId: ctx.companyId,
+          },
+        });
+
+        revalidatePath("/proformas");
+        revalidatePath(`/proformas/${prof.id}`);
+        revalidatePath("/cobros");
+        revalidatePath(`/cobros/${invId}`);
+        revalidatePath("/cuentas");
+        revalidatePath("/dashboard");
+        return { ok: true, id: invId };
+      }
+
+      // Si es el PRIMER pago o pago completo directo:
       const { data: company } = await supabase
         .from("companies")
         .select("next_invoice_number")
@@ -1199,10 +1256,9 @@ export async function convertProformaToInvoiceAndPay(
         .single();
       const invoiceNumber = company?.next_invoice_number ?? 1;
 
-      const totalVal = Number(prof.total);
-      const payAmount = input.amount && input.amount > 0 ? input.amount : totalVal;
       const isFullPayment = payAmount >= totalVal;
       const finalStatus: InvoiceStatus = isFullPayment ? "pagada" : "parcial";
+      const profStatus: ProformaStatus = isFullPayment ? "pagada" : "parcial";
 
       // Crear factura pagada/parcial definitiva
       const { data: inv, error: invErr } = await supabase
@@ -1262,7 +1318,7 @@ export async function convertProformaToInvoiceAndPay(
       // Actualizar proforma
       await supabase
         .from("proformas")
-        .update({ status: isFullPayment ? "pagada" : "aprobada", invoice_id: inv.id })
+        .update({ status: profStatus, invoice_id: inv.id, paid_amount: payAmount })
         .eq("id", prof.id);
 
       // Incrementar contador de facturas

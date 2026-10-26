@@ -104,12 +104,16 @@ export function ProformasManager({
     .filter((p) => {
       const clientName = clientMap.get(p.clientId) || "";
       let matchesStatus = true;
+      const paidVal = Number(p.paidAmount) || 0;
+      const isPartial = p.status === "parcial" || (paidVal > 0 && paidVal < p.total);
+      const isPaid = p.status === "pagada" || (paidVal >= p.total && p.total > 0);
+
       if (statusFilter === "pendiente") {
-        matchesStatus = p.status === "pendiente";
+        matchesStatus = !isPaid && !isPartial;
       } else if (statusFilter === "parcial") {
-        matchesStatus = (p.paidAmount !== undefined && p.paidAmount > 0 && p.paidAmount < p.total) || p.status === "aprobada";
+        matchesStatus = isPartial;
       } else if (statusFilter === "pagada") {
-        matchesStatus = p.status === "pagada";
+        matchesStatus = isPaid;
       }
 
       const q = query.toLowerCase().trim();
@@ -127,8 +131,10 @@ export function ProformasManager({
   function startPayProforma(p: Proforma) {
     setOpenMenuId(null);
     setPayingProforma(p);
+    const paidVal = Number(p.paidAmount) || 0;
+    const remaining = Math.max(0, p.total - paidVal);
     setPayType("completo");
-    setPayAmount(p.total);
+    setPayAmount(remaining > 0 ? remaining : p.total);
 
     // Pre-cargar cuenta prevista si existe
     const targetAcc = accounts.find((a) => a.id === p.targetAccountId) || accounts[0];
@@ -426,7 +432,11 @@ export function ProformasManager({
         ) : (
           <div className="divide-y divide-line">
             {filteredProformas.map((p) => {
-              const isPaid = p.status === "pagada";
+              const paidVal = Number(p.paidAmount) || 0;
+              const isPartial = p.status === "parcial" || (paidVal > 0 && paidVal < p.total);
+              const isPaid = p.status === "pagada" || (paidVal >= p.total && p.total > 0);
+              const remaining = Math.max(0, p.total - paidVal);
+              const displayStatus = isPaid ? "pagada" : isPartial ? "parcial" : "pendiente";
               const hasExpectedAccount = Boolean(p.targetAccountName || p.targetAccountId);
               const isMenuOpen = openMenuId === p.id;
 
@@ -448,7 +458,7 @@ export function ProformasManager({
                       <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
                         {p.code || formatEntityCode("Mas-Corp-Prof-", Number(p.number), 4)}
                       </span>
-                      <StatusBadge status={p.status as any} />
+                      <StatusBadge status={displayStatus} />
                     </div>
                     <p className="truncate text-xs text-hint mt-0.5">
                       {clientMap.get(p.clientId) || "Cliente General"} · Emisión:{" "}
@@ -467,9 +477,17 @@ export function ProformasManager({
                       <span className={`tnum text-sm font-bold ${!isPaid ? "text-pending" : "text-foreground"}`}>
                         {formatMoney(p.total)}
                       </span>
-                      {!isPaid && (
+                      {isPartial ? (
+                        <span className="block text-[10px] text-accent font-semibold">
+                          Abonado: {formatMoney(paidVal)} · Resta: {formatMoney(remaining)}
+                        </span>
+                      ) : !isPaid ? (
                         <span className="block text-[10px] text-pending font-medium">
                           En espera de pago
+                        </span>
+                      ) : (
+                        <span className="block text-[10px] text-income font-medium">
+                          ✓ Pagada 100%
                         </span>
                       )}
                     </div>
@@ -497,7 +515,7 @@ export function ProformasManager({
                               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left font-semibold text-accent hover:bg-accent/10 transition-colors"
                             >
                               <PlusIcon className="h-4 w-4" />
-                              <span>Marcar como Pagada</span>
+                              <span>{isPartial ? "Abonar / Pagar Saldo" : "Marcar como Pagada"}</span>
                             </button>
                           )}
 
@@ -584,7 +602,9 @@ export function ProformasManager({
                     type="button"
                     onClick={() => {
                       setPayType("completo");
-                      setPayAmount(payingProforma.total);
+                      const paidVal = Number(payingProforma.paidAmount) || 0;
+                      const remaining = Math.max(0, payingProforma.total - paidVal);
+                      setPayAmount(remaining > 0 ? remaining : payingProforma.total);
                     }}
                     className={`rounded-xl border p-2 text-center transition-all ${
                       payType === "completo"
@@ -598,7 +618,9 @@ export function ProformasManager({
                     type="button"
                     onClick={() => {
                       setPayType("parcial");
-                      setPayAmount(payingProforma.total / 2);
+                      const paidVal = Number(payingProforma.paidAmount) || 0;
+                      const remaining = Math.max(0, payingProforma.total - paidVal);
+                      setPayAmount(remaining > 0 ? remaining / 2 : payingProforma.total / 2);
                     }}
                     className={`rounded-xl border p-2 text-center transition-all ${
                       payType === "parcial"
@@ -622,6 +644,9 @@ export function ProformasManager({
                 />
                 <p className="text-[11px] text-hint mt-1">
                   Total de la proforma: {formatMoney(payingProforma.total)}
+                  {(Number(payingProforma.paidAmount) || 0) > 0 && (
+                    <> · Ya abonado: <strong className="text-foreground">{formatMoney(Number(payingProforma.paidAmount))}</strong> · Saldo pendiente: <strong className="text-accent">{formatMoney(Math.max(0, payingProforma.total - Number(payingProforma.paidAmount)))}</strong></>
+                  )}
                 </p>
               </div>
 

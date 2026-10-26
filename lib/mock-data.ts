@@ -120,7 +120,7 @@ export const invoices: Invoice[] = [
 
 /* ----------------------------- Proformas ---------------------------- */
 
-export type ProformaStatus = "pendiente" | "aprobada" | "pagada" | "anulada";
+export type ProformaStatus = "pendiente" | "parcial" | "aprobada" | "pagada" | "anulada";
 
 export interface Proforma {
   id: string;
@@ -170,6 +170,17 @@ export interface Expense {
   vesRate?: number | null;
   vesRateRef?: string | null;
   vesTotal?: number | null;
+  status?: "pendiente" | "parcial" | "pagado";
+  paidAmount?: number;
+  payments?: Array<{
+    id: string;
+    amount: number;
+    paidOn: string;
+    method?: string;
+    accountName?: string;
+    reference?: string;
+    notes?: string;
+  }>;
 }
 
 export const expenses: Expense[] = [];

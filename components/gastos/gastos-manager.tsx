@@ -9,6 +9,7 @@ import { deleteExpense, updateExpense } from "@/lib/mutations";
 import { exportExpenseVoucherPdf } from "@/lib/pdf-export";
 import { DownloadIcon, SearchIcon, ReceiptIcon, EditIcon, PlusIcon } from "@/components/ui/icons";
 import { MoneyInput } from "@/components/ui/money-input";
+import { StatusBadge } from "@/components/cobros/status-badge";
 import type { Expense } from "@/lib/mock-data";
 import type { CompanyAccount } from "@/lib/cuentas-actions";
 import { getPaymentMethodsForAccount, getExpenseBreakdown, isExcludedFromExpenseTotals } from "@/lib/cuentas-helpers";
@@ -31,6 +32,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
+  const [statusFilter, setStatusFilter] = useState<string>("todas");
   const [activeExpense, setActiveExpense] = useState<Expense | null>(null);
 
   // Estado para modal de edición
@@ -66,6 +68,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
 
   const filtered = expenses
     .filter((e) => {
+      const breakdown = getExpenseBreakdown(e);
       const matchesCat =
         selectedCategory === "todas" ||
         (e.category || "General").toLowerCase() === selectedCategory.toLowerCase();
@@ -75,7 +78,17 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
         (e.note || "").toLowerCase().includes(q) ||
         (e.code || "").toLowerCase().includes(q) ||
         (e.category || "").toLowerCase().includes(q);
-      return matchesCat && matchesQuery;
+
+      let matchesStatus = true;
+      if (statusFilter === "pendiente") {
+        matchesStatus = breakdown.isPending && !breakdown.isPartial;
+      } else if (statusFilter === "parcial") {
+        matchesStatus = breakdown.isPartial;
+      } else if (statusFilter === "pagado") {
+        matchesStatus = !breakdown.isPending;
+      }
+
+      return matchesCat && matchesQuery && matchesStatus;
     })
     .sort((a, b) => {
       if (b.code && a.code && b.code !== a.code) {
@@ -279,12 +292,53 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
     setPayError(null);
 
     const selectedAcc = accounts.find((a) => a.id === payAccountId);
-    const cleanBaseNote = payingExpense.note.replace(/\s*\[.*?\]\s*$/, "").trim();
     const breakdown = getExpenseBreakdown(payingExpense);
-
-    let newNote = cleanBaseNote;
     const currentPending = breakdown.pendingAmount > 0 ? breakdown.pendingAmount : payingExpense.amount;
     const currentPaid = breakdown.paidAmount;
+
+    // Extraer historial previo
+    const matchHist = (payingExpense.note || "").match(/\[HistorialPagos:\s*(\[[\s\S]*?\])\]/);
+    let history: Array<{
+      id: string;
+      amount: number;
+      paidOn: string;
+      method?: string;
+      accountName?: string;
+      reference?: string;
+      notes?: string;
+    }> = [];
+
+    if (matchHist) {
+      try {
+        history = JSON.parse(matchHist[1]);
+      } catch {}
+    } else if (currentPaid > 0) {
+      history.push({
+        id: `pay_${Date.now()}_prev`,
+        amount: currentPaid,
+        paidOn: payingExpense.date || new Date().toISOString().slice(0, 10),
+        method: "Abono anterior",
+        notes: "Abono inicial registrado",
+      });
+    }
+
+    history.push({
+      id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      amount: payAmount,
+      paidOn: new Date().toISOString().slice(0, 10),
+      method: payMethod || "Abono / Pago de Gasto",
+      accountName: selectedAcc ? selectedAcc.name : undefined,
+      reference: payReference.trim() || undefined,
+      notes: payNote.trim() || undefined,
+    });
+
+    const histTag = `[HistorialPagos: ${JSON.stringify(history)}]`;
+    const cleanBaseNote = payingExpense.note
+      .replace(/\[HistorialPagos:[\s\S]*?\]/gi, "")
+      .replace(/\s*\[.*?\]\s*$/, "")
+      .trim();
+
+    let newNote = cleanBaseNote;
 
     if (payAmount >= currentPending) {
       // Pago completo de la totalidad / saldo pendiente
@@ -292,7 +346,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
       if (selectedAcc?.name) metaParts.push(`Pagado desde ${selectedAcc.name}`);
       if (payReference.trim()) metaParts.push(`Ref: ${payReference.trim()}`);
       if (payNote.trim()) metaParts.push(`"${payNote.trim()}"`);
-      newNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
+      newNote = `${cleanBaseNote} [${metaParts.join(" · ")}] ${histTag}`;
     } else {
       // Abono parcial
       const totalPaidSoFar = currentPaid + payAmount;
@@ -302,7 +356,7 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
       if (payReference.trim()) metaParts.push(`Ref: ${payReference.trim()}`);
       metaParts.push(`Pendiente ${formatMoney(newRemaining)}`);
       if (payNote.trim()) metaParts.push(`"${payNote.trim()}"`);
-      newNote = `${cleanBaseNote} [${metaParts.join(" · ")}]`;
+      newNote = `${cleanBaseNote} [${metaParts.join(" · ")}] ${histTag}`;
     }
 
     startTransition(async () => {
@@ -327,6 +381,40 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
 
   return (
     <div className="space-y-4">
+      {/* Filtros de Estado: Todas, Por Pagar, Parciales, Pagadas */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        {[
+          { id: "todas", label: "Todas" },
+          { id: "pendiente", label: "Por Pagar (Pendientes)" },
+          { id: "parcial", label: "Parciales (Abonadas)" },
+          { id: "pagado", label: "Pagadas" },
+        ].map((tab) => {
+          const count = expenses.filter((e) => {
+            const b = getExpenseBreakdown(e);
+            if (tab.id === "todas") return true;
+            if (tab.id === "pendiente") return b.isPending && !b.isPartial;
+            if (tab.id === "parcial") return b.isPartial;
+            if (tab.id === "pagado") return !b.isPending;
+            return true;
+          }).length;
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setStatusFilter(tab.id)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all ${
+                statusFilter === tab.id
+                  ? "bg-accent text-white shadow-sm"
+                  : "bg-soft border border-line text-muted hover:text-foreground"
+              }`}
+            >
+              {tab.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       {/* Barra de Búsqueda y Filtros de Categoría */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -402,16 +490,10 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
                       <span className="rounded-full bg-soft font-mono px-2 py-0.5 text-[10px] font-semibold text-muted">
                         {e.code || "Mas-Corp-0001"}
                       </span>
-                      {isPending && (
+                      <StatusBadge status={breakdown.isPartial ? "parcial" : isPending ? "pendiente" : "pagado"} />
+                      {breakdown.isPartial && (
                         <span className="rounded-full bg-pending/15 text-pending font-semibold px-2 py-0.5 text-[10px]">
-                          {breakdown.isPartial
-                            ? `Parcial · Pendiente ${formatMoney(breakdown.pendingAmount)}`
-                            : "Por Pagar / Pendiente"}
-                        </span>
-                      )}
-                      {!isPending && (
-                        <span className="rounded-full bg-income/10 text-income font-semibold px-2 py-0.5 text-[10px]">
-                          Pagado
+                          Pendiente {formatMoney(breakdown.pendingAmount)}
                         </span>
                       )}
                       {isExcludedFromExpenseTotals(e) ? (
@@ -1074,71 +1156,174 @@ export function GastosManager({ expenses, accounts = [], bcv, admin }: GastosMan
       )}
 
       {/* Modal de Detalle de Gasto */}
-      {activeExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-line bg-card p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-line pb-3">
-              <div className="flex items-center gap-2">
-                <ReceiptIcon className="h-5 w-5 text-overdue" />
-                <h3 className="font-serif text-base font-semibold">
-                  Comprobante de Egreso
-                </h3>
-              </div>
-              <span className="rounded-full bg-soft font-mono px-2.5 py-1 text-xs font-bold text-accent">
-                {activeExpense.code || "Mas-Corp-0001"}
-              </span>
-            </div>
+      {activeExpense && (() => {
+        const breakdown = getExpenseBreakdown(activeExpense);
+        let paymentsList: Array<{
+          id: string;
+          amount: number;
+          paidOn: string;
+          method?: string;
+          accountName?: string;
+          reference?: string;
+          notes?: string;
+        }> = (activeExpense as any).payments || [];
 
-            <div className="space-y-2.5 text-xs">
-              <div>
-                <span className="text-muted">Concepto / Detalle:</span>
-                <p className="text-sm font-medium text-foreground mt-0.5">
-                  {activeExpense.note}
-                </p>
-              </div>
+        if (paymentsList.length === 0) {
+          const matchHist = (activeExpense.note || "").match(/\[HistorialPagos:\s*(\[[\s\S]*?\])\]/);
+          if (matchHist) {
+            try { paymentsList = JSON.parse(matchHist[1]); } catch {}
+          } else if (breakdown.paidAmount > 0) {
+            paymentsList = [{
+              id: "prev_pay_1",
+              amount: breakdown.paidAmount,
+              paidOn: activeExpense.date || new Date().toISOString().slice(0, 10),
+              method: "Abono / Pago previo",
+              notes: "Pago registrado previamente",
+            }];
+          }
+        }
 
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div>
-                  <span className="text-muted">Categoría:</span>
-                  <p className="font-medium text-foreground">{activeExpense.category}</p>
+        const cleanNoteText = activeExpense.note
+          .replace(/\[HistorialPagos:[\s\S]*?\]/gi, "")
+          .trim();
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="w-full max-w-lg rounded-3xl border border-line bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-line pb-3">
+                <div className="flex items-center gap-2">
+                  <ReceiptIcon className="h-5 w-5 text-accent" />
+                  <h3 className="font-serif text-base font-semibold">
+                    Comprobante de Egreso
+                  </h3>
                 </div>
-                <div>
-                  <span className="text-muted">Fecha de Registro:</span>
-                  <p className="font-medium text-foreground">{formatDate(activeExpense.date)}</p>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-soft font-mono px-2.5 py-1 text-xs font-bold text-accent">
+                    {activeExpense.code || "Mas-Corp-0001"}
+                  </span>
+                  <StatusBadge status={breakdown.isPartial ? "parcial" : breakdown.isPending ? "pendiente" : "pagado"} />
                 </div>
               </div>
 
-              <div className="rounded-xl bg-soft p-3 text-center border border-line">
-                <span className="text-[11px] text-muted">Monto Contabilizado</span>
-                <p className="text-xl font-bold text-overdue mt-0.5">
-                  − {formatMoney(activeExpense.amount)}
-                </p>
-              </div>
-            </div>
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-muted block text-[11px] font-semibold">Concepto / Detalle:</span>
+                  <p className="text-sm font-medium text-foreground mt-0.5 whitespace-pre-line">
+                    {cleanNoteText}
+                  </p>
+                </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
-              <button
-                type="button"
-                onClick={() => setActiveExpense(null)}
-                className="rounded-xl border border-line px-4 py-2 text-xs font-medium text-muted hover:text-foreground hover:bg-soft"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  exportExpenseVoucherPdf(activeExpense);
-                  setActiveExpense(null);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-accent/90"
-              >
-                <DownloadIcon className="h-3.5 w-3.5" />
-                <span>Descargar Comprobante PDF</span>
-              </button>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="rounded-xl border border-line bg-soft/30 p-2.5">
+                    <span className="text-muted text-[11px] block">Categoría:</span>
+                    <p className="font-semibold text-foreground text-xs mt-0.5">{activeExpense.category}</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-soft/30 p-2.5">
+                    <span className="text-muted text-[11px] block">Fecha de Registro:</span>
+                    <p className="font-semibold text-foreground text-xs mt-0.5">{formatDate(activeExpense.date)}</p>
+                  </div>
+                </div>
+
+                {/* Resumen de Montos */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-soft p-2.5 text-center border border-line">
+                    <span className="text-[10px] text-muted block uppercase tracking-wider font-semibold">Total Gasto</span>
+                    <p className="text-sm font-bold text-foreground mt-0.5 font-mono">
+                      {formatMoney(activeExpense.amount)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-income/10 p-2.5 text-center border border-income/20">
+                    <span className="text-[10px] text-income block uppercase tracking-wider font-semibold">Abonado</span>
+                    <p className="text-sm font-bold text-income mt-0.5 font-mono">
+                      {formatMoney(breakdown.paidAmount)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-pending/10 p-2.5 text-center border border-pending/20">
+                    <span className="text-[10px] text-pending block uppercase tracking-wider font-semibold">Saldo Pendiente</span>
+                    <p className="text-sm font-bold text-pending mt-0.5 font-mono">
+                      {formatMoney(breakdown.pendingAmount)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Historial de Pagos & Abonos */}
+                {paymentsList.length > 0 && (
+                  <div className="space-y-2 pt-1 border-t border-line">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-foreground text-xs uppercase tracking-wider">
+                        Historial de Pagos & Abonos ({paymentsList.length})
+                      </span>
+                      <span className="text-[11px] text-muted font-medium">
+                        {breakdown.isPending ? `Resta: ${formatMoney(breakdown.pendingAmount)}` : "Liquidado"}
+                      </span>
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-xl border border-line bg-soft/20 p-2">
+                      {paymentsList.map((p, idx) => (
+                        <div key={p.id || idx} className="flex items-center justify-between p-2 rounded-lg bg-card border border-line/60 text-xs shadow-xs">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-foreground">Abono #{idx + 1}</span>
+                              <span className="text-hint font-mono text-[10px]">· {formatDate(p.paidOn)}</span>
+                            </div>
+                            <p className="text-[11px] text-muted mt-0.5">
+                              {p.accountName ? `Desde ${p.accountName}` : p.method || "Transferencia"}
+                              {p.reference ? ` · Ref: ${p.reference}` : ""}
+                              {p.notes ? ` · "${p.notes}"` : ""}
+                            </p>
+                          </div>
+                          <span className="tnum font-bold text-income font-mono text-sm whitespace-nowrap ml-2">
+                            + {formatMoney(p.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-line">
+                <div>
+                  {breakdown.isPending && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = activeExpense;
+                        setActiveExpense(null);
+                        startPayExpense(target);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 active:scale-95 transition-all"
+                    >
+                      <PlusIcon className="h-3.5 w-3.5" />
+                      <span>Abonar / Pagar Saldo</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveExpense(null)}
+                    className="rounded-xl border border-line px-3.5 py-2 text-xs font-medium text-muted hover:text-foreground hover:bg-soft"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportExpenseVoucherPdf(activeExpense);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent/10 px-3.5 py-2 text-xs font-semibold text-accent hover:bg-accent hover:text-white transition-all shadow-sm"
+                  >
+                    <DownloadIcon className="h-3.5 w-3.5" />
+                    <span>PDF</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -28,7 +28,10 @@ export default async function ProformaDetailPage({
   if (!prof) notFound();
 
   const isForeign = prof.currency !== "VES";
-  const isPaid = prof.status === "pagada";
+  const paidVal = Number(prof.paidTotal || prof.paidAmount) || 0;
+  const isPartial = prof.status === "parcial" || (paidVal > 0 && paidVal < prof.total);
+  const isPaid = prof.status === "pagada" || (paidVal >= prof.total && prof.total > 0);
+  const remainingBalance = Math.max(0, prof.total - paidVal);
 
   const parsedNotes = cleanConceptAndNotes(prof.notes);
   const generalProjectConcept = parsedNotes.title;
@@ -202,6 +205,50 @@ export default async function ProformaDetailPage({
         )}
       </section>
 
+      {/* Historial de Pagos & Abonos */}
+      {prof.payments && prof.payments.length > 0 && (
+        <section className="rounded-2xl border border-line bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-line pb-2">
+            <div>
+              <h2 className="font-semibold text-foreground text-xs uppercase tracking-wider">
+                Historial de Pagos & Abonos ({prof.payments.length})
+              </h2>
+              <p className="text-[11px] text-muted">
+                Registro de abonos recibidos y aplicados a esta proforma
+              </p>
+            </div>
+            <StatusBadge status={prof.status as any} />
+          </div>
+
+          <div className="divide-y divide-line/60">
+            {prof.payments.map((p, idx) => (
+              <div key={p.id || idx} className="flex items-center justify-between py-2 text-xs">
+                <div>
+                  <span className="font-medium text-foreground">
+                    Abono #{idx + 1} · {formatDate(p.paidOn)}
+                  </span>
+                  <span className="text-muted ml-2">
+                    · {p.method || "Abono / Pago"}
+                  </span>
+                </div>
+                <span className="tnum font-bold text-income">
+                  + {formatCurrency(p.amount, prof.currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-2 border-t border-line flex items-center justify-between text-xs">
+            <span className="text-muted font-medium">
+              Total Abonado: <strong className="text-income">{formatCurrency(paidVal, prof.currency)}</strong>
+            </span>
+            <span className="font-medium text-pending">
+              Saldo Pendiente: <strong>{formatCurrency(remainingBalance, prof.currency)}</strong>
+            </span>
+          </div>
+        </section>
+      )}
+
       {/* Acciones de Cobro y Factura */}
       <section className="rounded-2xl border border-line bg-card p-5 space-y-4">
         <h3 className="text-xs font-bold uppercase tracking-wider text-hint">
@@ -211,9 +258,9 @@ export default async function ProformaDetailPage({
         {isPaid ? (
           <div className="rounded-xl bg-income/10 border border-income/20 p-4 text-xs font-medium text-income flex items-center justify-between">
             <div>
-              <p className="font-bold">✓ Proforma Cobrada y Acreditada</p>
+              <p className="font-bold">✓ Proforma Cobrada y Acreditada (100% Pagada)</p>
               <p className="text-[11px] text-muted mt-0.5">
-                Esta proforma ya fue pagada y convertida en factura oficial.
+                Esta proforma ya fue liquidada en su totalidad y convertida en factura oficial.
               </p>
             </div>
             {prof.invoiceId && (
@@ -224,6 +271,48 @@ export default async function ProformaDetailPage({
                 Ver Factura Generada
               </Link>
             )}
+          </div>
+        ) : isPartial ? (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-accent/10 border border-accent/20 p-4 text-xs font-medium text-accent flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <p className="font-bold">⚠️ Proforma Parcialmente Pagada</p>
+                <p className="text-[11px] text-muted mt-0.5">
+                  Se ha registrado un abono de {formatCurrency(paidVal, prof.currency)}. Saldo restante: <strong>{formatCurrency(remainingBalance, prof.currency)}</strong>.
+                </p>
+              </div>
+              {prof.invoiceId && (
+                <Link
+                  href={`/cobros/${prof.invoiceId}`}
+                  className="rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-accent/90 whitespace-nowrap self-start sm:self-auto"
+                >
+                  Ver Factura de Cobro
+                </Link>
+              )}
+            </div>
+
+            <ProformasManager
+              proformas={[
+                {
+                  id: prof.id,
+                  number: String(prof.number),
+                  code: prof.code,
+                  clientId: prof.clientId,
+                  date: prof.date,
+                  total: prof.total,
+                  currency: prof.currency,
+                  status: prof.status,
+                  notes: prof.notes,
+                  paidAmount: paidVal,
+                  invoiceId: prof.invoiceId,
+                  targetAccountId: prof.targetAccountId,
+                  targetAccountName: prof.targetAccountName,
+                },
+              ]}
+              clients={[{ id: prof.clientId, name: prof.clientName, rif: "", score: 100, termDays: 0, balance: 0 }]}
+              accounts={accounts}
+              admin={admin}
+            />
           </div>
         ) : (
           <div className="space-y-3">
