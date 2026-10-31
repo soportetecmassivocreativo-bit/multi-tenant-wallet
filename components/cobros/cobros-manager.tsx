@@ -924,8 +924,8 @@ export function CobrosManager({
               <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-foreground block">Condiciones del Proyecto</span>
-                    <span className="text-[11px] text-muted">Incluye forma de pago, tiempos de entrega, propiedad intelectual y confidencialidad</span>
+                    <span className="text-xs font-bold text-foreground block">Condiciones de la Factura</span>
+                    <span className="text-[11px] text-muted">Cuadro editable con las condiciones comerciales aplicables a este cobro</span>
                   </div>
                   <input
                     type="checkbox"
@@ -936,43 +936,17 @@ export function CobrosManager({
                 </div>
 
                 {editHasConditions && (
-                  <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground mb-0.5">Forma de Pago:</label>
-                      <textarea
-                        rows={2}
-                        value={editCondPayment}
-                        onChange={(e) => setEditCondPayment(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground mb-0.5">Tiempo de entrega:</label>
-                      <textarea
-                        rows={2}
-                        value={editCondDelivery}
-                        onChange={(e) => setEditCondDelivery(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground mb-0.5">Propiedad Intelectual:</label>
-                      <textarea
-                        rows={2}
-                        value={editCondIP}
-                        onChange={(e) => setEditCondIP(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-foreground mb-0.5">Confidencialidad:</label>
-                      <textarea
-                        rows={2}
-                        value={editCondConfidentiality}
-                        onChange={(e) => setEditCondConfidentiality(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
+                  <div className="space-y-2 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+                    <label className="block text-[11px] font-semibold text-foreground">
+                      Términos y Condiciones Comerciales:
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editConditionsText}
+                      onChange={(e) => setEditConditionsText(e.target.value)}
+                      placeholder="Escribe aquí las condiciones de la factura (forma de pago, tiempos de entrega, acuerdos)..."
+                      className="w-full rounded-xl border border-line bg-card p-3 text-xs leading-relaxed outline-none focus:border-accent font-mono"
+                    />
                   </div>
                 )}
               </div>

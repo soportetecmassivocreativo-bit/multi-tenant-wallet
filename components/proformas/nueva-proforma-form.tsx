@@ -234,10 +234,7 @@ export function NuevaProformaForm({
         hasConditions,
         conditions: hasConditions
           ? {
-              payment: condPayment.trim(),
-              delivery: condDelivery.trim(),
-              ip: condIP.trim(),
-              confidentiality: condConfidentiality.trim(),
+              text: conditionsText.trim(),
             }
           : undefined,
       });
@@ -652,7 +649,7 @@ export function NuevaProformaForm({
           <div className="flex items-center justify-between">
             <div>
               <span className="text-xs font-bold text-foreground block">Condiciones del Proyecto</span>
-              <span className="text-[11px] text-muted">Incluye forma de pago, tiempos de entrega y confidencialidad en el documento</span>
+              <span className="text-[11px] text-muted">Cuadro editable con las condiciones comerciales del presupuesto</span>
             </div>
             <input
               type="checkbox"
@@ -663,43 +660,17 @@ export function NuevaProformaForm({
           </div>
 
           {hasConditions && (
-            <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
-              <div>
-                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Forma de Pago:</label>
-                <textarea
-                  rows={2}
-                  value={condPayment}
-                  onChange={(e) => setCondPayment(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Tiempo de entrega:</label>
-                <textarea
-                  rows={2}
-                  value={condDelivery}
-                  onChange={(e) => setCondDelivery(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Propiedad Intelectual:</label>
-                <textarea
-                  rows={2}
-                  value={condIP}
-                  onChange={(e) => setCondIP(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-foreground mb-0.5">Confidencialidad:</label>
-                <textarea
-                  rows={2}
-                  value={condConfidentiality}
-                  onChange={(e) => setCondConfidentiality(e.target.value)}
-                  className={inputClass}
-                />
-              </div>
+            <div className="space-y-2 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+              <label className="block text-[11px] font-semibold text-foreground">
+                Términos y Condiciones del Proyecto:
+              </label>
+              <textarea
+                rows={6}
+                value={conditionsText}
+                onChange={(e) => setConditionsText(e.target.value)}
+                placeholder="Escribe aquí las condiciones del proyecto (forma de pago, tiempos de entrega, acuerdos)..."
+                className="w-full rounded-xl border border-line bg-card p-3 text-xs leading-relaxed outline-none focus:border-accent font-mono"
+              />
             </div>
           )}
         </div>

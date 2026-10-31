@@ -976,62 +976,36 @@ export function ProformasManager({
                     </div>
                   </div>
 
-                  {/* Condiciones Estructuradas del Proyecto */}
-                  <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-foreground block">Condiciones del Proyecto</span>
-                        <span className="text-[11px] text-muted">Incluye forma de pago, tiempos de entrega, propiedad intelectual y confidencialidad</span>
+                    {/* Condiciones Estructuradas del Proyecto */}
+                    <div className="rounded-xl border border-line bg-soft/20 p-3.5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-foreground block">Condiciones del Proyecto</span>
+                          <span className="text-[11px] text-muted">Cuadro editable con las condiciones aplicables a este presupuesto</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={editHasConditions}
+                          onChange={(e) => setEditHasConditions(e.target.checked)}
+                          className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
+                        />
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={editHasConditions}
-                        onChange={(e) => setEditHasConditions(e.target.checked)}
-                        className="h-4 w-4 rounded text-accent focus:ring-accent cursor-pointer"
-                      />
-                    </div>
 
-                    {editHasConditions && (
-                      <div className="space-y-3 pt-2 border-t border-line/60 animate-in fade-in duration-150">
-                        <div>
-                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Forma de Pago:</label>
+                      {editHasConditions && (
+                        <div className="space-y-2 pt-2 border-t border-line/60 animate-in fade-in duration-150">
+                          <label className="block text-[11px] font-semibold text-foreground">
+                            Términos y Condiciones del Proyecto:
+                          </label>
                           <textarea
-                            rows={2}
-                            value={editCondPayment}
-                            onChange={(e) => setEditCondPayment(e.target.value)}
-                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+                            rows={6}
+                            value={editConditionsText}
+                            onChange={(e) => setEditConditionsText(e.target.value)}
+                            placeholder="Escribe aquí las condiciones del proyecto (forma de pago, tiempos de entrega, acuerdos)..."
+                            className="w-full rounded-xl border border-line bg-card p-3 text-xs leading-relaxed outline-none focus:border-accent font-mono"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Tiempo de entrega:</label>
-                          <textarea
-                            rows={2}
-                            value={editCondDelivery}
-                            onChange={(e) => setEditCondDelivery(e.target.value)}
-                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Propiedad Intelectual:</label>
-                          <textarea
-                            rows={2}
-                            value={editCondIP}
-                            onChange={(e) => setEditCondIP(e.target.value)}
-                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-foreground mb-0.5">Confidencialidad:</label>
-                          <textarea
-                            rows={2}
-                            value={editCondConfidentiality}
-                            onChange={(e) => setEditCondConfidentiality(e.target.value)}
-                            className="w-full rounded-xl border border-line bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
                   {/* Notas / Observaciones */}
                   <div>
